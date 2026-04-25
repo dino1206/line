@@ -303,7 +303,7 @@
             text-decoration: none;
             font-weight: 600;
             font-size: 0.85rem;
-            z-index: 200; /* 高於畫布和操作面板 */
+            z-index: 200;
             transition: all 0.3s ease;
             border: 1px solid rgba(0,0,0,0.05);
         }
@@ -326,7 +326,7 @@
                 <i class="fa-solid fa-wand-magic-sparkles"></i>
                 <div>
                     <h1>簡單的圖片工具</h1>
-                    <p>裁切・去背・網格對齊・標註，一頁搞定</p>
+                    <p>裁切・去背・網格對齊・標註變形</p>
                 </div>
             </div>
             <div class="header-actions">
@@ -340,7 +340,7 @@
         <main class="workspace">
             <aside class="sidebar">
                 
-                <!-- 1. 智慧去背/填色 (置頂區塊) -->
+                <!-- 1. 智慧去背/填色 -->
                 <div class="sticky-section">
                     <h3><i class="fa-solid fa-fill-drip"></i> 1. 智慧去背 / 填色</h3>
                     <button id="btn-wand-toggle" class="btn btn-outline w-100" disabled>
@@ -395,7 +395,7 @@
                     </div>
                 </div>
 
-                <!-- 2. 畫布規格 (改為下拉選單) -->
+                <!-- 2. 畫布規格 -->
                 <div class="section">
                     <h3><i class="fa-solid fa-crop-simple"></i> 2. 畫布規格</h3>
                     <select id="preset-size" class="btn btn-outline w-100 form-select">
@@ -491,12 +491,30 @@
                                 <input type="range" id="font-size" min="10" max="200" value="30" style="width:90px;flex:none">
                             </div>
                             <div class="form-row">
+                                <label>水平斜角：<span id="text-skew-x-val">0</span>°</label>
+                                <input type="range" id="text-skew-x" min="-60" max="60" value="0" style="width:90px;flex:none">
+                            </div>
+                            <div class="form-row">
+                                <label>垂直斜角：<span id="text-skew-y-val">0</span>°</label>
+                                <input type="range" id="text-skew-y" min="-60" max="60" value="0" style="width:90px;flex:none">
+                            </div>
+                            <div class="form-row">
                                 <label>顏色</label>
                                 <input type="color" id="text-color" class="color-picker" value="#000000">
                             </div>
                         </div>
+                        
                         <div class="section-divider"></div>
-                        <div class="form-row" style="margin-top:8px"><label>旋轉角度</label></div>
+                        
+                        <div class="form-row align-center mt-2 mb-2">
+                            <label>顯示立體陰影</label>
+                            <label class="switch">
+                                <input type="checkbox" id="anno-shadow" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-row" style="margin-top:8px"><label>整體旋轉</label></div>
                         <div class="angle-wheel">
                             <input type="range" id="anno-angle" min="0" max="360" value="0" step="15">
                             <div class="angle-display"><span id="anno-angle-val">0</span>°</div>
@@ -510,6 +528,17 @@
                 <!-- 6. 完成匯出 -->
                 <div class="section mt-auto">
                     <h3><i class="fa-solid fa-cloud-arrow-down"></i> 6. 完成匯出</h3>
+                    
+                    <div class="form-row mb-2 mt-2">
+                        <label>存檔格式</label>
+                        <select id="export-format" class="btn btn-outline btn-sm form-select" style="padding:2px 8px; width:140px;">
+                            <option value="image/png">PNG (保留透明底)</option>
+                            <option value="image/jpeg">JPEG (無透明底)</option>
+                            <option value="image/gif">GIF (單格靜態圖)</option>
+                            <option value="image/webp">WEBP (高壓縮比)</option>
+                        </select>
+                    </div>
+                    
                     <div class="export-info mb-2">
                         <div>輸出尺寸：<b id="stat-size">370 × 320 px</b></div>
                         <div>安全邊距：<b>10 px</b></div>
@@ -559,7 +588,7 @@
                     </div>
                 </div>
 
-                <!-- 新增：贊助連結按鈕 -->
+                <!-- 贊助連結按鈕 -->
                 <a href="https://store.line.me/stickershop/author/61922/zh-Hant" target="_blank" class="sponsor-btn" title="喜歡這個工具嗎？來看看我的原創貼圖吧！">
                     <i class="fa-solid fa-mug-hot" style="color: #FF9500;"></i>
                     <span>贊助開發者 (逛貼圖)</span>
@@ -589,10 +618,10 @@
                         <b>移動圖片</b>：拖曳圖片本身，裁切框完美跟隨。<br>
                         <b>調整選區</b>：切換模式後拖曳邊框，圖片不動。<br><br>
                         <b>標註與磁吸</b>：拖曳藍點移動位置。開啟「磁吸」時，會自動吸附網格與中心點，角度以 15 度為單位。<br>
+                        <b>立體與變形</b>：文字可獨立調整傾斜角度，支援動態陰影效果。<br>
                         <b>去背/填色</b>：切換模式。魔術棒可點擊透明處填色，新增「畫筆工具」可自由塗抹 (支援快捷鍵 <kbd>[</kbd> <kbd>]</kbd> 調整筆刷)。<br>
                         <b>滴管取色</b>：點擊後可於畫布上點選精準取色。<br>
-                        <b>復原</b>：<kbd>Ctrl+Z</kbd> / <b>重做</b>：<kbd>Ctrl+Y</kbd><br>
-                        <b>縮放</b>：滾輪 / 雙指捏合。（選區同步鎖定）
+                        <b>復原</b>：<kbd>Ctrl+Z</kbd> / <b>重做</b>：<kbd>Ctrl+Y</kbd>
                     </div>
                 </div>
             </aside>
@@ -693,10 +722,104 @@
             arrowSize:        $('arrow-size'),        arrowSizeVal:     $('arrow-size-val'),
             textContent:      $('text-content'),      textFont:         $('text-font'),
             fontSize:         $('font-size'),         fontSizeVal:      $('font-size-val'),
+            
+            textSkewX:        $('text-skew-x'),       textSkewXVal:     $('text-skew-x-val'),
+            textSkewY:        $('text-skew-y'),       textSkewYVal:     $('text-skew-y-val'),
+            
+            annoShadow:       $('anno-shadow'),
+            
             textColor:        $('text-color'),
             annoAngle:        $('anno-angle'),        annoAngleVal:     $('anno-angle-val'),
             btnDeleteAnno:    $('btn-delete-anno'),
+
+            // 匯出格式
+            exportFormat:     $('export-format'),
         };
+
+        /* ══ 本地儲存：全域狀態記憶引擎 ══ */
+        function loadSettings() {
+            const saved = localStorage.getItem('simpleImgEditorSettings');
+            if (saved) {
+                try {
+                    const settings = JSON.parse(saved);
+                    
+                    if (settings.presetSize) DOM.presetSize.value = settings.presetSize;
+                    if (settings.customW) DOM.customW.value = settings.customW;
+                    if (settings.customH) DOM.customH.value = settings.customH;
+                    
+                    if (settings.tolerance) {
+                        DOM.tolerance.value = settings.tolerance;
+                        DOM.tolVal.textContent = settings.tolerance;
+                    }
+                    if (settings.contiguous !== undefined) DOM.contiguous.checked = settings.contiguous;
+                    if (settings.limitToCrop !== undefined) DOM.limitToCrop.checked = settings.limitToCrop;
+                    if (settings.brushSize) {
+                        DOM.brushSize.value = settings.brushSize;
+                        DOM.brushSizeVal.textContent = settings.brushSize;
+                    }
+                    
+                    if (settings.borderRadius) {
+                        DOM.borderRadius.value = settings.borderRadius;
+                        DOM.radiusVal.textContent = settings.borderRadius;
+                    }
+                    
+                    if (settings.showGrid !== undefined) DOM.showGrid.checked = settings.showGrid;
+                    if (settings.snapGrid !== undefined) {
+                        DOM.snapGrid.checked = settings.snapGrid;
+                        DOM.annoAngle.step = settings.snapGrid ? 15 : 1;
+                    }
+                    if (settings.gridSize) {
+                        DOM.gridSize.value = settings.gridSize;
+                        DOM.gridSizeVal.textContent = settings.gridSize;
+                    }
+                    
+                    if (settings.exportFormat) DOM.exportFormat.value = settings.exportFormat;
+                    if (settings.previewBg) DOM.previewBg.value = settings.previewBg;
+
+                    // 觸發初始版面邏輯
+                    DOM.previewBox.style.background = DOM.previewBg.value === 'transparent' ? '' : DOM.previewBg.value;
+                    
+                    if (DOM.presetSize.value === 'custom') {
+                        isCustomSize = true;
+                        DOM.customSizeBox.classList.remove('hidden');
+                        targetWidth = parseInt(DOM.customW.value) || 370;
+                        targetHeight = parseInt(DOM.customH.value) || 320;
+                    } else {
+                        isCustomSize = false;
+                        DOM.customSizeBox.classList.add('hidden');
+                        const [w, h] = DOM.presetSize.value.split('x').map(Number);
+                        targetWidth = w || 370;
+                        targetHeight = h || 320;
+                    }
+                    DOM.statSize.textContent = `${targetWidth} × ${targetHeight} px`;
+
+                } catch(e) {
+                    console.error("讀取本地設定失敗", e);
+                }
+            }
+        }
+
+        function saveSettings() {
+            const settings = {
+                presetSize: DOM.presetSize.value,
+                customW: DOM.customW.value,
+                customH: DOM.customH.value,
+                tolerance: DOM.tolerance.value,
+                contiguous: DOM.contiguous.checked,
+                limitToCrop: DOM.limitToCrop.checked,
+                brushSize: DOM.brushSize.value,
+                borderRadius: DOM.borderRadius.value,
+                showGrid: DOM.showGrid.checked,
+                snapGrid: DOM.snapGrid.checked,
+                gridSize: DOM.gridSize.value,
+                exportFormat: DOM.exportFormat.value,
+                previewBg: DOM.previewBg.value
+            };
+            localStorage.setItem('simpleImgEditorSettings', JSON.stringify(settings));
+        }
+
+        // 啟動時先讀取設定
+        loadSettings();
 
         /* ══ 檔案與截圖處理 ══ */
         DOM.dropZone.ondragover  = e => { e.preventDefault(); DOM.dropZone.classList.add('dragover'); };
@@ -972,6 +1095,7 @@
                 updatePreview();
                 rebuildAnnoOverlay();
             }
+            saveSettings();
         };
 
         DOM.customW.oninput = () => {
@@ -988,6 +1112,7 @@
             rebuildAnnoOverlay();
             updatePreview();
             isUpdatingFromInput = false;
+            saveSettings();
         };
 
         DOM.customH.oninput = () => {
@@ -1004,26 +1129,32 @@
             rebuildAnnoOverlay();
             updatePreview();
             isUpdatingFromInput = false;
+            saveSettings();
         };
 
         /* ══ 圖片圓角 ══ */
         DOM.borderRadius.oninput = () => {
             DOM.radiusVal.textContent = DOM.borderRadius.value;
             updatePreview();
+            saveSettings();
         };
 
 
         /* ══ 網格與磁吸系統 ══ */
-        DOM.showGrid.onchange = rebuildAnnoOverlay;
+        DOM.showGrid.onchange = () => {
+            rebuildAnnoOverlay();
+            saveSettings();
+        };
         
         DOM.snapGrid.onchange = () => {
             DOM.annoAngle.step = DOM.snapGrid.checked ? 15 : 1;
+            saveSettings();
         };
-        DOM.annoAngle.step = DOM.snapGrid.checked ? 15 : 1;
 
         DOM.gridSize.oninput = () => {
             DOM.gridSizeVal.textContent = DOM.gridSize.value;
             rebuildAnnoOverlay();
+            saveSettings();
         };
 
 
@@ -1089,8 +1220,17 @@
             }
         };
 
-        DOM.tolerance.oninput = () => { DOM.tolVal.textContent = DOM.tolerance.value; };
-        DOM.brushSize.oninput = () => { DOM.brushSizeVal.textContent = DOM.brushSize.value; };
+        DOM.tolerance.oninput = () => { 
+            DOM.tolVal.textContent = DOM.tolerance.value; 
+            saveSettings(); 
+        };
+        DOM.brushSize.oninput = () => { 
+            DOM.brushSizeVal.textContent = DOM.brushSize.value; 
+            saveSettings(); 
+        };
+        
+        DOM.contiguous.addEventListener('change', saveSettings);
+        DOM.limitToCrop.addEventListener('change', saveSettings);
         
         DOM.btnEraseWand.onclick = () => setEraserTool('wand');
         DOM.btnEraseBrush.onclick = () => setEraserTool('brush');
@@ -1451,14 +1591,14 @@
         /* ══ 標註系統 ══ */
         DOM.btnAddArrow.onclick = () => {
             const id = Date.now();
-            annotations.push({ id, type:'arrow', x:targetWidth/2, y:targetHeight/2, angle:0, color:'#FF3B30', size:100 });
+            annotations.push({ id, type:'arrow', x:targetWidth/2, y:targetHeight/2, angle:0, color:'#FF3B30', size:100, skewX:0, skewY:0, hasShadow:true });
             renderAnnotationList(); selectAnnotation(id); updatePreview(); rebuildAnnoOverlay();
         };
         
         DOM.btnAddText.onclick = () => {
             const id = Date.now();
             const defaultFont = "'Noto Sans TC', 'Inter', sans-serif";
-            annotations.push({ id, type:'text', x:targetWidth/2, y:targetHeight/2, angle:0, color:'#000000', fontSize:40, fontFamily: defaultFont, content:'新文字' });
+            annotations.push({ id, type:'text', x:targetWidth/2, y:targetHeight/2, angle:0, color:'#000000', fontSize:40, fontFamily: defaultFont, content:'新文字', skewX:0, skewY:0, hasShadow:true });
             renderAnnotationList(); selectAnnotation(id); updatePreview(); rebuildAnnoOverlay();
             
             setTimeout(() => {
@@ -1497,6 +1637,9 @@
             DOM.annoSettings.classList.remove('hidden');
             DOM.arrowProps.classList.toggle('hidden', anno.type !== 'arrow');
             DOM.textProps.classList.toggle('hidden',  anno.type !== 'text');
+            
+            DOM.annoShadow.checked = anno.hasShadow !== false;
+            
             if (anno.type === 'arrow') {
                 DOM.arrowColor.value = anno.color;
                 DOM.arrowSize.value = anno.size; DOM.arrowSizeVal.textContent = anno.size;
@@ -1505,6 +1648,11 @@
                 DOM.fontSize.value = anno.fontSize; DOM.fontSizeVal.textContent = anno.fontSize;
                 DOM.textColor.value = anno.color;
                 DOM.textFont.value = anno.fontFamily || "'Noto Sans TC', 'Inter', sans-serif";
+                
+                DOM.textSkewX.value = anno.skewX || 0;
+                DOM.textSkewXVal.textContent = anno.skewX || 0;
+                DOM.textSkewY.value = anno.skewY || 0;
+                DOM.textSkewYVal.textContent = anno.skewY || 0;
             }
             DOM.annoAngle.value = anno.angle; DOM.annoAngleVal.textContent = anno.angle;
         }
@@ -1521,6 +1669,9 @@
             if (!selectedAnnoId) return;
             const anno = annotations.find(a => a.id === selectedAnnoId);
             if (!anno) return;
+            
+            anno.hasShadow = DOM.annoShadow.checked;
+            
             if (anno.type === 'arrow') {
                 anno.color = DOM.arrowColor.value;
                 anno.size = parseInt(DOM.arrowSize.value); DOM.arrowSizeVal.textContent = anno.size;
@@ -1529,16 +1680,28 @@
                 anno.fontSize = parseInt(DOM.fontSize.value); DOM.fontSizeVal.textContent = anno.fontSize;
                 anno.color = DOM.textColor.value;
                 anno.fontFamily = DOM.textFont.value; 
+                
+                anno.skewX = parseInt(DOM.textSkewX.value) || 0;
+                DOM.textSkewXVal.textContent = anno.skewX;
+                anno.skewY = parseInt(DOM.textSkewY.value) || 0;
+                DOM.textSkewYVal.textContent = anno.skewY;
             }
             anno.angle = parseInt(DOM.annoAngle.value); DOM.annoAngleVal.textContent = anno.angle;
             updatePreview(); rebuildAnnoOverlay();
         }
 
         [DOM.arrowColor, DOM.arrowSize,
-         DOM.textContent, DOM.fontSize, DOM.textColor, DOM.textFont, DOM.annoAngle
+         DOM.textContent, DOM.fontSize, DOM.textColor, DOM.textFont, DOM.annoAngle,
+         DOM.textSkewX, DOM.textSkewY, DOM.annoShadow
         ].forEach(el => { 
-            el.oninput = syncSelected; 
-            el.onchange = syncSelected; 
+            if(el) { 
+                if (el.type === 'checkbox') {
+                    el.onchange = syncSelected;
+                } else {
+                    el.oninput = syncSelected; 
+                    el.onchange = syncSelected; 
+                }
+            }
         });
 
         document.addEventListener('keydown', e => {
@@ -1551,6 +1714,7 @@
                     currentSize = Math.max(1, Math.min(150, currentSize));
                     DOM.brushSize.value = currentSize;
                     DOM.brushSizeVal.textContent = currentSize;
+                    saveSettings();
                     
                     if (!DOM.eraserOverlay.classList.contains('hidden') && cropper) {
                         const cd = cropper.getCanvasData();
@@ -1704,6 +1868,7 @@
         DOM.previewBg.onchange = () => {
             const v = DOM.previewBg.value;
             DOM.previewBox.style.background = v === 'transparent' ? '' : v;
+            saveSettings();
         };
 
         /* ══ Undo / Redo ══ */
@@ -1755,6 +1920,12 @@
             final.width = targetWidth; final.height = targetHeight;
             const ctx = final.getContext('2d');
             
+            const format = DOM.exportFormat.value;
+            if (format === 'image/jpeg') {
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, targetWidth, targetHeight);
+            }
+            
             const radiusPercent = parseInt(DOM.borderRadius.value) || 0;
             ctx.save(); 
             if (radiusPercent > 0) {
@@ -1791,8 +1962,28 @@
             
             annotations.forEach(anno => {
                 ctx.save();
+                
+                if (anno.hasShadow !== false) {
+                    const scale = Math.max(targetWidth, targetHeight) / 500;
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+                    ctx.shadowBlur = 8 * scale;
+                    ctx.shadowOffsetX = 2 * scale;
+                    ctx.shadowOffsetY = 2 * scale;
+                } else {
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                }
+
                 ctx.translate(anno.x, anno.y);
                 ctx.rotate(anno.angle * Math.PI / 180);
+                
+                if (anno.type === 'text' && (anno.skewX !== 0 || anno.skewY !== 0)) {
+                    const skewXRad = (anno.skewX || 0) * Math.PI / 180;
+                    const skewYRad = (anno.skewY || 0) * Math.PI / 180;
+                    ctx.transform(1, Math.tan(skewYRad), Math.tan(skewXRad), 1, 0, 0);
+                }
                 
                 if (anno.type === 'arrow') {
                     const s = anno.size / 100;
@@ -1828,14 +2019,19 @@
             if (DOM.btnExport.disabled) return;
             DOM.btnExport.disabled = true;
             
+            const format = DOM.exportFormat.value;
+            let ext = format.split('/')[1];
+            if (ext === 'jpeg') ext = 'jpg';
+            
             const canvas = getFinalCanvas();
             if (!canvas) {
                 DOM.btnExport.disabled = false;
                 return;
             }
+            
             const link = document.createElement('a');
-            link.download = `${currentFilename}_edited.png`;
-            link.href = canvas.toDataURL('image/png');
+            link.download = `${currentFilename}_edited.${ext}`;
+            link.href = canvas.toDataURL(format, 0.92);
             link.click();
             
             const originalHTML = DOM.btnExport.innerHTML;
@@ -1850,9 +2046,12 @@
                 DOM.btnExport.disabled = false;
             }, 2000);
         };
+        
+        DOM.exportFormat.onchange = () => {
+            updatePreview();
+            saveSettings();
+        };
 
-        /* ══ 初始化 ══ */
-        renderAnnotationList();
     });
     </script>
 </body>
