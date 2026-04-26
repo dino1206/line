@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>極速圖片工具</title>
+    <title>簡單的圖片工具</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
@@ -174,18 +174,6 @@
         .preview-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
         .preview-container img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
 
-        /* 九宮格視覺預覽框線 */
-        .preview-9grid-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-            box-sizing: border-box;
-            border: 1px solid rgba(255, 59, 48, 0.8);
-            background-image: 
-                linear-gradient(to right, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px)), 
-                linear-gradient(to bottom, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px));
-        }
-
         .color-picker { width: 30px; height: 30px; border: none; padding: 0; background: none; cursor: pointer; border-radius: 6px; overflow: hidden; flex-shrink: 0; }
 
         input[type="range"] { -webkit-appearance: none; height: 4px; background: #d2d2d7; border-radius: 2px; cursor: pointer; flex: 1; }
@@ -216,6 +204,7 @@
         .preset-item .size-label { font-size: 0.7rem; color: var(--text-muted); display: block; margin-top: 2px; font-weight: 400;}
         .preset-item:hover { border-color: var(--primary); background: rgba(0,122,255,0.05); }
         .preset-item.active { border-color: var(--primary); background: rgba(0,122,255,0.1); font-weight: 700; color: var(--primary); }
+        .preset-item[data-w="custom"] { grid-column: 1 / -1; }
 
         .export-info { background: #f5f5f7; border-radius: 12px; padding: 12px; font-size: 0.8rem; border: 1px solid rgba(0,0,0,0.03); }
         .export-info div { display: flex; justify-content: space-between; margin-bottom: 4px; }
@@ -561,15 +550,16 @@
                     </div>
 
                     <div class="form-row align-center mb-2">
-                        <label>自動切割成九宮格 (3x3)</label>
-                        <label class="switch">
-                            <input type="checkbox" id="export-grid">
-                            <span class="slider"></span>
-                        </label>
+                        <label>網格切割匯出</label>
+                        <select id="export-slice" class="btn btn-outline btn-sm form-select" style="padding:2px 8px; width:130px;">
+                            <option value="none">不切割</option>
+                            <option value="3x3">九宮格 (3x3)</option>
+                            <option value="4x4">16宮格 (4x4)</option>
+                        </select>
                     </div>
                     
                     <div class="export-info mb-2">
-                        <div>輸出尺寸：<b id="stat-size">370 × 320 px</b></div>
+                        <div>輸出總尺寸：<b id="stat-size">370 × 320 px</b></div>
                         <div>安全邊距：<b>10 px</b></div>
                     </div>
                     <button id="btn-export" class="btn btn-primary w-100" style="transition: background-color 0.3s;" disabled>
@@ -649,7 +639,7 @@
                         <b>標註與磁吸</b>：拖曳藍點移動位置。開啟「磁吸」時，會自動吸附網格與中心點，角度以 15 度為單位。<br>
                         <b>立體與變形</b>：文字可獨立調整傾斜角度，支援動態陰影效果。<br>
                         <b>去背/填色</b>：切換模式。魔術棒可點擊透明處填色，新增「畫筆工具」可自由塗抹 (支援快捷鍵 <kbd>[</kbd> <kbd>]</kbd> 調整筆刷)。<br>
-                        <b>九宮格匯出</b>：開啟選項可自動切成 9 張並打包 ZIP 下載。<br>
+                        <b>分割匯出</b>：選擇九宮格或16宮格，可自動依比例放大裁切並打包 ZIP 下載。<br>
                         <b>復原</b>：<kbd>Ctrl+Z</kbd> / <b>重做</b>：<kbd>Ctrl+Y</kbd>
                     </div>
                 </div>
@@ -761,10 +751,18 @@
             annoAngle:        $('anno-angle'),        annoAngleVal:     $('anno-angle-val'),
             btnDeleteAnno:    $('btn-delete-anno'),
 
-            // 匯出格式與九宮格
+            // 匯出格式與九宮格/16宮格
             exportFormat:     $('export-format'),
-            exportGrid:       $('export-grid'),
+            exportSlice:      $('export-slice'),
         };
+
+        // 更新匯出尺寸文字的函數
+        function updateStatSize() {
+            let splits = 1;
+            if (DOM.exportSlice.value === '3x3') splits = 3;
+            else if (DOM.exportSlice.value === '4x4') splits = 4;
+            DOM.statSize.textContent = `${targetWidth * splits} × ${targetHeight * splits} px`;
+        }
 
         /* ══ 本地儲存：全域狀態記憶引擎 ══ */
         function loadSettings() {
@@ -829,11 +827,11 @@
                     }
                     
                     if (settings.exportFormat) DOM.exportFormat.value = settings.exportFormat;
-                    if (settings.exportGrid !== undefined) DOM.exportGrid.checked = settings.exportGrid;
+                    if (settings.exportSlice) DOM.exportSlice.value = settings.exportSlice;
                     if (settings.previewBg) DOM.previewBg.value = settings.previewBg;
 
                     DOM.previewBox.style.background = DOM.previewBg.value === 'transparent' ? '' : DOM.previewBg.value;
-                    DOM.statSize.textContent = `${targetWidth} × ${targetHeight} px`;
+                    updateStatSize();
 
                 } catch(e) {
                     console.error("讀取本地設定失敗", e);
@@ -865,7 +863,7 @@
                 snapGrid: DOM.snapGrid.checked,
                 gridSize: DOM.gridSize.value,
                 exportFormat: DOM.exportFormat.value,
-                exportGrid: DOM.exportGrid.checked,
+                exportSlice: DOM.exportSlice.value,
                 previewBg: DOM.previewBg.value
             };
             localStorage.setItem('simpleImgEditorSettings', JSON.stringify(settings));
@@ -874,9 +872,10 @@
         // 啟動時先讀取設定
         loadSettings();
         
-        DOM.exportGrid.addEventListener('change', () => {
+        DOM.exportSlice.addEventListener('change', () => {
             saveSettings();
-            updatePreview(); // 更新預覽區的九宮格輔助線
+            updateStatSize();
+            updatePreview(); // 更新預覽區的輔助線
         });
 
         /* ══ 檔案與截圖處理 ══ */
@@ -1058,7 +1057,7 @@
                             
                             if (document.activeElement !== DOM.customW) DOM.customW.value = targetWidth;
                             if (document.activeElement !== DOM.customH) DOM.customH.value = targetHeight;
-                            DOM.statSize.textContent = `${targetWidth} × ${targetHeight} px`;
+                            updateStatSize();
                         }
                     } else if (lockedCropData) {
                         const currentData = cropper.getData();
@@ -1131,7 +1130,7 @@
                         targetHeight = Math.max(1, Math.round(cropData.height));
                         DOM.customW.value = targetWidth;
                         DOM.customH.value = targetHeight;
-                        DOM.statSize.textContent = `${targetWidth} × ${targetHeight} px`;
+                        updateStatSize();
                         lockedCropData = cropper.getData(); 
                         isUserInteractingWithCropBox = false;
                         
@@ -1151,7 +1150,7 @@
                         isUserInteractingWithCropBox = false;
                     }
                     
-                    DOM.statSize.textContent = `${targetWidth} × ${targetHeight} px`;
+                    updateStatSize();
                     updatePreview();
                     rebuildAnnoOverlay();
                 }
@@ -1162,7 +1161,7 @@
         DOM.customW.oninput = () => {
             isUpdatingFromInput = true;
             targetWidth  = Math.max(1, parseInt(DOM.customW.value) || 1);
-            DOM.statSize.textContent = `${targetWidth} × ${targetHeight} px`;
+            updateStatSize();
             if (cropper) {
                 isUserInteractingWithCropBox = true;
                 const cropData = cropper.getData(true);
@@ -1179,7 +1178,7 @@
         DOM.customH.oninput = () => {
             isUpdatingFromInput = true;
             targetHeight = Math.max(1, parseInt(DOM.customH.value) || 1);
-            DOM.statSize.textContent = `${targetWidth} × ${targetHeight} px`;
+            updateStatSize();
             if (cropper) {
                 isUserInteractingWithCropBox = true;
                 const cropData = cropper.getData(true);
@@ -1980,7 +1979,9 @@
             img.style.cssText = 'max-width:100%; max-height:100%; width:auto; height:auto; display:block;';
             imgWrapper.appendChild(img);
             
-            if (DOM.exportGrid && DOM.exportGrid.checked) {
+            // 加入動態的九宮格/16宮格預覽輔助線
+            const sliceMode = DOM.exportSlice.value;
+            if (sliceMode !== 'none') {
                 const gridOverlay = document.createElement('div');
                 gridOverlay.style.position = 'absolute';
                 gridOverlay.style.top = '0';
@@ -1991,10 +1992,20 @@
                 gridOverlay.style.boxSizing = 'border-box';
                 gridOverlay.style.border = '1px solid rgba(255, 59, 48, 0.8)';
                 
-                gridOverlay.style.backgroundImage = `
-                    linear-gradient(to right, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px)), 
-                    linear-gradient(to bottom, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px))
-                `;
+                let bgImage = '';
+                if (sliceMode === '3x3') {
+                    bgImage = `
+                        linear-gradient(to right, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px)), 
+                        linear-gradient(to bottom, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px))
+                    `;
+                } else if (sliceMode === '4x4') {
+                    bgImage = `
+                        linear-gradient(to right, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px)),
+                        linear-gradient(to bottom, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px))
+                    `;
+                }
+                
+                gridOverlay.style.backgroundImage = bgImage;
                 imgWrapper.appendChild(gridOverlay);
             }
             
@@ -2123,9 +2134,13 @@
             let ext = format.split('/')[1];
             if (ext === 'jpeg') ext = 'jpg';
             
-            const isGrid = DOM.exportGrid.checked;
-            // 【核心修正】: 判斷是否為九宮格，若是則生成 3 倍解析度的高畫質畫布
-            const canvas = getFinalCanvas(isGrid ? 3 : 1);
+            const sliceMode = DOM.exportSlice.value;
+            let splits = 1;
+            if (sliceMode === '3x3') splits = 3;
+            else if (sliceMode === '4x4') splits = 4;
+            
+            // 【核心修正】: 依據切割模式生成倍數解析度的高畫質畫布
+            const canvas = getFinalCanvas(splits);
             if (!canvas) {
                 DOM.btnExport.disabled = false;
                 return;
@@ -2133,21 +2148,21 @@
 
             const originalHTML = DOM.btnExport.innerHTML;
             
-            if (isGrid) {
+            if (splits > 1) {
                 DOM.btnExport.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 打包壓縮中...';
                 
                 try {
                     const zip = new JSZip();
-                    // 將放大 3 倍的畫布等分為 3x3，切出來的尺寸剛好等於使用者的目標尺寸，解析度 100% 不流失！
-                    const pieceW = Math.floor(canvas.width / 3);
-                    const pieceH = Math.floor(canvas.height / 3);
+                    // 將放大的畫布等分切割，切出來的尺寸剛好等於使用者的目標單格尺寸，解析度 100% 不流失！
+                    const pieceW = Math.floor(canvas.width / splits);
+                    const pieceH = Math.floor(canvas.height / splits);
                     const promises = [];
 
-                    for (let r = 0; r < 3; r++) {
-                        for (let c = 0; c < 3; c++) {
-                            const idx = r * 3 + c + 1;
-                            const w = (c === 2) ? canvas.width - pieceW * 2 : pieceW;
-                            const h = (r === 2) ? canvas.height - pieceH * 2 : pieceH;
+                    for (let r = 0; r < splits; r++) {
+                        for (let c = 0; c < splits; c++) {
+                            const idx = r * splits + c + 1;
+                            const w = (c === splits - 1) ? canvas.width - pieceW * (splits - 1) : pieceW;
+                            const h = (r === splits - 1) ? canvas.height - pieceH * (splits - 1) : pieceH;
                             
                             const pieceCanvas = document.createElement('canvas');
                             pieceCanvas.width = w;
@@ -2168,13 +2183,13 @@
                     await Promise.all(promises);
                     const content = await zip.generateAsync({ type: 'blob' });
                     const link = document.createElement('a');
-                    link.download = `${currentFilename}_grid.zip`;
+                    link.download = `${currentFilename}_${sliceMode}_grid.zip`;
                     link.href = URL.createObjectURL(content);
                     link.click();
                     
                 } catch(e) {
-                    console.error("打包九宮格失敗", e);
-                    alert("打包九宮格失敗，請重試！");
+                    console.error("打包網格失敗", e);
+                    alert("打包網格失敗，請重試！");
                 }
             } else {
                 const link = document.createElement('a');
