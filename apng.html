@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LINE 動態貼圖/GIF 產生器 (專業除錯版)</title>
+    <!-- 引入 Tailwind CSS 進行美化 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 SortableJS 處理拖曳排序 -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <!-- 引入 UPNG.js 和 pako 用於生成 APNG -->
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js"></script>
+    <!-- 引入 gif.js 用於生成 GIF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+    <!-- 引入 Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .sortable-ghost { opacity: 0.4; }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* 日誌視窗捲動條美化 */
+        #log-panel::-webkit-scrollbar { width: 8px; }
+        #log-panel::-webkit-scrollbar-track { background: #1f2937; }
+        #log-panel::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 text-gray-800">
+
+    <div class="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+        <!-- Header -->
+        <div class="bg-blue-600 p-6 text-white text-center relative">
+            <h1 class="text-3xl font-bold mb-2 flex items-center justify-center gap-2">
+                <i data-lucide="clapperboard"></i> APNG 專業產生器 (LINE 嚴格版)
+            </h1>
+            <p class="text-blue-100">內建 X光標頭掃描，徹底解決上傳 LINE 被退件的黑箱問題。</p>
+        </div>
+
+        <div class="p-6 md:p-8">
+            <!-- 步驟 1: 上傳 -->
+            <div class="mb-8">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="upload-cloud"></i> 1. 上傳圖片格</h2>
+                <div 
+                    id="drop-zone" 
+                    class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 transition cursor-pointer relative"
+                >
+                    <input type="file" id="file-input" multiple accept="image/png, image/jpeg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <i data-lucide="image-plus" class="mx-auto w-12 h-12 text-gray-400 mb-3"></i>
+                    <p class="text-gray-600 font-medium">點擊或將圖片拖曳至此</p>
+                    <p class="text-sm text-gray-400 mt-1">支援 PNG, JPG (根據檔名自動排序 1.png, 2.png...)</p>
+                </div>
+            </div>
+
+            <!-- 步驟 2: 預覽與排序 -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2"><i data-lucide="layers"></i> 2. 排序與預覽</h2>
+                    <button id="clear-btn" class="text-red-500 hover:text-red-700 text-sm font-medium px-3 py-1 bg-red-50 rounded hover:bg-red-100 transition hidden">清除全部</button>
+                </div>
+                <div id="preview-container" class="hidden">
+                    <p class="text-sm text-gray-500 mb-3"><i data-lucide="move" class="inline w-4 h-4"></i> 可以用滑鼠拖曳圖片來調整動畫順序</p>
+                    <ul id="preview-list" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                        <!-- Thumbnails -->
+                    </ul>
+                </div>
+                <div id="empty-state" class="text-center py-8 text-gray-400 bg-gray-50 rounded-xl border border-gray-100">
+                    尚無圖片
+                </div>
+            </div>
+
+            <!-- 步驟 3: 設定與生成 -->
+            <div class="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-200">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="settings"></i> 3. 輸出設定</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="w-full">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">單次循環時間 (LINE 嚴格整數秒)</label>
+                        <select id="duration-input" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border bg-white">
+                            <option value="1000">1 秒 (自動循環 4 次 = 總長 4 秒)</option>
+                            <option value="2000" selected>2 秒 (自動循環 2 次 = 總長 4 秒)</option>
+                            <option value="3000">3 秒 (自動循環 1 次 = 總長 3 秒)</option>
+                            <option value="4000">4 秒 (自動循環 1 次 = 總長 4 秒)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">系統將自動精密分配每格毫秒數，保證無小數點誤差。</p>
+                    </div>
+                    <div class="w-full">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">智慧對齊與畫布尺寸</label>
+                        <select id="alignment-input" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border bg-white">
+                            <option value="line-bottom">強制 LINE 尺寸 (320x270) + 底部置中</option>
+                            <option value="line-center">強制 LINE 尺寸 (320x270) + 絕對置中</option>
+                            <option value="auto-bottom">自動偵測最大尺寸 + 底部置中</option>
+                            <option value="auto-center">自動偵測最大尺寸 + 絕對置中</option>
+                            <option value="stretch">不對齊拉伸 (不推薦)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">系統將強制轉換寬高為偶數以符合規定。</p>
+                    </div>
+                    <div class="w-full">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">壓縮與相容性</label>
+                        <select id="quality-input" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border bg-white">
+                            <option value="0">無損 RGBA (相容性最高，最推薦)</option>
+                            <option value="256">256色壓縮 (僅在超過 300KB 時使用)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">LINE 伺服器有時會拒絕 256 色的 APNG，請優先用無損。</p>
+                    </div>
+                </div>
+
+                <!-- 官方規範提醒 -->
+                <div class="mb-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200 text-sm text-yellow-800">
+                    <p class="font-bold mb-1 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-4 h-4"></i> 圖稿審核必看地雷：</p>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li><strong>第 1 格最重要：</strong> 系統強制抓第一格當作靜態預覽圖，請確保包含主視覺與文字。</li>
+                        <li><strong>10px 安全距離：</strong> 角色邊緣不可貼齊畫布邊界，四周至少留白 10px 防止切邊。</li>
+                        <li><strong>絕對乾淨去背：</strong> 若邊緣有白邊或雜訊未清乾淨，人工審核極高機率退件。</li>
+                    </ul>
+                </div>
+
+                <!-- LINE 規格檢查儀表板 -->
+                <div class="mb-6 bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        <i data-lucide="clipboard-check" class="text-blue-600"></i> LINE 審核前置檢查表
+                    </h3>
+                    <ul id="line-check-list" class="space-y-2 text-sm grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <li id="check-size" class="flex items-center gap-2 text-gray-500"><i data-lucide="circle-dashed" class="w-4 h-4"></i> 尺寸：寬 320 x 高 270 px 以內 (必須偶數)</li>
+                        <li id="check-frames" class="flex items-center gap-2 text-gray-500"><i data-lucide="circle-dashed" class="w-4 h-4"></i> 影格數：5 ~ 20 張</li>
+                        <li id="check-duration" class="flex items-center gap-2 text-gray-500"><i data-lucide="circle-dashed" class="w-4 h-4"></i> 總時間：不超過 4 秒 (4000ms)</li>
+                        <li id="check-filesize" class="flex items-center gap-2 text-gray-500"><i data-lucide="circle-dashed" class="w-4 h-4"></i> 大小：嚴格上限 300 KB (產出後計算)</li>
+                    </ul>
+                </div>
+
+                <div class="flex flex-wrap gap-4">
+                    <button id="btn-apng" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="aperture"></i> 生成 APNG (LINE 用)
+                    </button>
+                    <button id="btn-gif" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="film"></i> 生成一般 GIF
+                    </button>
+                </div>
+                
+                <!-- Loading State -->
+                <div id="loading-state" class="hidden justify-center items-center gap-3 mt-4 text-blue-600 font-medium">
+                    <div class="loader"></div> <span id="loading-text">正在處理中，請稍候...</span>
+                </div>
+            </div>
+
+            <!-- 日誌視窗 (Debug Console) -->
+            <div class="mb-8 bg-gray-900 rounded-xl overflow-hidden shadow-lg border border-gray-700">
+                <div class="bg-gray-800 px-4 py-2 flex justify-between items-center border-b border-gray-700">
+                    <h3 class="text-gray-200 font-mono text-sm flex items-center gap-2"><i data-lucide="terminal" class="w-4 h-4"></i> 系統除錯日誌 (Debug Console)</h3>
+                    <button id="clear-log-btn" class="text-gray-400 hover:text-white text-xs transition">清除日誌</button>
+                </div>
+                <div id="log-panel" class="p-4 h-48 overflow-y-auto font-mono text-xs space-y-1">
+                    <div class="text-green-400">[系統] 介面初始化完成，隨時可以開始。</div>
+                </div>
+            </div>
+
+            <!-- 步驟 4: 結果 -->
+            <div id="result-section" class="hidden">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2 text-green-600"><i data-lucide="check-circle"></i> 生成成功！</h2>
+                <div class="flex flex-col items-center p-6 bg-green-50 rounded-xl border border-green-200">
+                    <img id="result-image" class="max-w-full h-auto rounded shadow-sm border border-gray-200 bg-white checkboard-bg" style="max-height: 400px; background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(135deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(135deg, transparent 75%, #ccc 75%); background-size: 20px 20px; background-position: 0 0, 10px 0, 10px -10px, 0px 10px;">
+                    <div class="mt-6 flex gap-4">
+                        <a id="download-btn" href="#" download="animation.png" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg shadow transition flex items-center gap-2">
+                            <i data-lucide="download"></i> 下載檔案
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // 初始化圖標
+        lucide.createIcons();
+
+        // DOM 元素
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const previewList = document.getElementById('preview-list');
+        const previewContainer = document.getElementById('preview-container');
+        const emptyState = document.getElementById('empty-state');
+        const clearBtn = document.getElementById('clear-btn');
+        const btnApng = document.getElementById('btn-apng');
+        const btnGif = document.getElementById('btn-gif');
+        const resultSection = document.getElementById('result-section');
+        const resultImage = document.getElementById('result-image');
+        const downloadBtn = document.getElementById('download-btn');
+        const durationInput = document.getElementById('duration-input');
+        const alignmentInput = document.getElementById('alignment-input');
+        const qualityInput = document.getElementById('quality-input');
+        const loadingState = document.getElementById('loading-state');
+        const loadingText = document.getElementById('loading-text');
+        const logPanel = document.getElementById('log-panel');
+        const clearLogBtn = document.getElementById('clear-log-btn');
+
+        // 日誌系統
+        function addLog(msg, type = 'info') {
+            const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+            let colorClass = 'text-gray-300';
+            if (type === 'error') colorClass = 'text-red-400 font-bold';
+            if (type === 'success') colorClass = 'text-green-400';
+            if (type === 'warn') colorClass = 'text-yellow-400';
+            if (type === 'sys') colorClass = 'text-blue-300';
+
+            const logLine = document.createElement('div');
+            logLine.className = colorClass;
+            logLine.innerText = `[${time}] ${msg}`;
+            logPanel.appendChild(logLine);
+            logPanel.scrollTop = logPanel.scrollHeight;
+            console.log(`[${time}] [${type}] ${msg}`);
+        }
+
+        clearLogBtn.addEventListener('click', () => {
+            logPanel.innerHTML = '';
+            addLog('日誌已清除。', 'sys');
+        });
+
+        // PNG CRC32 計算函數 (必須是無符號整數)
+        const crcTable = [];
+        for (let n = 0; n < 256; n++) {
+            let c = n;
+            for (let k = 0; k < 8; k++) {
+                if (c & 1) c = 0xedb88320 ^ (c >>> 1);
+                else c = c >>> 1;
+            }
+            crcTable[n] = c;
+        }
+
+        function crc32(buffer, offset, length) {
+            let c = 0xffffffff;
+            const view = new Uint8Array(buffer);
+            for (let i = 0; i < length; i++) {
+                c = crcTable[(c ^ view[offset + i]) & 0xff] ^ (c >>> 8);
+            }
+            return (c ^ 0xffffffff) >>> 0; // 確保回傳無符號 32-bit 整數
+        }
+
+        // 檢查函數
+        window.updateLineCheck = function() {
+            const images = getSortedImages();
+            const targetDuration = parseInt(durationInput.value) || 2000;
+            const framesCount = images.length;
+            
+            // 根據單次時間，決定循環次數，以符合 LINE 總長度限制
+            let targetLoop = 1;
+            if (targetDuration === 1000) targetLoop = 4;
+            else if (targetDuration === 2000) targetLoop = 2;
+            
+            const totalDuration = targetDuration * targetLoop;
+
+            const elSize = document.getElementById('check-size');
+            const elFrames = document.getElementById('check-frames');
+            const elDuration = document.getElementById('check-duration');
+            const elFileSize = document.getElementById('check-filesize');
+            const alignMode = alignmentInput.value;
+
+            const setStatus = (el, isPass, text) => {
+                if (framesCount === 0) {
+                    el.className = 'flex items-center gap-2 text-gray-500';
+                    el.innerHTML = `<i data-lucide="circle-dashed" class="w-4 h-4"></i> ${text}`;
+                } else if (isPass) {
+                    el.className = 'flex items-center gap-2 text-green-600 font-medium';
+                    el.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4"></i> ${text}`;
+                } else {
+                    el.className = 'flex items-center gap-2 text-red-500 font-medium';
+                    el.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4"></i> ${text}`;
+                }
+            };
+
+            if (framesCount > 0) {
+                let finalW = 0, finalH = 0;
+                if (alignMode.includes('auto')) {
+                    finalW = Math.max(...images.map(img => img.naturalWidth));
+                    finalH = Math.max(...images.map(img => img.naturalHeight));
+                } else if (alignMode.includes('line')) {
+                    finalW = 320;
+                    finalH = 270;
+                } else {
+                    finalW = images[0].naturalWidth;
+                    finalH = images[0].naturalHeight;
+                }
+                
+                // 強制尺寸必須為偶數
+                finalW = finalW - (finalW % 2);
+                finalH = finalH - (finalH % 2);
+                
+                setStatus(elSize, (finalW <= 320 && finalH <= 270), `尺寸：${finalW} x ${finalH} px`);
+            } else {
+                setStatus(elSize, false, `尺寸：寬 320 x 高 270 px 以內 (必須偶數)`);
+            }
+
+            setStatus(elFrames, (framesCount >= 5 && framesCount <= 20), `影格數：${framesCount} 張 (規定: 5~20)`);
+            setStatus(elDuration, (totalDuration <= 4000), `總時間：絕對 ${totalDuration/1000} 秒 (符合整數規定)`);
+
+            if (framesCount === 0 || !resultSection.classList.contains('hidden')) {
+                elFileSize.className = 'flex items-center gap-2 text-gray-500';
+                elFileSize.innerHTML = `<i data-lucide="circle-dashed" class="w-4 h-4"></i> 大小：嚴格上限 300 KB (產出後計算)`;
+            }
+
+            lucide.createIcons();
+        };
+
+        function updateFileSizeCheck(sizeInBytes) {
+            const kb = (sizeInBytes / 1024).toFixed(1);
+            const elFileSize = document.getElementById('check-filesize');
+            const isPass = sizeInBytes <= 307200; // 300 * 1024
+            
+            if (isPass) {
+                elFileSize.className = 'flex items-center gap-2 text-green-600 font-medium';
+                elFileSize.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4"></i> 大小：${kb} KB (安全過關)`;
+                addLog(`檔案大小檢查通過: ${kb} KB (上限 300 KB)`, "success");
+            } else {
+                elFileSize.className = 'flex items-center gap-2 text-red-500 font-bold';
+                elFileSize.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4"></i> 大小：${kb} KB (超標退件！請改用256色壓縮)`;
+                addLog(`❌ 檔案大小超標: ${kb} KB！LINE 將會拒絕此檔案，請至上方「壓縮與相容性」切換為 256 色壓縮。`, "error");
+            }
+            lucide.createIcons();
+        }
+
+        durationInput.addEventListener('change', window.updateLineCheck);
+        alignmentInput.addEventListener('change', window.updateLineCheck);
+        qualityInput.addEventListener('change', window.updateLineCheck);
+
+        new Sortable(previewList, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: window.updateLineCheck
+        });
+
+        // 拖曳上傳
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-blue-50', 'border-blue-400'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('bg-blue-50', 'border-blue-400'); });
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('bg-blue-50', 'border-blue-400'); handleFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        function handleFiles(files) {
+            const newFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+            if (newFiles.length === 0) return;
+
+            addLog(`讀取了 ${newFiles.length} 張新圖片。`, "info");
+            newFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+            emptyState.classList.add('hidden');
+            previewContainer.classList.remove('hidden');
+            clearBtn.classList.remove('hidden');
+
+            newFiles.forEach(file => {
+                const objectUrl = URL.createObjectURL(file);
+                const li = document.createElement('li');
+                li.className = 'relative group cursor-move bg-white p-2 rounded-lg border border-gray-200 shadow-sm';
+                li.innerHTML = `
+                    <div class="aspect-w-1 aspect-h-1 w-full overflow-hidden rounded mb-1 bg-gray-100 flex items-center justify-center">
+                        <img src="${objectUrl}" class="object-contain w-full h-full frame-img" data-name="${file.name}">
+                    </div>
+                    <p class="text-xs text-center truncate text-gray-500">${file.name}</p>
+                    <button class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition shadow" onclick="this.parentElement.remove(); checkEmpty(); window.updateLineCheck();">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                `;
+                previewList.appendChild(li);
+                const imgEl = li.querySelector('img');
+                imgEl.onload = window.updateLineCheck;
+            });
+            fileInput.value = '';
+            lucide.createIcons();
+        }
+
+        function checkEmpty() {
+            if (previewList.children.length === 0) {
+                emptyState.classList.remove('hidden');
+                previewContainer.classList.add('hidden');
+                clearBtn.classList.add('hidden');
+                resultSection.classList.add('hidden');
+                addLog('已清空所有圖片。', 'sys');
+            }
+        }
+
+        clearBtn.addEventListener('click', () => {
+            previewList.innerHTML = '';
+            checkEmpty();
+            window.updateLineCheck();
+        });
+
+        function getSortedImages() {
+            return Array.from(previewList.querySelectorAll('.frame-img'));
+        }
+
+        function setLoading(isLoading, text = '處理中...') {
+            btnApng.disabled = isLoading;
+            btnGif.disabled = isLoading;
+            if (isLoading) {
+                loadingText.innerText = text;
+                loadingState.classList.remove('hidden');
+                loadingState.classList.add('flex');
+                resultSection.classList.add('hidden');
+            } else {
+                loadingState.classList.add('hidden');
+                loadingState.classList.remove('flex');
+            }
+        }
+
+        function drawSmartAligned(ctx, img, canvasWidth, canvasHeight, alignMode) {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            if (alignMode === 'stretch') {
+                ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+                return;
+            }
+            const iw = img.naturalWidth;
+            const ih = img.naturalHeight;
+            let dw = iw, dh = ih;
+
+            if (iw > canvasWidth || ih > canvasHeight) {
+                const scale = Math.min(canvasWidth / iw, canvasHeight / ih);
+                dw = iw * scale;
+                dh = ih * scale;
+            }
+            let x = 0, y = 0;
+            if (alignMode.includes('center')) {
+                x = (canvasWidth - dw) / 2;
+                y = (canvasHeight - dh) / 2;
+            } else if (alignMode.includes('bottom')) {
+                x = (canvasWidth - dw) / 2;
+                y = canvasHeight - dh;
+            }
+            ctx.drawImage(img, x, y, dw, dh);
+        }
+
+        // ==========================================
+        // APNG 二進位分析與 LINE 規則驗證器 (X光機)
+        // ==========================================
+        function analyzeAndPatchAPNG(buffer, targetLoop) {
+            addLog("--- 開始解析 APNG 檔案標頭 (LINE 嚴格掃描) ---", "sys");
+            const view = new DataView(buffer);
+            const uint8 = new Uint8Array(buffer);
+
+            // 檢查 PNG 簽名
+            const sig = [137, 80, 78, 71, 13, 10, 26, 10];
+            for(let i=0; i<8; i++) {
+                if (uint8[i] !== sig[i]) {
+                    addLog("❌ 嚴重錯誤：這不是合法的 PNG 檔案！", "error");
+                    return false;
+                }
+            }
+
+            let offset = 8;
+            let hasAcTL = false;
+
+            while (offset < buffer.byteLength) {
+                const length = view.getUint32(offset);
+                const typeStr = String.fromCharCode(uint8[offset+4], uint8[offset+5], uint8[offset+6], uint8[offset+7]);
+
+                if (typeStr === 'IHDR') {
+                    const w = view.getUint32(offset+8);
+                    const h = view.getUint32(offset+12);
+                    addLog(`[IHDR] 偵測畫布: 寬 ${w}px, 高 ${h}px`, "info");
+                    if (w % 2 !== 0 || h % 2 !== 0) addLog("❌ 錯誤：畫布寬高出現奇數！LINE 將會拒絕。", "error");
+                }
+                else if (typeStr === 'acTL') {
+                    hasAcTL = true;
+                    const frames = view.getUint32(offset+8);
+                    let playCount = view.getUint32(offset+12);
+                    
+                    addLog(`[acTL] 原始寫入: ${frames} 張影格, 循環 ${playCount} 次`, "warn");
+                    
+                    if (playCount !== targetLoop) {
+                        addLog(`[修正] 偵測到不合規循環次數。正在強制竄改二進位碼，將循環次數改為絕對 -> ${targetLoop} 次`, "sys");
+                        view.setUint32(offset + 12, targetLoop); // 寫入正確次數
+                        const newCrc = crc32(buffer, offset + 4, 12); // 重算 CRC
+                        view.setUint32(offset + 16, newCrc);
+                        addLog(`[修正] 循環次數竄改完成，已重算寫入 CRC 校驗碼以騙過驗證。`, "success");
+                    } else {
+                        addLog(`[acTL] 循環次數 ${playCount} 次符合預期，無需竄改。`, "success");
+                    }
+                }
+                offset += 12 + length;
+            }
+
+            if (!hasAcTL) {
+                addLog("❌ 錯誤：檔案缺少 acTL 動畫區塊，產生出來的只是靜態圖片！", "error");
+                return false;
+            }
+
+            addLog("--- 標頭掃描與修補完成 ---", "sys");
+            return true;
+        }
+
+        // 生成 APNG
+        btnApng.addEventListener('click', async () => {
+            const images = getSortedImages();
+            if (images.length === 0) return alert('請先上傳並加入圖片！');
+
+            addLog("=====================================", "sys");
+            addLog("🚀 啟動 APNG 產生引擎...", "info");
+            setLoading(true, '正在合成 APNG...');
+            await new Promise(r => setTimeout(r, 50)); 
+
+            try {
+                const targetDuration = parseInt(durationInput.value) || 2000;
+                let targetLoop = 1;
+                if (targetDuration === 1000) targetLoop = 4;
+                else if (targetDuration === 2000) targetLoop = 2;
+
+                const alignMode = alignmentInput.value;
+                const quality = parseInt(qualityInput.value) || 0; // 0 = 無損, 256 = 有損
+                
+                let width, height;
+                if (alignMode.includes('auto')) {
+                    width = Math.max(...images.map(img => img.naturalWidth));
+                    height = Math.max(...images.map(img => img.naturalHeight));
+                } else if (alignMode.includes('line')) {
+                    width = 320;
+                    height = 270;
+                } else {
+                    width = images[0].naturalWidth;
+                    height = images[0].naturalHeight;
+                }
+
+                width = width - (width % 2);
+                height = height - (height % 2);
+                
+                addLog(`⚙️ 準備參數: 畫布 ${width}x${height}, 影格數 ${images.length}, 單次 ${targetDuration/1000}秒`, "info");
+                addLog(`⚙️ 壓縮模式: ${quality === 0 ? '無損輸出 (相容性最高)' : '256色壓縮 (強效瘦身)'}`, "warn");
+
+                const frames = [];
+                const delays = [];
+                const framesCount = images.length;
+                
+                // 【核心修正】精密計算每一幀的延遲時間，確保總和「絕對」等於目標秒數 (避免小數點誤差)
+                const baseDelay = Math.floor(targetDuration / framesCount);
+                const remainder = targetDuration % framesCount;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+                addLog(`正在繪製並抽取像素資料...`, "info");
+                for (let i = 0; i < framesCount; i++) {
+                    drawSmartAligned(ctx, images[i], width, height, alignMode);
+                    const imgData = ctx.getImageData(0, 0, width, height);
+                    frames.push(imgData.data.buffer);
+                    // 分配殘餘的毫秒，確保總時間精準無誤
+                    delays.push(i < remainder ? baseDelay + 1 : baseDelay);
+                }
+
+                addLog(`呼叫 UPNG 編碼核心... (這可能會花幾秒鐘)`, "info");
+                const apngBuffer = UPNG.encode(frames, width, height, quality, delays);
+                
+                // 執行 X 光機驗證與修補
+                analyzeAndPatchAPNG(apngBuffer, targetLoop);
+
+                const blob = new Blob([apngBuffer], { type: 'image/apng' });
+                const url = URL.createObjectURL(blob);
+                
+                updateFileSizeCheck(blob.size);
+                showResult(url, 'animation.png', 'APNG 生成成功！請查看下方日誌。');
+
+            } catch (error) {
+                console.error(error);
+                addLog(`❌ 核心崩潰：${error.message}`, "error");
+                alert('APNG 生成失敗，請查看日誌。');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // 生成 GIF
+        btnGif.addEventListener('click', async () => {
+            const images = getSortedImages();
+            if (images.length === 0) return alert('請先上傳並加入圖片！');
+
+            addLog("=====================================", "sys");
+            addLog("🚀 啟動 GIF 產生引擎...", "info");
+            setLoading(true, '正在合成 GIF，載入引擎中...');
+
+            try {
+                const targetDuration = parseInt(durationInput.value) || 2000;
+                const alignMode = alignmentInput.value;
+                
+                let width, height;
+                if (alignMode.includes('auto')) {
+                    width = Math.max(...images.map(img => img.naturalWidth));
+                    height = Math.max(...images.map(img => img.naturalHeight));
+                } else if (alignMode.includes('line')) {
+                    width = 320;
+                    height = 270;
+                } else {
+                    width = images[0].naturalWidth;
+                    height = images[0].naturalHeight;
+                }
+
+                width = width - (width % 2);
+                height = height - (height % 2);
+
+                addLog(`下載並載入 gif.worker.js 腳本...`, "info");
+                const workerRes = await fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
+                const workerBlob = await workerRes.blob();
+                const workerUrl = URL.createObjectURL(workerBlob);
+
+                const gif = new GIF({
+                    workers: 2,
+                    quality: 10,
+                    width: width,
+                    height: height,
+                    workerScript: workerUrl,
+                    transparent: 'rgba(0,0,0,0)'
+                });
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+                const framesCount = images.length;
+                const baseDelay = Math.floor(targetDuration / framesCount);
+                const remainder = targetDuration % framesCount;
+
+                addLog(`將 ${images.length} 張圖片加入 GIF 渲染佇列...`, "info");
+                for (let i = 0; i < framesCount; i++) {
+                    drawSmartAligned(ctx, images[i], width, height, alignMode);
+                    const exactDelay = i < remainder ? baseDelay + 1 : baseDelay;
+                    gif.addFrame(ctx, { copy: true, delay: exactDelay });
+                }
+
+                gif.on('finished', function(blob) {
+                    addLog(`GIF 渲染完成！`, "success");
+                    const url = URL.createObjectURL(blob);
+                    updateFileSizeCheck(blob.size);
+                    showResult(url, 'animation.gif', 'GIF 生成成功！');
+                    setLoading(false);
+                });
+
+                setLoading(true, '正在渲染 GIF 幀數...');
+                addLog(`開始平行渲染 GIF 幀數，請稍候...`, "info");
+                gif.render();
+
+            } catch (error) {
+                console.error(error);
+                addLog(`❌ GIF 產生錯誤：${error.message}`, "error");
+                alert('GIF 生成過程中發生錯誤。');
+                setLoading(false);
+            }
+        });
+
+        // 顯示結果
+        function showResult(url, filename, msg) {
+            resultImage.src = url;
+            downloadBtn.href = url;
+            downloadBtn.download = filename;
+            
+            resultSection.querySelector('h2').innerHTML = `<i data-lucide="check-circle"></i> ${msg}`;
+            lucide.createIcons();
+            
+            resultSection.classList.remove('hidden');
+            resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+    </script>
+</body>
+</html>
