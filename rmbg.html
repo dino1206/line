@@ -62,7 +62,7 @@
             <i data-lucide="wand-2" style="width: 16px; height: 16px;"></i> 魔術棒
           </button>
           <button id="btn-mode-ai" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors text-gray-500">
-            <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i> AI人像
+            <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i> AI引擎
           </button>
           <button id="btn-mode-manual" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors text-gray-500">
             <i data-lucide="hand" style="width: 16px; height: 16px;"></i> 塗抹
@@ -112,15 +112,29 @@
           </p>
         </div>
 
-        <!-- AI 人像模式控制項 -->
+        <!-- AI 雙引擎模式控制項 -->
         <div id="ai-controls" class="flex flex-col gap-4 hidden">
-          <p class="text-sm text-gray-600 font-medium text-center bg-purple-50 p-3 rounded-xl border border-purple-100">
-            啟動 Google MediaPipe 引擎，精準辨識人像邊緣，效能更高且支援平滑去背。<br>
-            <span class="text-xs text-purple-500 mt-1 block">(首次使用需載入模型，請保持網路暢通)</span>
-          </p>
+          
+          <!-- 雙引擎選擇器 -->
+          <div class="bg-purple-50 p-3 rounded-xl border border-purple-100 flex flex-col gap-2">
+            <label class="text-sm font-bold text-purple-800">選擇 AI 引擎：</label>
+            <div class="flex gap-2">
+              <button id="btn-engine-imgly" class="flex-1 py-2 rounded-lg border-2 font-bold transition-all border-purple-400 bg-white text-purple-600 text-sm">
+                高精度全景 (U2-Net)
+              </button>
+              <button id="btn-engine-mediapipe" class="flex-1 py-2 rounded-lg border-2 font-bold transition-all border-transparent bg-white/50 text-gray-500 text-sm hover:bg-white">
+                高速人像 (MediaPipe)
+              </button>
+            </div>
+            <p id="ai-engine-hint" class="text-xs text-purple-600 mt-1">
+              適合：全身照、複雜背景、商品 (首次需下載約40MB模型)
+            </p>
+          </div>
+
           <button id="btn-run-ai" class="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-lg font-bold py-3 rounded-xl shadow-md active:scale-95 transition-transform">
-            <i data-lucide="sparkles"></i> 啟動精準 AI 去背
+            <i data-lucide="sparkles"></i> <span id="run-ai-text">啟動高精度去背</span>
           </button>
+
           <div id="ai-loading" class="hidden flex-col items-center justify-center gap-2 py-2">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
             <span class="text-sm text-purple-600 font-bold" id="ai-status-text">載入模型中...</span>
@@ -188,6 +202,7 @@
     let smartFillMode = 'contiguous'; // 'contiguous' 或 'global'
     const FIXED_TOLERANCE = 30; // 固定容忍值
     let appMode = 'smart'; // 'smart' | 'ai' | 'manual'
+    let currentAiEngine = 'imgly'; // 'imgly' 或 'mediapipe'
     let brushMode = 'erase'; // 'erase' 或 'restore'
     let brushSize = 30;
     let isDrawing = false;
@@ -206,9 +221,9 @@
     
     const mainCanvas = document.getElementById('main-canvas');
     const ctx = mainCanvas.getContext('2d');
-    const originalCanvas = document.createElement('canvas'); // 隱藏備份畫布
+    const originalCanvas = document.createElement('canvas'); 
     const origCtx = originalCanvas.getContext('2d');
-    let originalImageData = null; // 用於智慧去背的原始像素
+    let originalImageData = null; 
     let imageWidth = 0;
     let imageHeight = 0;
 
@@ -224,7 +239,11 @@
     const btnFillGlobal = document.getElementById('btn-fill-global');
     const smartHintText = document.getElementById('smart-hint-text');
 
+    const btnEngineImgly = document.getElementById('btn-engine-imgly');
+    const btnEngineMediapipe = document.getElementById('btn-engine-mediapipe');
+    const aiEngineHint = document.getElementById('ai-engine-hint');
     const btnRunAi = document.getElementById('btn-run-ai');
+    const runAiText = document.getElementById('run-ai-text');
     const aiLoading = document.getElementById('ai-loading');
     const aiStatusText = document.getElementById('ai-status-text');
 
@@ -283,7 +302,7 @@
       return Math.sqrt(Math.pow(r1 - r2, 2) + Math.pow(g1 - g2, 2) + Math.pow(b1 - b2, 2));
     }
 
-    // 動態載入外部腳本，並支援備援網址 (避免單一 CDN 異常)
+    // 動態載入外部腳本，並支援備援網址
     function loadScript(src, fallbackSrc) {
       return new Promise((resolve, reject) => {
         if (document.querySelector(`script[src="${src}"]`) || document.querySelector(`script[src="${fallbackSrc}"]`)) {
@@ -311,16 +330,84 @@
       });
     }
 
-    // 執行 AI 人體去背
-    async function runAIBodyPix() {
+    // 執行 AI 總控
+    async function runAI() {
+      if (currentAiEngine === 'imgly') {
+        await runAIImgly();
+      } else {
+        await runAIMediaPipe();
+      }
+    }
+
+    // 執行高精度 AI (Imgly U2-Net) - 適合全身/複雜背景
+    async function runAIImgly() {
       if (isAiProcessing || !hasImage) return;
       isAiProcessing = true;
-      
       btnRunAi.classList.add('hidden');
       aiLoading.classList.remove('hidden');
       
       try {
-        aiStatusText.innerText = "載入 MediaPipe 引擎 (1/1)...";
+        aiStatusText.innerText = "初始化高精度 AI...";
+        
+        // 修正：使用 ES Module 動態載入，取代舊有的 UMD script 引入方式避免路徑 404 錯誤
+        let removeBackground;
+        try {
+          const module = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
+          removeBackground = module.removeBackground;
+        } catch (e) {
+          console.warn("JSDelivr ESM 載入失敗，嘗試備用 ESM 來源");
+          const module = await import('https://esm.sh/@imgly/background-removal@1.5.5');
+          removeBackground = module.removeBackground;
+        }
+        
+        aiStatusText.innerText = "準備分析圖片...";
+        
+        // 安全起見，將 Canvas 先轉成 Blob 給 API 使用
+        const imageBlob = await new Promise(resolve => originalCanvas.toBlob(resolve, 'image/png'));
+        
+        const blob = await removeBackground(imageBlob, {
+          progress: (key, current, total) => {
+            if (total) {
+              const pct = Math.round((current / total) * 100);
+              aiStatusText.innerText = `下載模型 / 處理中... ${pct}%`;
+            } else {
+              aiStatusText.innerText = `正在精細扣圖中...`;
+            }
+          }
+        });
+
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          ctx.clearRect(0, 0, imageWidth, imageHeight);
+          ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
+          saveState(); 
+          URL.revokeObjectURL(url);
+          
+          isAiProcessing = false;
+          btnRunAi.classList.remove('hidden');
+          aiLoading.classList.add('hidden');
+        };
+        img.src = url;
+        
+      } catch (err) {
+        alert('高精度 AI 模型載入失敗。這可能是網路問題。');
+        console.error("AI 引擎發生錯誤：", err);
+        isAiProcessing = false;
+        btnRunAi.classList.remove('hidden');
+        aiLoading.classList.add('hidden');
+      }
+    }
+
+    // 執行高效人像 AI (MediaPipe Selfie Segmentation) - 適合半身/視訊截圖
+    async function runAIMediaPipe() {
+      if (isAiProcessing || !hasImage) return;
+      isAiProcessing = true;
+      btnRunAi.classList.add('hidden');
+      aiLoading.classList.remove('hidden');
+      
+      try {
+        aiStatusText.innerText = "載入 MediaPipe 引擎...";
         if (!window.SelfieSegmentation) {
           await loadScript(
             'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js',
@@ -328,15 +415,15 @@
           );
         }
         
-        aiStatusText.innerText = "正在精準辨識人像邊緣...";
+        aiStatusText.innerText = "正在極速辨識人像邊緣...";
         
         await new Promise((resolve, reject) => {
-          const selfieSegmentation = new SelfieSegmentation({
+          const selfieSegmentation = new window.SelfieSegmentation({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
           });
 
           selfieSegmentation.setOptions({
-            modelSelection: 0, // 0為高品質模型
+            modelSelection: 1, // 1=Landscape mode (faster, slightly better for non-square)
           });
 
           selfieSegmentation.onResults((results) => {
@@ -345,34 +432,29 @@
               maskCanvas.width = imageWidth;
               maskCanvas.height = imageHeight;
               const maskCtx = maskCanvas.getContext('2d');
-              // 繪製分割遮罩 (白色為前景，黑色為背景)
               maskCtx.drawImage(results.segmentationMask, 0, 0, imageWidth, imageHeight);
               const maskData = maskCtx.getImageData(0, 0, imageWidth, imageHeight).data;
 
               const currentData = ctx.getImageData(0, 0, imageWidth, imageHeight);
               
-              // 處理透明度平滑過渡 (Anti-aliasing 邊緣羽化)
+              // 處理透明度平滑過渡 (羽化效果)
               for (let i = 0; i < maskData.length; i += 4) {
-                // maskData[i] 取 R 通道，介於 0 (背景) 到 255 (主體)
-                // 將原圖的 Alpha 通道與 mask 結合，保留半透明的平滑邊緣 (如頭髮邊緣)
                 currentData.data[i + 3] = Math.min(currentData.data[i + 3], maskData[i]);
               }
 
               ctx.putImageData(currentData, 0, 0);
-              saveState(); // 存檔讓使用者可以復原
+              saveState(); 
               resolve();
             } catch (e) {
               reject(e);
             }
           });
-
-          // 將原圖送入模型
           selfieSegmentation.send({image: originalCanvas}).catch(reject);
         });
         
       } catch (err) {
-        alert('AI 模型載入失敗，這可能是網路問題。請檢查連線或稍後再試。');
-        console.error("AI 載入詳細錯誤: ", err.message || err);
+        alert('MediaPipe 模型載入失敗。請檢查網路。');
+        console.error(err);
       } finally {
         isAiProcessing = false;
         btnRunAi.classList.remove('hidden');
@@ -608,13 +690,30 @@
       }
     });
 
-    btnRunAi.addEventListener('click', runAIBodyPix);
+    btnRunAi.addEventListener('click', runAI);
+
+    // 雙引擎切換
+    btnEngineImgly.addEventListener('click', () => {
+      currentAiEngine = 'imgly';
+      btnEngineImgly.className = "flex-1 py-2 rounded-lg border-2 font-bold transition-all border-purple-400 bg-white text-purple-600 text-sm";
+      btnEngineMediapipe.className = "flex-1 py-2 rounded-lg border-2 font-bold transition-all border-transparent bg-white/50 text-gray-500 text-sm hover:bg-white";
+      aiEngineHint.innerText = "適合：全身照、複雜背景、商品 (首次需下載約40MB模型)";
+      runAiText.innerText = "啟動高精度去背";
+    });
+
+    btnEngineMediapipe.addEventListener('click', () => {
+      currentAiEngine = 'mediapipe';
+      btnEngineMediapipe.className = "flex-1 py-2 rounded-lg border-2 font-bold transition-all border-purple-400 bg-white text-purple-600 text-sm";
+      btnEngineImgly.className = "flex-1 py-2 rounded-lg border-2 font-bold transition-all border-transparent bg-white/50 text-gray-500 text-sm hover:bg-white";
+      aiEngineHint.innerText = "適合：半身照、視訊大頭貼 (瞬間完成，邊緣極度平滑)";
+      runAiText.innerText = "啟動 MediaPipe 去背";
+    });
 
     // Canvas 互動
     mainCanvas.addEventListener('pointerenter', updateBrushCursor);
     mainCanvas.addEventListener('pointerleave', () => brushCursor.classList.add('hidden'));
 
-    // 【防誤觸機制】：魔術棒改用 click 觸發，因為手機上的 scroll 不會觸發 click
+    // 【防誤觸機制】：魔術棒改用 click 觸發
     mainCanvas.addEventListener('click', (e) => {
       if (!originalImageData || appMode !== 'smart') return;
 
@@ -791,7 +890,6 @@
         
         mainCanvas.classList.remove('cursor-none');
         mainCanvas.classList.add('cursor-crosshair');
-        // 解除防滑動限制
         mainCanvas.classList.remove('touch-none');
         
         hintIcon.setAttribute('data-lucide', 'mouse-pointer-2');
@@ -810,11 +908,10 @@
         aiControls.classList.remove('hidden');
         
         mainCanvas.classList.remove('cursor-none', 'cursor-crosshair');
-        // 解除防滑動限制
         mainCanvas.classList.remove('touch-none');
         
         hintIcon.setAttribute('data-lucide', 'sparkles');
-        hintText.innerText = '點擊下方按鈕開始自動辨識';
+        hintText.innerText = '選擇下方 AI 引擎並開始辨識';
 
       } else {
         // Manual mode
@@ -823,7 +920,6 @@
         
         mainCanvas.classList.add('cursor-none');
         mainCanvas.classList.remove('cursor-crosshair');
-        // 加上防滑動限制，確保繪畫不中斷
         mainCanvas.classList.add('touch-none');
         
         hintIcon.setAttribute('data-lucide', 'brush');
