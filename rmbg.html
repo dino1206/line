@@ -37,6 +37,9 @@
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex flex-col items-center pb-6">
 
+  <!-- 筆刷鼠標游標 -->
+  <div id="brush-cursor" class="pointer-events-none fixed rounded-full border-2 border-gray-800 bg-white/40 hidden" style="z-index: 100; transform: translate(-50%, -50%);"></div>
+
   <!-- 頂部標題 -->
   <header class="w-full bg-white shadow-sm p-2 text-center mb-2">
     <h1 class="text-xl font-extrabold text-blue-600">智慧去背小幫手</h1>
@@ -61,7 +64,7 @@
         <!-- 模式切換標籤 -->
         <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner flex-1">
           <button id="btn-mode-smart" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors bg-white text-blue-600 shadow">
-            <i data-lucide="wand-2" style="width: 18px; height: 18px;"></i> 智慧選色
+            <i data-lucide="wand-2" style="width: 18px; height: 18px;"></i> 魔術棒去背
           </button>
           <button id="btn-mode-manual" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors text-gray-500">
             <i data-lucide="hand" style="width: 18px; height: 18px;"></i> 手動塗抹
@@ -103,7 +106,7 @@
           </div>
           <input type="range" id="tolerance-slider" min="0" max="100" value="30" disabled class="w-full h-6 bg-gray-200 rounded-lg appearance-none cursor-not-allowed">
           <p id="smart-hint-text" class="text-xs text-orange-600 font-medium">
-            請先在上方圖片點擊您想要去除的背景顏色，即可啟用容忍值調整。
+            點擊圖片中要去除的背景區域，系統會自動選取相連的相近顏色。
           </p>
         </div>
 
@@ -156,7 +159,8 @@
 
     // 狀態變數
     let hasImage = false;
-    let targetColor = null;
+    let activeClick = null; // 取代 targetColor，紀錄魔術棒點擊位置
+    let currentBaseImageData = null; // 紀錄魔術棒點擊前的畫面狀態
     let tolerance = 30;
     let appMode = 'smart'; // 'smart' 或 'manual'
     let brushMode = 'erase'; // 'erase' 或 'restore'
@@ -205,6 +209,7 @@
 
     const hintText = document.getElementById('hint-text');
     const hintIcon = document.getElementById('hint-icon');
+    const brushCursor = document.getElementById('brush-cursor');
 
     // ----------------------------------------------------------------
     // 核心邏輯區
@@ -220,7 +225,8 @@
       // 儲存當前畫面狀態、顏色與容忍值
       history.push({
         imageData: ctx.getImageData(0, 0, imageWidth, imageHeight),
-        targetColor: targetColor ? { ...targetColor } : null,
+        preClickImageData: currentBaseImageData ? new ImageData(new Uint8ClampedArray(currentBaseImageData.data), imageWidth, imageHeight) : null,
+        activeClick: activeClick ? { ...activeClick } : null,
         tolerance: tolerance
       });
       
@@ -236,7 +242,8 @@
     // 應用歷史狀態
     function applyState(state) {
       ctx.putImageData(state.imageData, 0, 0);
-      targetColor = state.targetColor ? { ...state.targetColor } : null;
+      activeClick = state.activeClick ? { ...state.activeClick } : null;
+      currentBaseImageData = state.preClickImageData ? new ImageData(new Uint8ClampedArray(state.preClickImageData.data), imageWidth, imageHeight) : null;
       tolerance = state.tolerance;
       toleranceSlider.value = tolerance;
       toleranceValDisplay.innerText = `${tolerance}%`;
@@ -286,7 +293,8 @@
           originalImageData = ctx.getImageData(0, 0, w, h);
 
           // 重置狀態
-          targetColor = null;
+          activeClick = null;
+          currentBaseImageData = null;
           tolerance = 30;
           toleranceSlider.value = 30;
           appMode = 'smart';
@@ -304,29 +312,99 @@
       e.target.value = ''; // 清除 input，允許重複選同一張圖
     }
 
-    // 智慧去背處理
+    // 魔術棒 (連通區域) 去背處理
     function processSmartImage() {
-      if (!originalImageData || !targetColor) return;
+      if (!currentBaseImageData || !activeClick) return;
       
-      const originalData = originalImageData.data;
+      const { x: startX, y: startY } = activeClick;
+      const originalData = currentBaseImageData.data;
+      
+      // 建立新的 ImageData 以寫入
       const newImgData = new ImageData(
         new Uint8ClampedArray(originalData),
         imageWidth,
         imageHeight
       );
       const data = newImgData.data;
+      
+      const startIndex = (startY * imageWidth + startX) * 4;
+      const targetR = originalData[startIndex];
+      const targetG = originalData[startIndex + 1];
+      const targetB = originalData[startIndex + 2];
+      const targetA = originalData[startIndex + 3];
+
+      // 若點擊處已透明，則不作處理
+      if (targetA === 0) {
+        ctx.putImageData(newImgData, 0, 0);
+        return;
+      }
 
       // 容忍值轉換 (0-100 映射到 0-441)
       const maxDist = 441.67; 
       const currentTol = (tolerance / 100) * maxDist;
 
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        
-        if (colorDistance(r, g, b, targetColor.r, targetColor.g, targetColor.b) <= currentTol) {
-          data[i + 3] = 0; // 設為透明
+      // 廣度優先搜尋 (BFS) 陣列
+      const visited = new Uint8Array(imageWidth * imageHeight);
+      let head = 0;
+      let tail = 1;
+      const qX = new Int32Array(imageWidth * imageHeight);
+      const qY = new Int32Array(imageWidth * imageHeight);
+      
+      qX[0] = startX;
+      qY[0] = startY;
+      visited[startY * imageWidth + startX] = 1;
+
+      while (head < tail) {
+        const x = qX[head++];
+        const y = qY[head-1];
+
+        const idx = (y * imageWidth + x) * 4;
+        data[idx + 3] = 0; // 設為透明
+
+        // 檢查相鄰的四個像素
+        // 右
+        if (x + 1 < imageWidth) {
+          const nx = x + 1, ny = y, nIdx = ny * imageWidth + nx;
+          if (!visited[nIdx]) {
+            visited[nIdx] = 1;
+            const pxIdx = nIdx * 4;
+            if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
+              qX[tail] = nx; qY[tail] = ny; tail++;
+            }
+          }
+        }
+        // 左
+        if (x - 1 >= 0) {
+          const nx = x - 1, ny = y, nIdx = ny * imageWidth + nx;
+          if (!visited[nIdx]) {
+            visited[nIdx] = 1;
+            const pxIdx = nIdx * 4;
+            if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
+              qX[tail] = nx; qY[tail] = ny; tail++;
+            }
+          }
+        }
+        // 下
+        if (y + 1 < imageHeight) {
+          const nx = x, ny = y + 1, nIdx = ny * imageWidth + nx;
+          if (!visited[nIdx]) {
+            visited[nIdx] = 1;
+            const pxIdx = nIdx * 4;
+            if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
+              qX[tail] = nx; qY[tail] = ny; tail++;
+            }
+          }
+        }
+        // 上
+        if (y - 1 >= 0) {
+          const nx = x, ny = y - 1, nIdx = ny * imageWidth + nx;
+          if (!visited[nIdx]) {
+            visited[nIdx] = 1;
+            const pxIdx = nIdx * 4;
+            if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
+              qX[tail] = nx; qY[tail] = ny; tail++;
+            }
+          }
         }
       }
 
@@ -371,6 +449,27 @@
     // 事件監聽區
     // ----------------------------------------------------------------
 
+    // 處理筆刷游標位置與顯示
+    function updateBrushCursor(e) {
+      if (appMode !== 'manual' || !hasImage) {
+        brushCursor.classList.add('hidden');
+        return;
+      }
+      brushCursor.classList.remove('hidden');
+      
+      const rect = mainCanvas.getBoundingClientRect();
+      const scaleX = mainCanvas.width / rect.width;
+      const cssSize = (brushSize * 2) / scaleX; // 將畫布的像素大小轉換為畫面上顯示的大小
+      
+      brushCursor.style.width = `${cssSize}px`;
+      brushCursor.style.height = `${cssSize}px`;
+      
+      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+      brushCursor.style.left = `${clientX}px`;
+      brushCursor.style.top = `${clientY}px`;
+    }
+
     uploadInputs.forEach(input => input.addEventListener('change', handleImageUpload));
 
     // 復原 / 重做 按鈕事件
@@ -389,19 +488,27 @@
     });
 
     // Canvas 互動
+    mainCanvas.addEventListener('pointerenter', updateBrushCursor);
+    mainCanvas.addEventListener('pointerleave', () => brushCursor.classList.add('hidden'));
+
     mainCanvas.addEventListener('pointerdown', (e) => {
       if (!originalImageData) return;
 
       if (appMode === 'smart') {
-        // 智慧選色
+        // 魔術棒選色去背
         const { x, y } = getCoordinates(e);
-        const data = originalImageData.data;
-        const index = (Math.floor(y) * imageWidth + Math.floor(x)) * 4;
+        const ix = Math.floor(x);
+        const iy = Math.floor(y);
         
-        if (index >= 0 && index < data.length) {
-          targetColor = { r: data[index], g: data[index + 1], b: data[index + 2] };
+        // 檢查是否點擊在有效範圍內且該像素尚未透明
+        const data = ctx.getImageData(0, 0, imageWidth, imageHeight).data;
+        const idx = (iy * imageWidth + ix) * 4;
+        
+        if (idx >= 0 && idx < data.length && data[idx + 3] > 0) {
+          currentBaseImageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+          activeClick = { x: ix, y: iy };
           processSmartImage();
-          saveState(); // 儲存智慧選色狀態
+          saveState(); // 儲存魔術棒去背結果
           updateUI();
         }
       } else {
@@ -411,10 +518,15 @@
         const { x, y } = getCoordinates(e);
         drawPoint(x, y);
         lastPos = { x, y };
+        updateBrushCursor(e);
       }
     });
 
     mainCanvas.addEventListener('pointermove', (e) => {
+      if (appMode === 'manual') {
+        updateBrushCursor(e);
+      }
+      
       if (!isDrawing || appMode !== 'manual') return;
 
       const { x, y } = getCoordinates(e);
@@ -451,8 +563,8 @@
     // 模式切換
     btnModeSmart.addEventListener('click', () => {
       appMode = 'smart';
-      if (targetColor) processSmartImage(); // 切回智慧時重置為智慧去背結果
       updateUI();
+      brushCursor.classList.add('hidden');
     });
 
     btnModeManual.addEventListener('click', () => {
@@ -464,12 +576,17 @@
     toleranceSlider.addEventListener('input', (e) => {
       tolerance = Number(e.target.value);
       toleranceValDisplay.innerText = `${tolerance}%`;
-      if (targetColor) processSmartImage();
+      if (activeClick && currentBaseImageData) {
+        processSmartImage();
+      }
     });
 
-    // 滑桿放開時才儲存狀態，避免拖拉過程中產生海量歷史紀錄
+    // 滑桿放開時才儲存狀態，並覆寫當前歷史紀錄
     toleranceSlider.addEventListener('change', (e) => {
-      if (targetColor) saveState();
+      if (activeClick && currentBaseImageData && history.length > 0) {
+        history[historyIndex].imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+        history[historyIndex].tolerance = tolerance;
+      }
     });
 
     // 筆刷切換
@@ -486,7 +603,8 @@
     btnReset.addEventListener('click', () => {
       if (!originalImageData) return;
       ctx.putImageData(originalImageData, 0, 0);
-      targetColor = null;
+      activeClick = null;
+      currentBaseImageData = null;
       tolerance = 30;
       toleranceSlider.value = 30;
       toleranceValDisplay.innerText = `30%`;
@@ -536,26 +654,26 @@
         btnModeManual.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors text-gray-500";
         smartControls.classList.remove('hidden');
         manualControls.classList.add('hidden');
-        mainCanvas.classList.remove('cursor-pointer');
+        mainCanvas.classList.remove('cursor-none');
         mainCanvas.classList.add('cursor-crosshair');
         
         // 遮罩提示
         hintIcon.setAttribute('data-lucide', 'mouse-pointer-2');
-        hintText.innerText = targetColor ? '點擊圖片重新選擇背景色' : '請先點擊圖片選擇要去背的顏色';
+        hintText.innerText = activeClick ? '繼續點擊圖片中想去除的背景' : '請點擊圖片選擇要去背的背景顏色';
         
         // 容忍值狀態
-        if (targetColor) {
+        if (activeClick) {
           smartControls.classList.remove('opacity-60');
           toleranceSlider.disabled = false;
           toleranceSlider.classList.remove('cursor-not-allowed');
           toleranceSlider.classList.add('cursor-pointer', 'accent-blue-600');
-          smartHintText.innerText = '提示：調整此數值會重置「手動塗抹」的結果。建議先決定好容忍值，再切換到手動塗抹。';
+          smartHintText.innerText = '調整滑桿可改變「最新一次點擊」的去背範圍。';
         } else {
           smartControls.classList.add('opacity-60');
           toleranceSlider.disabled = true;
           toleranceSlider.classList.add('cursor-not-allowed');
           toleranceSlider.classList.remove('cursor-pointer', 'accent-blue-600');
-          smartHintText.innerText = '請先在上方圖片點擊您想要去除的背景顏色，即可啟用容忍值調整。';
+          smartHintText.innerText = '點擊圖片中要去除的背景區域，系統會自動選取相連的相近顏色。';
         }
 
       } else {
@@ -564,12 +682,12 @@
         btnModeManual.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors bg-white text-purple-600 shadow";
         smartControls.classList.add('hidden');
         manualControls.classList.remove('hidden');
-        mainCanvas.classList.add('cursor-pointer');
+        mainCanvas.classList.add('cursor-none');
         mainCanvas.classList.remove('cursor-crosshair');
         
         // 遮罩提示
         hintIcon.setAttribute('data-lucide', 'brush');
-        hintText.innerText = '直接在圖片上滑動手指塗抹';
+        hintText.innerText = '使用筆刷塗抹來去除或還原';
 
         // 筆刷按鈕狀態
         if (brushMode === 'erase') {
