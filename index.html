@@ -818,14 +818,14 @@
 
         loadSettings();
         
-        DOM.exportSlice.addEventListener('change', () => { saveSettings(); updateStatSize(); updatePreview(); });
+        DOM.exportSlice.addEventListener('change', () => { saveSettings(); updateStatSize(); updatePreview(); rebuildAnnoOverlay(); });
 
         /* ══ 歷史紀錄全域封裝引擎 (Undo / Redo) ══ */
         function saveState() {
             if (!cropper) return;
             const state = {
                 src: wandCanvas.toDataURL('image/png'),
-                annotations: JSON.parse(JSON.stringify(annotations)), // 深度拷貝當前所有標註與文字狀態
+                annotations: JSON.parse(JSON.stringify(annotations)), 
                 cropData: cropper.getData(),
                 targetWidth: targetWidth,
                 targetHeight: targetHeight,
@@ -838,7 +838,6 @@
             }
             history.push(state);
             
-            // 限制歷史紀錄 20 步以防記憶體爆炸
             if (history.length > 20) {
                 history.shift();
             } else {
@@ -856,17 +855,14 @@
             currentIndex = idx; 
             const state = history[idx];
             
-            // 復原標註與文字
             annotations = JSON.parse(JSON.stringify(state.annotations));
             selectedAnnoId = null; 
             
-            // 復原畫布尺寸
             targetWidth = state.targetWidth;
             targetHeight = state.targetHeight;
             isCustomSize = state.isCustomSize;
             updateStatSize();
             
-            // 復原 UI 選項按鈕狀態
             DOM.presetItems.forEach(i => {
                 i.classList.remove('active');
                 if (state.presetSize === 'custom' && i.dataset.w === 'custom') i.classList.add('active');
@@ -880,7 +876,6 @@
                 DOM.customSizeBox.classList.add('hidden');
             }
             
-            // 復原影像與裁切框
             const img = new Image(); 
             img.onload = () => {
                 wandCanvas.width = img.width; wandCanvas.height = img.height;
@@ -991,7 +986,6 @@
                 cropper = _createCropper('move');
                 updateModeUI();
                 
-                // 重置所有全域歷史狀態
                 history = []; currentIndex = -1; annotations = [];
                 renderAnnotationList();
                 saveState();
@@ -1021,13 +1015,14 @@
                 viewMode: 0, dragMode: isMoveMode ? 'move' : 'crop',
                 aspectRatio: isCustomSize ? NaN : (targetWidth / targetHeight),
                 autoCropArea: 0.9, background: false, movable: isMoveMode, zoomable: true,
+                guides: false, // 關閉原生 3x3 虛線，交給我們的紅線與自訂網格
                 cropBoxMovable: !isMoveMode, cropBoxResizable: !isMoveMode, restore: false,
                 
                 cropstart: (e) => {
                     const action = e.detail.action;
                     if (['crop', 'e', 'w', 's', 'n', 'se', 'sw', 'ne', 'nw', 'all'].includes(action)) {
                         isUserInteractingWithCropBox = true;
-                        if (cropper) previousCropData = cropper.getData(); // 紀錄拖曳前的裁切框狀態
+                        if (cropper) previousCropData = cropper.getData(); 
                     }
                 },
                 cropend: () => {
@@ -1037,7 +1032,7 @@
                         if (!lockedCropData || Math.abs(newData.x - lockedCropData.x) > 0.1 || Math.abs(newData.y - lockedCropData.y) > 0.1 ||
                             Math.abs(newData.width - lockedCropData.width) > 0.1 || Math.abs(newData.height - lockedCropData.height) > 0.1) {
                             lockedCropData = newData;
-                            saveState(); // 紀錄裁切框被移動的狀態
+                            saveState(); 
                         }
                     }
                 },
@@ -1126,7 +1121,7 @@
                     }
                     updateStatSize(); updatePreview(); rebuildAnnoOverlay();
                 }
-                saveSettings(); saveState(); // 紀錄尺寸變更歷史
+                saveSettings(); saveState(); 
             };
         });
 
@@ -1308,7 +1303,7 @@
         document.addEventListener('mouseup', e => {
             if (isDrawingBrush) {
                 isDrawingBrush = false; originalImageSrc = wandCanvas.toDataURL('image/png'); updateCropperImagesFast(originalImageSrc); 
-                saveState(); // 畫筆結束紀錄歷史
+                saveState(); 
                 updatePreview(); return;
             }
             if (!isDrawingEraseShape) return;
@@ -1321,7 +1316,7 @@
             const pt1 = screenToImage(eraseStartX, eraseStartY); const pt2 = screenToImage(currentX, currentY);
             wandCtx.putImageData(savedWandImageData, 0, 0); applyProcessShapeToCanvas(pt1, pt2, activeEraserTool);
             originalImageSrc = wandCanvas.toDataURL('image/png'); updateCropperImagesFast(originalImageSrc); 
-            saveState(); // 拉框結束紀錄歷史
+            saveState(); 
             updatePreview();
         });
 
@@ -1389,7 +1384,7 @@
             }
             wandCtx.putImageData(imgData, 0, 0); originalImageSrc = wandCanvas.toDataURL('image/png');
             updatePreview(); updateCropperImagesFast(originalImageSrc); 
-            saveState(); // 魔術棒處理結束紀錄歷史
+            saveState(); 
         }
 
         /* ══ 標註系統 ══ */
@@ -1397,7 +1392,7 @@
             const id = Date.now();
             annotations.push({ id, type:'arrow', x:targetWidth/2, y:targetHeight/2, angle:0, color:'#FF3B30', size:100, skewX:0, skewY:0, hasShadow:true });
             renderAnnotationList(); selectAnnotation(id); updatePreview(); rebuildAnnoOverlay();
-            saveState(); // 新增圖形紀錄歷史
+            saveState(); 
         };
         
         DOM.btnAddText.onclick = () => {
@@ -1405,7 +1400,7 @@
             const defaultFont = "'Noto Sans TC', 'Inter', sans-serif";
             annotations.push({ id, type:'text', x:targetWidth/2, y:targetHeight/2, angle:0, color:'#000000', fontSize:40, fontFamily: defaultFont, content:'新文字', skewX:0, skewY:0, hasShadow:true });
             renderAnnotationList(); selectAnnotation(id); updatePreview(); rebuildAnnoOverlay();
-            saveState(); // 新增文字紀錄歷史
+            saveState(); 
             setTimeout(() => { DOM.textContent.focus(); DOM.textContent.select(); }, 50);
         };
 
@@ -1447,7 +1442,7 @@
             annotations = annotations.filter(a => a.id !== id);
             if (selectedAnnoId === id) selectedAnnoId = null;
             renderAnnotationList(); selectAnnotation(null); updatePreview(); rebuildAnnoOverlay();
-            saveState(); // 刪除圖形紀錄歷史
+            saveState(); 
         }
 
         DOM.btnDeleteAnno.onclick = () => { if (selectedAnnoId) deleteAnnotation(selectedAnnoId); };
@@ -1493,7 +1488,7 @@
             if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z')) && !isInputActive) { e.preventDefault(); if (currentIndex < history.length - 1) restore(currentIndex + 1); }
         });
 
-        /* ══ 標註把手浮層 ══ */
+        /* ══ 標註把手浮層 & 主視窗切割輔助線 ══ */
         function rebuildAnnoOverlay() {
             DOM.annoOverlay.innerHTML = '';
             if (!cropper) return;
@@ -1507,6 +1502,7 @@
                 return { x: canvasData.left + imgX * scaleX, y: canvasData.top + imgY * scaleY };
             }
 
+            // 原本的絕對像素網格
             if (DOM.showGrid.checked) {
                 const tl = toWrapperPx(0, 0); const br = toWrapperPx(targetWidth, targetHeight);
                 const gridDiv = document.createElement('div');
@@ -1521,6 +1517,26 @@
                 const centerDiv = document.createElement('div'); centerDiv.style.position = 'absolute'; centerDiv.style.left = '50%'; centerDiv.style.top = '0'; centerDiv.style.width = '1px'; centerDiv.style.height = '100%'; centerDiv.style.backgroundColor = 'rgba(255, 59, 48, 0.4)'; gridDiv.appendChild(centerDiv);
                 const centerDivH = document.createElement('div'); centerDivH.style.position = 'absolute'; centerDivH.style.left = '0'; centerDivH.style.top = '50%'; centerDivH.style.width = '100%'; centerDivH.style.height = '1px'; centerDivH.style.backgroundColor = 'rgba(255, 59, 48, 0.4)'; gridDiv.appendChild(centerDivH);
                 DOM.annoOverlay.appendChild(gridDiv);
+            }
+
+            // 新增：主編輯區即時顯示九宮格/16宮格切割輔助線
+            const sliceMode = DOM.exportSlice.value;
+            if (sliceMode !== 'none') {
+                const tl = toWrapperPx(0, 0); const br = toWrapperPx(targetWidth, targetHeight);
+                const sliceDiv = document.createElement('div');
+                sliceDiv.style.position = 'absolute'; sliceDiv.style.left = tl.x + 'px'; sliceDiv.style.top = tl.y + 'px';
+                sliceDiv.style.width = (br.x - tl.x) + 'px'; sliceDiv.style.height = (br.y - tl.y) + 'px';
+                sliceDiv.style.pointerEvents = 'none'; sliceDiv.style.boxSizing = 'border-box';
+                sliceDiv.style.border = '2px solid rgba(255, 59, 48, 0.8)'; sliceDiv.style.zIndex = '45';
+
+                let bgImage = '';
+                if (sliceMode === '3x3') {
+                    bgImage = `linear-gradient(to right, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px)), linear-gradient(to bottom, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px))`;
+                } else if (sliceMode === '4x4') {
+                    bgImage = `linear-gradient(to right, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px)), linear-gradient(to bottom, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px))`;
+                }
+                sliceDiv.style.backgroundImage = bgImage;
+                DOM.annoOverlay.appendChild(sliceDiv);
             }
 
             annotations.forEach(anno => {
@@ -1558,7 +1574,7 @@
         document.addEventListener('mouseup', () => { 
             if (_dragAnno) {
                 _dragAnno = null; 
-                saveState(); // 拖曳放開後紀錄歷史
+                saveState(); 
             }
         });
 
@@ -1685,13 +1701,11 @@
                             const pieceCanvas = document.createElement('canvas'); pieceCanvas.width = w; pieceCanvas.height = h;
                             const pCtx = pieceCanvas.getContext('2d'); 
                             
-                            // 【防殘線處理】確保 JPEG 匯出時邊緣填滿純白，PNG 則自帶透明
                             if (format === 'image/jpeg') {
                                 pCtx.fillStyle = '#FFFFFF';
                                 pCtx.fillRect(0, 0, w, h);
                             }
                             
-                            // 【防殘線處理】上下左右預設內縮 1px
                             const inset = 1;
                             pCtx.drawImage(
                                 canvas, 
