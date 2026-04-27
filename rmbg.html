@@ -99,14 +99,18 @@
       <div class="bg-white p-4 rounded-2xl shadow-md border border-gray-100 flex flex-col gap-4 w-full">
         
         <!-- 智慧模式控制項 -->
-        <div id="smart-controls" class="flex flex-col gap-2 opacity-60">
-          <div class="flex justify-between items-center">
-            <label class="text-base font-bold text-gray-800">去背容忍值</label>
-            <span id="tolerance-val-display" class="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">30%</span>
+        <div id="smart-controls" class="flex flex-col gap-3">
+          <label class="text-base font-bold text-gray-800">去背範圍</label>
+          <div class="flex gap-2">
+            <button id="btn-fill-contiguous" class="flex-1 py-2 rounded-xl border-2 font-bold transition-all border-blue-400 bg-blue-50 text-blue-600">
+              相鄰區域
+            </button>
+            <button id="btn-fill-global" class="flex-1 py-2 rounded-xl border-2 font-bold transition-all border-transparent bg-gray-100 text-gray-500">
+              全圖相似色
+            </button>
           </div>
-          <input type="range" id="tolerance-slider" min="0" max="100" value="30" disabled class="w-full h-6 bg-gray-200 rounded-lg appearance-none cursor-not-allowed">
-          <p id="smart-hint-text" class="text-xs text-orange-600 font-medium">
-            點擊圖片中要去除的背景區域，系統會自動選取相連的相近顏色。
+          <p id="smart-hint-text" class="text-xs text-gray-500 font-medium">
+            點擊圖片，僅會去除與點擊處「相連」的相近顏色。
           </p>
         </div>
 
@@ -161,7 +165,8 @@
     let hasImage = false;
     let activeClick = null; // 取代 targetColor，紀錄魔術棒點擊位置
     let currentBaseImageData = null; // 紀錄魔術棒點擊前的畫面狀態
-    let tolerance = 30;
+    let smartFillMode = 'contiguous'; // 'contiguous' 或 'global'
+    const FIXED_TOLERANCE = 30; // 固定容忍值，簡化操作
     let appMode = 'smart'; // 'smart' 或 'manual'
     let brushMode = 'erase'; // 'erase' 或 'restore'
     let brushSize = 30;
@@ -192,8 +197,8 @@
     const smartControls = document.getElementById('smart-controls');
     const manualControls = document.getElementById('manual-controls');
     
-    const toleranceSlider = document.getElementById('tolerance-slider');
-    const toleranceValDisplay = document.getElementById('tolerance-val-display');
+    const btnFillContiguous = document.getElementById('btn-fill-contiguous');
+    const btnFillGlobal = document.getElementById('btn-fill-global');
     const smartHintText = document.getElementById('smart-hint-text');
 
     const btnBrushErase = document.getElementById('btn-brush-erase');
@@ -222,12 +227,12 @@
         history = history.slice(0, historyIndex + 1);
       }
       
-      // 儲存當前畫面狀態、顏色與容忍值
+      // 儲存當前畫面狀態、顏色與範圍模式
       history.push({
         imageData: ctx.getImageData(0, 0, imageWidth, imageHeight),
         preClickImageData: currentBaseImageData ? new ImageData(new Uint8ClampedArray(currentBaseImageData.data), imageWidth, imageHeight) : null,
         activeClick: activeClick ? { ...activeClick } : null,
-        tolerance: tolerance
+        smartFillMode: smartFillMode
       });
       
       // 限制紀錄數量
@@ -244,9 +249,7 @@
       ctx.putImageData(state.imageData, 0, 0);
       activeClick = state.activeClick ? { ...state.activeClick } : null;
       currentBaseImageData = state.preClickImageData ? new ImageData(new Uint8ClampedArray(state.preClickImageData.data), imageWidth, imageHeight) : null;
-      tolerance = state.tolerance;
-      toleranceSlider.value = tolerance;
-      toleranceValDisplay.innerText = `${tolerance}%`;
+      smartFillMode = state.smartFillMode || 'contiguous';
       updateUI();
       updateUndoRedoUI();
     }
@@ -295,8 +298,7 @@
           // 重置狀態
           activeClick = null;
           currentBaseImageData = null;
-          tolerance = 30;
-          toleranceSlider.value = 30;
+          smartFillMode = 'contiguous';
           appMode = 'smart';
           hasImage = true;
           
@@ -341,68 +343,81 @@
 
       // 容忍值轉換 (0-100 映射到 0-441)
       const maxDist = 441.67; 
-      const currentTol = (tolerance / 100) * maxDist;
+      const currentTol = (FIXED_TOLERANCE / 100) * maxDist;
 
-      // 廣度優先搜尋 (BFS) 陣列
-      const visited = new Uint8Array(imageWidth * imageHeight);
-      let head = 0;
-      let tail = 1;
-      const qX = new Int32Array(imageWidth * imageHeight);
-      const qY = new Int32Array(imageWidth * imageHeight);
-      
-      qX[0] = startX;
-      qY[0] = startY;
-      visited[startY * imageWidth + startX] = 1;
-
-      while (head < tail) {
-        const x = qX[head++];
-        const y = qY[head-1];
-
-        const idx = (y * imageWidth + x) * 4;
-        data[idx + 3] = 0; // 設為透明
-
-        // 檢查相鄰的四個像素
-        // 右
-        if (x + 1 < imageWidth) {
-          const nx = x + 1, ny = y, nIdx = ny * imageWidth + nx;
-          if (!visited[nIdx]) {
-            visited[nIdx] = 1;
-            const pxIdx = nIdx * 4;
-            if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
-              qX[tail] = nx; qY[tail] = ny; tail++;
-            }
+      if (smartFillMode === 'global') {
+        // 全圖相似色去背
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          
+          if (data[i + 3] > 0 && colorDistance(r, g, b, targetR, targetG, targetB) <= currentTol) {
+            data[i + 3] = 0; // 設為透明
           }
         }
-        // 左
-        if (x - 1 >= 0) {
-          const nx = x - 1, ny = y, nIdx = ny * imageWidth + nx;
-          if (!visited[nIdx]) {
-            visited[nIdx] = 1;
-            const pxIdx = nIdx * 4;
-            if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
-              qX[tail] = nx; qY[tail] = ny; tail++;
+      } else {
+        // 廣度優先搜尋 (BFS) 陣列 - 相鄰區域去背
+        const visited = new Uint8Array(imageWidth * imageHeight);
+        let head = 0;
+        let tail = 1;
+        const qX = new Int32Array(imageWidth * imageHeight);
+        const qY = new Int32Array(imageWidth * imageHeight);
+        
+        qX[0] = startX;
+        qY[0] = startY;
+        visited[startY * imageWidth + startX] = 1;
+
+        while (head < tail) {
+          const x = qX[head++];
+          const y = qY[head-1];
+
+          const idx = (y * imageWidth + x) * 4;
+          data[idx + 3] = 0; // 設為透明
+
+          // 檢查相鄰的四個像素
+          // 右
+          if (x + 1 < imageWidth) {
+            const nx = x + 1, ny = y, nIdx = ny * imageWidth + nx;
+            if (!visited[nIdx]) {
+              visited[nIdx] = 1;
+              const pxIdx = nIdx * 4;
+              if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
+                qX[tail] = nx; qY[tail] = ny; tail++;
+              }
             }
           }
-        }
-        // 下
-        if (y + 1 < imageHeight) {
-          const nx = x, ny = y + 1, nIdx = ny * imageWidth + nx;
-          if (!visited[nIdx]) {
-            visited[nIdx] = 1;
-            const pxIdx = nIdx * 4;
-            if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
-              qX[tail] = nx; qY[tail] = ny; tail++;
+          // 左
+          if (x - 1 >= 0) {
+            const nx = x - 1, ny = y, nIdx = ny * imageWidth + nx;
+            if (!visited[nIdx]) {
+              visited[nIdx] = 1;
+              const pxIdx = nIdx * 4;
+              if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
+                qX[tail] = nx; qY[tail] = ny; tail++;
+              }
             }
           }
-        }
-        // 上
-        if (y - 1 >= 0) {
-          const nx = x, ny = y - 1, nIdx = ny * imageWidth + nx;
-          if (!visited[nIdx]) {
-            visited[nIdx] = 1;
-            const pxIdx = nIdx * 4;
-            if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
-              qX[tail] = nx; qY[tail] = ny; tail++;
+          // 下
+          if (y + 1 < imageHeight) {
+            const nx = x, ny = y + 1, nIdx = ny * imageWidth + nx;
+            if (!visited[nIdx]) {
+              visited[nIdx] = 1;
+              const pxIdx = nIdx * 4;
+              if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
+                qX[tail] = nx; qY[tail] = ny; tail++;
+              }
+            }
+          }
+          // 上
+          if (y - 1 >= 0) {
+            const nx = x, ny = y - 1, nIdx = ny * imageWidth + nx;
+            if (!visited[nIdx]) {
+              visited[nIdx] = 1;
+              const pxIdx = nIdx * 4;
+              if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
+                qX[tail] = nx; qY[tail] = ny; tail++;
+              }
             }
           }
         }
@@ -572,20 +587,24 @@
       updateUI();
     });
 
-    // 容忍值滑桿
-    toleranceSlider.addEventListener('input', (e) => {
-      tolerance = Number(e.target.value);
-      toleranceValDisplay.innerText = `${tolerance}%`;
+    // 去背範圍切換
+    btnFillContiguous.addEventListener('click', () => {
+      smartFillMode = 'contiguous';
+      updateUI();
       if (activeClick && currentBaseImageData) {
         processSmartImage();
+        // 覆寫目前歷史紀錄的影像
+        if (history.length > 0) history[historyIndex].imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
       }
     });
 
-    // 滑桿放開時才儲存狀態，並覆寫當前歷史紀錄
-    toleranceSlider.addEventListener('change', (e) => {
-      if (activeClick && currentBaseImageData && history.length > 0) {
-        history[historyIndex].imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
-        history[historyIndex].tolerance = tolerance;
+    btnFillGlobal.addEventListener('click', () => {
+      smartFillMode = 'global';
+      updateUI();
+      if (activeClick && currentBaseImageData) {
+        processSmartImage();
+        // 覆寫目前歷史紀錄的影像
+        if (history.length > 0) history[historyIndex].imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
       }
     });
 
@@ -605,9 +624,7 @@
       ctx.putImageData(originalImageData, 0, 0);
       activeClick = null;
       currentBaseImageData = null;
-      tolerance = 30;
-      toleranceSlider.value = 30;
-      toleranceValDisplay.innerText = `30%`;
+      smartFillMode = 'contiguous';
       appMode = 'smart';
       updateUI();
       saveState(); // 儲存重設狀態
@@ -661,19 +678,15 @@
         hintIcon.setAttribute('data-lucide', 'mouse-pointer-2');
         hintText.innerText = activeClick ? '繼續點擊圖片中想去除的背景' : '請點擊圖片選擇要去背的背景顏色';
         
-        // 容忍值狀態
-        if (activeClick) {
-          smartControls.classList.remove('opacity-60');
-          toleranceSlider.disabled = false;
-          toleranceSlider.classList.remove('cursor-not-allowed');
-          toleranceSlider.classList.add('cursor-pointer', 'accent-blue-600');
-          smartHintText.innerText = '調整滑桿可改變「最新一次點擊」的去背範圍。';
+        // 去背範圍外觀
+        if (smartFillMode === 'contiguous') {
+          btnFillContiguous.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-blue-400 bg-blue-50 text-blue-600";
+          btnFillGlobal.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-transparent bg-gray-100 text-gray-500";
+          smartHintText.innerText = '點擊圖片，僅會去除與點擊處「相連」的相近顏色。';
         } else {
-          smartControls.classList.add('opacity-60');
-          toleranceSlider.disabled = true;
-          toleranceSlider.classList.add('cursor-not-allowed');
-          toleranceSlider.classList.remove('cursor-pointer', 'accent-blue-600');
-          smartHintText.innerText = '點擊圖片中要去除的背景區域，系統會自動選取相連的相近顏色。';
+          btnFillContiguous.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-transparent bg-gray-100 text-gray-500";
+          btnFillGlobal.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-blue-400 bg-blue-50 text-blue-600";
+          smartHintText.innerText = '點擊圖片，會將整張圖片中「所有」相近的顏色去除。';
         }
 
       } else {
