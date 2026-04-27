@@ -556,7 +556,7 @@
                     
                     <div class="export-info mb-2">
                         <div>輸出總尺寸：<b id="stat-size">370 × 320 px</b></div>
-                        <div>安全邊距：<b>10 px</b></div>
+                        <div>防殘留邊界：<b>內縮 1 px</b></div>
                     </div>
                     <button id="btn-export" class="btn btn-primary w-100" style="transition: background-color 0.3s;" disabled>
                         <i class="fa-solid fa-download"></i> 下載圖片
@@ -1683,7 +1683,21 @@
                             const h = (r === splits - 1) ? canvas.height - pieceH * (splits - 1) : pieceH;
                             
                             const pieceCanvas = document.createElement('canvas'); pieceCanvas.width = w; pieceCanvas.height = h;
-                            const pCtx = pieceCanvas.getContext('2d'); pCtx.drawImage(canvas, c * pieceW, r * pieceH, w, h, 0, 0, w, h);
+                            const pCtx = pieceCanvas.getContext('2d'); 
+                            
+                            // 【防殘線處理】確保 JPEG 匯出時邊緣填滿純白，PNG 則自帶透明
+                            if (format === 'image/jpeg') {
+                                pCtx.fillStyle = '#FFFFFF';
+                                pCtx.fillRect(0, 0, w, h);
+                            }
+                            
+                            // 【防殘線處理】上下左右預設內縮 1px
+                            const inset = 1;
+                            pCtx.drawImage(
+                                canvas, 
+                                c * pieceW + inset, r * pieceH + inset, w - inset * 2, h - inset * 2, 
+                                inset, inset, w - inset * 2, h - inset * 2
+                            );
                             
                             const promise = new Promise((resolve) => {
                                 pieceCanvas.toBlob((blob) => { zip.file(`${currentFilename}_part${idx}.${ext}`, blob); resolve(); }, format, format === 'image/jpeg' ? 0.92 : 1);
