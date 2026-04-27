@@ -8,8 +8,8 @@
   <!-- 載入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- 載入 Lucide 圖示庫 -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- 載入 Lucide 圖示庫 (指定 UMD 版本以增加穩定性) -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
   <style>
     /* 棋盤格背景樣式 */
@@ -115,11 +115,11 @@
         <!-- AI 人像模式控制項 -->
         <div id="ai-controls" class="flex flex-col gap-4 hidden">
           <p class="text-sm text-gray-600 font-medium text-center bg-purple-50 p-3 rounded-xl border border-purple-100">
-            啟動裝置端 AI 模型，自動偵測「人體與人臉」並保留主體，自動去除其餘背景。<br>
-            <span class="text-xs text-purple-500 mt-1 block">(首次使用需下載約幾MB模型，請耐心等候)</span>
+            啟動 Google MediaPipe 引擎，精準辨識人像邊緣，效能更高且支援平滑去背。<br>
+            <span class="text-xs text-purple-500 mt-1 block">(首次使用需載入模型，請保持網路暢通)</span>
           </p>
           <button id="btn-run-ai" class="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-lg font-bold py-3 rounded-xl shadow-md active:scale-95 transition-transform">
-            <i data-lucide="sparkles"></i> 啟動 AI 智慧去背
+            <i data-lucide="sparkles"></i> 啟動精準 AI 去背
           </button>
           <div id="ai-loading" class="hidden flex-col items-center justify-center gap-2 py-2">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
@@ -175,7 +175,11 @@
 
   <script>
     // 初始化 Lucide 圖示
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    } else {
+      console.warn("Lucide icons failed to load on initial parse.");
+    }
 
     // 狀態變數
     let hasImage = false;
@@ -279,16 +283,30 @@
       return Math.sqrt(Math.pow(r1 - r2, 2) + Math.pow(g1 - g2, 2) + Math.pow(b1 - b2, 2));
     }
 
-    // 動態載入外部腳本 (供 AI 使用)
-    function loadScript(src) {
+    // 動態載入外部腳本，並支援備援網址 (避免單一 CDN 異常)
+    function loadScript(src, fallbackSrc) {
       return new Promise((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) {
+        if (document.querySelector(`script[src="${src}"]`) || document.querySelector(`script[src="${fallbackSrc}"]`)) {
           resolve(); return;
         }
         const script = document.createElement('script');
         script.src = src;
+        script.crossOrigin = "anonymous";
         script.onload = resolve;
-        script.onerror = reject;
+        script.onerror = () => {
+          console.warn(`載入失敗: ${src}`);
+          if (fallbackSrc) {
+            console.log(`嘗試備用網址: ${fallbackSrc}`);
+            const fbScript = document.createElement('script');
+            fbScript.src = fallbackSrc;
+            fbScript.crossOrigin = "anonymous";
+            fbScript.onload = resolve;
+            fbScript.onerror = () => reject(new Error(`兩次嘗試皆無法載入腳本: ${fallbackSrc}`));
+            document.head.appendChild(fbScript);
+          } else {
+            reject(new Error(`無法載入腳本: ${src}`));
+          }
+        };
         document.head.appendChild(script);
       });
     }
@@ -302,45 +320,59 @@
       aiLoading.classList.remove('hidden');
       
       try {
-        aiStatusText.innerText = "載入 AI 引擎 (1/2)...";
-        if (!window.tf) {
-          await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js');
+        aiStatusText.innerText = "載入 MediaPipe 引擎 (1/1)...";
+        if (!window.SelfieSegmentation) {
+          await loadScript(
+            'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js',
+            'https://unpkg.com/@mediapipe/selfie_segmentation/selfie_segmentation.js'
+          );
         }
         
-        aiStatusText.innerText = "載入視覺模型 (2/2)...";
-        if (!window.bodyPix) {
-          await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js');
-        }
+        aiStatusText.innerText = "正在精準辨識人像邊緣...";
         
-        aiStatusText.innerText = "正在精準辨識人像...";
-        // 載入 BodyPix 模型
-        const net = await bodyPix.load({
-          architecture: 'MobileNetV1',
-          outputStride: 16,
-          multiplier: 0.75,
-          quantBytes: 2
+        await new Promise((resolve, reject) => {
+          const selfieSegmentation = new SelfieSegmentation({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+          });
+
+          selfieSegmentation.setOptions({
+            modelSelection: 0, // 0為高品質模型
+          });
+
+          selfieSegmentation.onResults((results) => {
+            try {
+              const maskCanvas = document.createElement('canvas');
+              maskCanvas.width = imageWidth;
+              maskCanvas.height = imageHeight;
+              const maskCtx = maskCanvas.getContext('2d');
+              // 繪製分割遮罩 (白色為前景，黑色為背景)
+              maskCtx.drawImage(results.segmentationMask, 0, 0, imageWidth, imageHeight);
+              const maskData = maskCtx.getImageData(0, 0, imageWidth, imageHeight).data;
+
+              const currentData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+              
+              // 處理透明度平滑過渡 (Anti-aliasing 邊緣羽化)
+              for (let i = 0; i < maskData.length; i += 4) {
+                // maskData[i] 取 R 通道，介於 0 (背景) 到 255 (主體)
+                // 將原圖的 Alpha 通道與 mask 結合，保留半透明的平滑邊緣 (如頭髮邊緣)
+                currentData.data[i + 3] = Math.min(currentData.data[i + 3], maskData[i]);
+              }
+
+              ctx.putImageData(currentData, 0, 0);
+              saveState(); // 存檔讓使用者可以復原
+              resolve();
+            } catch (e) {
+              reject(e);
+            }
+          });
+
+          // 將原圖送入模型
+          selfieSegmentation.send({image: originalCanvas}).catch(reject);
         });
-        
-        // 使用「原圖」進行辨識，獲得遮罩
-        const segmentation = await net.segmentPerson(originalCanvas, {
-          internalResolution: 'medium',
-          segmentationThreshold: 0.6
-        });
-        
-        // 將目前的畫布資料讀出，並套用 AI 遮罩
-        const currentData = ctx.getImageData(0, 0, imageWidth, imageHeight);
-        for (let i = 0; i < segmentation.data.length; i++) {
-          if (segmentation.data[i] === 0) { // 0 代表非人體(背景)
-            currentData.data[i * 4 + 3] = 0; // 將背景設為透明
-          }
-        }
-        
-        ctx.putImageData(currentData, 0, 0);
-        saveState(); // 存檔讓使用者可以復原
         
       } catch (err) {
-        alert('AI 模型載入失敗，請確認網路連線是否正常。');
-        console.error(err);
+        alert('AI 模型載入失敗，這可能是網路問題。請檢查連線或稍後再試。');
+        console.error("AI 載入詳細錯誤: ", err.message || err);
       } finally {
         isAiProcessing = false;
         btnRunAi.classList.remove('hidden');
@@ -391,6 +423,9 @@
 
           updateUI();
           saveState(); 
+        };
+        img.onerror = () => {
+          alert('無法讀取圖片，請確認檔案格式是否正確。');
         };
         img.src = event.target.result;
       };
@@ -579,7 +614,7 @@
     mainCanvas.addEventListener('pointerenter', updateBrushCursor);
     mainCanvas.addEventListener('pointerleave', () => brushCursor.classList.add('hidden'));
 
-    // 【防誤觸機制改良】：魔術棒改用 click 觸發，因為手機上的 scroll (滑動) 不會觸發 click，只有純點擊會觸發。
+    // 【防誤觸機制】：魔術棒改用 click 觸發，因為手機上的 scroll 不會觸發 click
     mainCanvas.addEventListener('click', (e) => {
       if (!originalImageData || appMode !== 'smart') return;
 
@@ -599,7 +634,7 @@
       }
     });
 
-    // 手動塗抹仍然需要 pointerdown 來處理繪圖軌跡
+    // 手動塗抹需要 pointerdown 來處理繪圖軌跡
     mainCanvas.addEventListener('pointerdown', (e) => {
       if (!originalImageData || appMode !== 'manual') return;
 
@@ -803,7 +838,9 @@
         }
       }
       
-      lucide.createIcons();
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
     }
 
   </script>
