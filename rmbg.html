@@ -56,14 +56,27 @@
     <!-- 圖片預覽與編輯區 (預設隱藏) -->
     <div id="editor-container" class="flex flex-col gap-3 hidden">
       
-      <!-- 模式切換標籤 -->
-      <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner">
-        <button id="btn-mode-smart" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors bg-white text-blue-600 shadow">
-          <i data-lucide="wand-2" style="width: 18px; height: 18px;"></i> 智慧選色
-        </button>
-        <button id="btn-mode-manual" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors text-gray-500">
-          <i data-lucide="hand" style="width: 18px; height: 18px;"></i> 手動塗抹
-        </button>
+      <!-- 頂部工具列：模式切換與復原重做 -->
+      <div class="flex items-center justify-between gap-2">
+        <!-- 模式切換標籤 -->
+        <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner flex-1">
+          <button id="btn-mode-smart" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors bg-white text-blue-600 shadow">
+            <i data-lucide="wand-2" style="width: 18px; height: 18px;"></i> 智慧選色
+          </button>
+          <button id="btn-mode-manual" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors text-gray-500">
+            <i data-lucide="hand" style="width: 18px; height: 18px;"></i> 手動塗抹
+          </button>
+        </div>
+        
+        <!-- 復原 / 重做 按鈕 -->
+        <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner">
+          <button id="btn-undo" class="p-2 rounded-lg text-gray-500 hover:bg-white hover:shadow transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none" disabled>
+            <i data-lucide="undo" style="width: 20px; height: 20px;"></i>
+          </button>
+          <button id="btn-redo" class="p-2 rounded-lg text-gray-500 hover:bg-white hover:shadow transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none" disabled>
+            <i data-lucide="redo" style="width: 20px; height: 20px;"></i>
+          </button>
+        </div>
       </div>
 
       <!-- 提示文字 (移出畫布) -->
@@ -151,6 +164,11 @@
     let isDrawing = false;
     let lastPos = null;
 
+    // 復原/重做 狀態紀錄
+    let history = [];
+    let historyIndex = -1;
+    const MAX_HISTORY = 15; // 最多紀錄 15 步
+
     // DOM 元素參考
     const initialContainer = document.getElementById('initial-upload-container');
     const editorContainer = document.getElementById('editor-container');
@@ -182,12 +200,49 @@
     const btnReset = document.getElementById('btn-reset');
     const btnSave = document.getElementById('btn-save');
 
+    const btnUndo = document.getElementById('btn-undo');
+    const btnRedo = document.getElementById('btn-redo');
+
     const hintText = document.getElementById('hint-text');
     const hintIcon = document.getElementById('hint-icon');
 
     // ----------------------------------------------------------------
     // 核心邏輯區
     // ----------------------------------------------------------------
+
+    // 儲存歷史狀態
+    function saveState() {
+      // 捨棄當前指標之後的重做紀錄
+      if (historyIndex < history.length - 1) {
+        history = history.slice(0, historyIndex + 1);
+      }
+      
+      // 儲存當前畫面狀態、顏色與容忍值
+      history.push({
+        imageData: ctx.getImageData(0, 0, imageWidth, imageHeight),
+        targetColor: targetColor ? { ...targetColor } : null,
+        tolerance: tolerance
+      });
+      
+      // 限制紀錄數量
+      if (history.length > MAX_HISTORY) {
+        history.shift();
+      } else {
+        historyIndex++;
+      }
+      updateUndoRedoUI();
+    }
+
+    // 應用歷史狀態
+    function applyState(state) {
+      ctx.putImageData(state.imageData, 0, 0);
+      targetColor = state.targetColor ? { ...state.targetColor } : null;
+      tolerance = state.tolerance;
+      toleranceSlider.value = tolerance;
+      toleranceValDisplay.innerText = `${tolerance}%`;
+      updateUI();
+      updateUndoRedoUI();
+    }
 
     // 顏色距離計算
     function colorDistance(r1, g1, b1, r2, g2, b2) {
@@ -236,8 +291,12 @@
           toleranceSlider.value = 30;
           appMode = 'smart';
           hasImage = true;
+          
+          history = [];
+          historyIndex = -1;
 
           updateUI();
+          saveState(); // 載入後存為第 0 步
         };
         img.src = event.target.result;
       };
@@ -314,6 +373,21 @@
 
     uploadInputs.forEach(input => input.addEventListener('change', handleImageUpload));
 
+    // 復原 / 重做 按鈕事件
+    btnUndo.addEventListener('click', () => {
+      if (historyIndex > 0) {
+        historyIndex--;
+        applyState(history[historyIndex]);
+      }
+    });
+
+    btnRedo.addEventListener('click', () => {
+      if (historyIndex < history.length - 1) {
+        historyIndex++;
+        applyState(history[historyIndex]);
+      }
+    });
+
     // Canvas 互動
     mainCanvas.addEventListener('pointerdown', (e) => {
       if (!originalImageData) return;
@@ -327,6 +401,7 @@
         if (index >= 0 && index < data.length) {
           targetColor = { r: data[index], g: data[index + 1], b: data[index + 2] };
           processSmartImage();
+          saveState(); // 儲存智慧選色狀態
           updateUI();
         }
       } else {
@@ -366,6 +441,7 @@
         isDrawing = false;
         lastPos = null;
         mainCanvas.releasePointerCapture(e.pointerId);
+        saveState(); // 儲存手動塗抹狀態
       }
     };
 
@@ -391,6 +467,11 @@
       if (targetColor) processSmartImage();
     });
 
+    // 滑桿放開時才儲存狀態，避免拖拉過程中產生海量歷史紀錄
+    toleranceSlider.addEventListener('change', (e) => {
+      if (targetColor) saveState();
+    });
+
     // 筆刷切換
     btnBrushErase.addEventListener('click', () => { brushMode = 'erase'; updateUI(); });
     btnBrushRestore.addEventListener('click', () => { brushMode = 'restore'; updateUI(); });
@@ -406,11 +487,12 @@
       if (!originalImageData) return;
       ctx.putImageData(originalImageData, 0, 0);
       targetColor = null;
-      tolerance = 0;
-      toleranceSlider.value = 0;
-      toleranceValDisplay.innerText = `0%`;
+      tolerance = 30;
+      toleranceSlider.value = 30;
+      toleranceValDisplay.innerText = `30%`;
       appMode = 'smart';
       updateUI();
+      saveState(); // 儲存重設狀態
     });
 
     // 存檔按鈕
@@ -427,6 +509,17 @@
     // ----------------------------------------------------------------
     // 介面更新邏輯
     // ----------------------------------------------------------------
+    
+    function updateUndoRedoUI() {
+      // 根據目前指標位置決定按鈕是否可以點擊
+      btnUndo.disabled = historyIndex <= 0;
+      btnRedo.disabled = historyIndex >= history.length - 1;
+      
+      // 更新顏色外觀
+      btnUndo.classList.toggle('text-blue-600', historyIndex > 0);
+      btnRedo.classList.toggle('text-blue-600', historyIndex < history.length - 1);
+    }
+
     function updateUI() {
       // 顯示/隱藏 主視窗
       if (hasImage) {
