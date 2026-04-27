@@ -35,100 +35,100 @@
     }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex flex-col items-center pb-10">
+<body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex flex-col items-center pb-6">
 
   <!-- 頂部標題 -->
-  <header class="w-full bg-white shadow-sm p-4 text-center mb-4">
-    <h1 class="text-3xl font-extrabold text-blue-600">智慧去背小幫手</h1>
+  <header class="w-full bg-white shadow-sm p-2 text-center mb-2">
+    <h1 class="text-xl font-extrabold text-blue-600">智慧去背小幫手</h1>
   </header>
 
-  <main class="w-full max-w-2xl px-4 flex flex-col gap-4">
+  <main class="w-full max-w-2xl px-3 flex flex-col gap-3">
     
     <!-- 未上傳圖片時顯示的按鈕區塊 -->
     <div id="initial-upload-container" class="transition-all duration-300 block">
-      <label class="bg-blue-600 text-white text-3xl font-bold py-12 px-6 rounded-3xl shadow-xl w-full flex flex-col items-center justify-center gap-6 cursor-pointer active:scale-95 transition-transform">
-        <i data-lucide="upload" style="width: 64px; height: 64px;"></i>
+      <label class="bg-blue-600 text-white text-xl font-bold py-8 px-4 rounded-2xl shadow-md w-full flex flex-col items-center justify-center gap-3 cursor-pointer active:scale-95 transition-transform">
+        <i data-lucide="upload" style="width: 48px; height: 48px;"></i>
         點擊讀入照片
         <input type="file" accept="image/*" class="hidden" id="upload-input-1" />
       </label>
     </div>
 
     <!-- 圖片預覽與編輯區 (預設隱藏) -->
-    <div id="editor-container" class="flex flex-col gap-4 hidden">
+    <div id="editor-container" class="flex flex-col gap-3 hidden">
       
       <!-- 模式切換標籤 -->
-      <div class="flex bg-gray-200 rounded-2xl p-1 shadow-inner">
-        <button id="btn-mode-smart" class="flex-1 flex justify-center items-center gap-2 py-3 rounded-xl text-xl font-bold transition-colors bg-white text-blue-600 shadow">
-          <i data-lucide="wand-2"></i> 智慧選色
+      <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner">
+        <button id="btn-mode-smart" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors bg-white text-blue-600 shadow">
+          <i data-lucide="wand-2" style="width: 18px; height: 18px;"></i> 智慧選色
         </button>
-        <button id="btn-mode-manual" class="flex-1 flex justify-center items-center gap-2 py-3 rounded-xl text-xl font-bold transition-colors text-gray-500">
-          <i data-lucide="hand"></i> 手動塗抹
+        <button id="btn-mode-manual" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors text-gray-500">
+          <i data-lucide="hand" style="width: 18px; height: 18px;"></i> 手動塗抹
         </button>
       </div>
 
+      <!-- 提示文字 (移出畫布) -->
+      <p id="status-hint" class="text-sm font-semibold text-center text-blue-600 m-0 flex items-center justify-center gap-1">
+        <i data-lucide="mouse-pointer-2" id="hint-icon" style="width: 16px; height: 16px;"></i> 
+        <span id="hint-text">請先點擊圖片選擇要去背的顏色</span>
+      </p>
+
       <!-- 畫布顯示區 -->
-      <div class="relative w-full rounded-2xl overflow-hidden shadow-inner border-4 border-gray-200 bg-white">
-        <!-- 提示遮罩 -->
-        <div id="canvas-overlay" class="absolute top-0 left-0 w-full bg-black/60 text-white text-lg p-2 text-center flex items-center justify-center gap-2 pointer-events-none z-10">
-          <i data-lucide="mouse-pointer-2" id="overlay-icon"></i> 
-          <span id="overlay-text">請先點擊圖片選擇要去背的顏色</span>
-        </div>
-        
-        <div class="checkerboard w-full h-full flex justify-center items-center overflow-hidden min-h-[300px]">
-          <canvas id="main-canvas" class="max-w-full h-auto cursor-crosshair transition-opacity" style="max-height: 55vh;"></canvas>
+      <div class="relative w-full rounded-xl overflow-hidden shadow-inner border-2 border-gray-200 bg-white">
+        <div class="checkerboard w-full h-full flex justify-center items-center overflow-hidden">
+          <canvas id="main-canvas" class="max-w-full h-auto cursor-crosshair transition-opacity" style="max-height: 65vh;"></canvas>
         </div>
       </div>
 
       <!-- 控制面板 -->
-      <div class="bg-white p-5 rounded-3xl shadow-lg border border-gray-100 flex flex-col gap-6 w-full">
+      <div class="bg-white p-4 rounded-2xl shadow-md border border-gray-100 flex flex-col gap-4 w-full">
         
         <!-- 智慧模式控制項 -->
-        <div id="smart-controls" class="flex flex-col gap-4 opacity-60">
+        <div id="smart-controls" class="flex flex-col gap-2 opacity-60">
           <div class="flex justify-between items-center">
-            <label class="text-2xl font-bold text-gray-800">去背容忍值</label>
-            <span id="tolerance-val-display" class="text-xl font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">30%</span>
+            <label class="text-base font-bold text-gray-800">去背容忍值</label>
+            <span id="tolerance-val-display" class="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">30%</span>
           </div>
-          <input type="range" id="tolerance-slider" min="0" max="100" value="30" disabled class="w-full h-8 bg-gray-200 rounded-lg appearance-none cursor-not-allowed">
-          <p id="smart-hint-text" class="text-md text-orange-600 font-medium">
+          <input type="range" id="tolerance-slider" min="0" max="100" value="30" disabled class="w-full h-6 bg-gray-200 rounded-lg appearance-none cursor-not-allowed">
+          <p id="smart-hint-text" class="text-xs text-orange-600 font-medium">
             請先在上方圖片點擊您想要去除的背景顏色，即可啟用容忍值調整。
           </p>
         </div>
 
         <!-- 手動模式控制項 (預設隱藏) -->
-        <div id="manual-controls" class="flex flex-col gap-6 hidden">
-          <div class="flex gap-4">
-            <button id="btn-brush-erase" class="flex-1 flex flex-col items-center justify-center gap-2 py-4 rounded-2xl border-4 transition-all border-red-400 bg-red-50 text-red-600">
-              <i data-lucide="eraser" style="width: 36px; height: 36px;"></i>
-              <span class="text-xl font-bold">橡皮擦 (去除)</span>
+        <div id="manual-controls" class="flex flex-col gap-4 hidden">
+          <div class="flex gap-2">
+            <button id="btn-brush-erase" class="flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-red-400 bg-red-50 text-red-600">
+              <i data-lucide="eraser" style="width: 24px; height: 24px;"></i>
+              <span class="text-sm font-bold">橡皮擦 (去除)</span>
             </button>
-            <button id="btn-brush-restore" class="flex-1 flex flex-col items-center justify-center gap-2 py-4 rounded-2xl border-4 transition-all border-transparent bg-gray-100 text-gray-500">
-              <i data-lucide="brush" style="width: 36px; height: 36px;"></i>
-              <span class="text-xl font-bold">修復筆 (還原)</span>
+            <button id="btn-brush-restore" class="flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-transparent bg-gray-100 text-gray-500">
+              <i data-lucide="brush" style="width: 24px; height: 24px;"></i>
+              <span class="text-sm font-bold">修復筆 (還原)</span>
             </button>
           </div>
           
-          <div class="flex flex-col gap-3">
+          <div class="flex flex-col gap-2">
             <div class="flex justify-between items-center">
-              <label class="text-2xl font-bold text-gray-800">筆刷大小</label>
-              <span id="brush-size-display" class="text-xl font-bold text-purple-600 bg-purple-50 px-3 py-1 rounded-lg">30px</span>
+              <label class="text-base font-bold text-gray-800">筆刷大小</label>
+              <span id="brush-size-display" class="text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md">30px</span>
             </div>
-            <input type="range" id="brush-size-slider" min="5" max="100" value="30" class="w-full h-8 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600">
+            <input type="range" id="brush-size-slider" min="5" max="100" value="30" class="w-full h-6 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600">
           </div>
         </div>
 
         <!-- 共用操作按鈕群 -->
-        <div class="grid grid-cols-2 gap-4 mt-2">
-          <button id="btn-reset" class="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 text-2xl font-bold py-4 rounded-2xl active:scale-95 transition-transform">
-            <i data-lucide="refresh-cw"></i> 重設全部
+        <div class="grid grid-cols-2 gap-2 mt-1">
+          <button id="btn-reset" class="flex items-center justify-center gap-1 bg-gray-100 text-gray-700 text-base font-bold py-2 rounded-xl active:scale-95 transition-transform">
+            <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i> 重設全部
           </button>
           
-          <button id="btn-save" class="flex items-center justify-center gap-2 bg-green-500 text-white text-2xl font-bold py-4 rounded-2xl shadow-md active:scale-95 transition-transform">
-            <i data-lucide="download"></i> 存檔
+          <button id="btn-save" class="flex items-center justify-center gap-1 bg-green-500 text-white text-base font-bold py-2 rounded-xl shadow-md active:scale-95 transition-transform">
+            <i data-lucide="download" style="width: 18px; height: 18px;"></i> 存檔
           </button>
         </div>
 
-        <label class="flex items-center justify-center gap-2 bg-blue-600 text-white text-2xl font-bold py-4 rounded-2xl shadow-md active:scale-95 transition-transform cursor-pointer w-full">
-          <i data-lucide="upload"></i> 換一張照片
+        <label class="flex items-center justify-center gap-1 bg-blue-600 text-white text-base font-bold py-2 rounded-xl shadow-md active:scale-95 transition-transform cursor-pointer w-full">
+          <i data-lucide="upload" style="width: 18px; height: 18px;"></i> 換一張照片
           <input type="file" accept="image/*" class="hidden" id="upload-input-2" />
         </label>
 
@@ -182,8 +182,8 @@
     const btnReset = document.getElementById('btn-reset');
     const btnSave = document.getElementById('btn-save');
 
-    const overlayText = document.getElementById('overlay-text');
-    const overlayIcon = document.getElementById('overlay-icon');
+    const hintText = document.getElementById('hint-text');
+    const hintIcon = document.getElementById('hint-icon');
 
     // ----------------------------------------------------------------
     // 核心邏輯區
@@ -439,16 +439,16 @@
 
       // 更新模式頁籤外觀
       if (appMode === 'smart') {
-        btnModeSmart.className = "flex-1 flex justify-center items-center gap-2 py-3 rounded-xl text-xl font-bold transition-colors bg-white text-blue-600 shadow";
-        btnModeManual.className = "flex-1 flex justify-center items-center gap-2 py-3 rounded-xl text-xl font-bold transition-colors text-gray-500";
+        btnModeSmart.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors bg-white text-blue-600 shadow";
+        btnModeManual.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors text-gray-500";
         smartControls.classList.remove('hidden');
         manualControls.classList.add('hidden');
         mainCanvas.classList.remove('cursor-pointer');
         mainCanvas.classList.add('cursor-crosshair');
         
         // 遮罩提示
-        overlayIcon.setAttribute('data-lucide', 'mouse-pointer-2');
-        overlayText.innerText = targetColor ? '點擊圖片重新選擇背景色' : '請先點擊圖片選擇要去背的顏色';
+        hintIcon.setAttribute('data-lucide', 'mouse-pointer-2');
+        hintText.innerText = targetColor ? '點擊圖片重新選擇背景色' : '請先點擊圖片選擇要去背的顏色';
         
         // 容忍值狀態
         if (targetColor) {
@@ -467,24 +467,24 @@
 
       } else {
         // Manual mode
-        btnModeSmart.className = "flex-1 flex justify-center items-center gap-2 py-3 rounded-xl text-xl font-bold transition-colors text-gray-500";
-        btnModeManual.className = "flex-1 flex justify-center items-center gap-2 py-3 rounded-xl text-xl font-bold transition-colors bg-white text-purple-600 shadow";
+        btnModeSmart.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors text-gray-500";
+        btnModeManual.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors bg-white text-purple-600 shadow";
         smartControls.classList.add('hidden');
         manualControls.classList.remove('hidden');
         mainCanvas.classList.add('cursor-pointer');
         mainCanvas.classList.remove('cursor-crosshair');
         
         // 遮罩提示
-        overlayIcon.setAttribute('data-lucide', 'brush');
-        overlayText.innerText = '直接在圖片上滑動手指塗抹';
+        hintIcon.setAttribute('data-lucide', 'brush');
+        hintText.innerText = '直接在圖片上滑動手指塗抹';
 
         // 筆刷按鈕狀態
         if (brushMode === 'erase') {
-          btnBrushErase.className = "flex-1 flex flex-col items-center justify-center gap-2 py-4 rounded-2xl border-4 transition-all border-red-400 bg-red-50 text-red-600";
-          btnBrushRestore.className = "flex-1 flex flex-col items-center justify-center gap-2 py-4 rounded-2xl border-4 transition-all border-transparent bg-gray-100 text-gray-500";
+          btnBrushErase.className = "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-red-400 bg-red-50 text-red-600";
+          btnBrushRestore.className = "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-transparent bg-gray-100 text-gray-500";
         } else {
-          btnBrushErase.className = "flex-1 flex flex-col items-center justify-center gap-2 py-4 rounded-2xl border-4 transition-all border-transparent bg-gray-100 text-gray-500";
-          btnBrushRestore.className = "flex-1 flex flex-col items-center justify-center gap-2 py-4 rounded-2xl border-4 transition-all border-green-400 bg-green-50 text-green-600";
+          btnBrushErase.className = "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-transparent bg-gray-100 text-gray-500";
+          btnBrushRestore.className = "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-green-400 bg-green-50 text-green-600";
         }
       }
       
