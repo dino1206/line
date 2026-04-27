@@ -24,11 +24,6 @@
       background-color: white;
     }
     
-    /* 防止畫布在手機上觸控時引發網頁滑動 */
-    canvas {
-      touch-action: none;
-    }
-    
     /* 隱藏元素的通用類別 */
     .hidden {
       display: none !important;
@@ -62,17 +57,20 @@
       <!-- 頂部工具列：模式切換與復原重做 -->
       <div class="flex items-center justify-between gap-2">
         <!-- 模式切換標籤 -->
-        <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner flex-1">
-          <button id="btn-mode-smart" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors bg-white text-blue-600 shadow">
-            <i data-lucide="wand-2" style="width: 18px; height: 18px;"></i> 魔術棒去背
+        <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner flex-1 overflow-hidden">
+          <button id="btn-mode-smart" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors bg-white text-blue-600 shadow">
+            <i data-lucide="wand-2" style="width: 16px; height: 16px;"></i> 魔術棒
           </button>
-          <button id="btn-mode-manual" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors text-gray-500">
-            <i data-lucide="hand" style="width: 18px; height: 18px;"></i> 手動塗抹
+          <button id="btn-mode-ai" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors text-gray-500">
+            <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i> AI人像
+          </button>
+          <button id="btn-mode-manual" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors text-gray-500">
+            <i data-lucide="hand" style="width: 16px; height: 16px;"></i> 塗抹
           </button>
         </div>
         
         <!-- 復原 / 重做 按鈕 -->
-        <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner">
+        <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner shrink-0">
           <button id="btn-undo" class="p-2 rounded-lg text-gray-500 hover:bg-white hover:shadow transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none" disabled>
             <i data-lucide="undo" style="width: 20px; height: 20px;"></i>
           </button>
@@ -91,14 +89,14 @@
       <!-- 畫布顯示區 -->
       <div class="relative w-full rounded-xl overflow-hidden shadow-inner border-2 border-gray-200 bg-white">
         <div class="checkerboard w-full h-full flex justify-center items-center overflow-hidden">
-          <canvas id="main-canvas" class="max-w-full h-auto cursor-crosshair transition-opacity" style="max-height: 65vh;"></canvas>
+          <canvas id="main-canvas" class="max-w-full h-auto cursor-crosshair transition-opacity" style="max-height: 60vh;"></canvas>
         </div>
       </div>
 
       <!-- 控制面板 -->
       <div class="bg-white p-4 rounded-2xl shadow-md border border-gray-100 flex flex-col gap-4 w-full">
         
-        <!-- 智慧模式控制項 -->
+        <!-- 魔術棒模式控制項 -->
         <div id="smart-controls" class="flex flex-col gap-3">
           <label class="text-base font-bold text-gray-800">去背範圍</label>
           <div class="flex gap-2">
@@ -110,12 +108,30 @@
             </button>
           </div>
           <p id="smart-hint-text" class="text-xs text-gray-500 font-medium">
-            點擊圖片，僅會去除與點擊處「相連」的相近顏色。
+            提示：在圖片上滑動可捲動網頁，單點擊才會去背。
           </p>
+        </div>
+
+        <!-- AI 人像模式控制項 -->
+        <div id="ai-controls" class="flex flex-col gap-4 hidden">
+          <p class="text-sm text-gray-600 font-medium text-center bg-purple-50 p-3 rounded-xl border border-purple-100">
+            啟動裝置端 AI 模型，自動偵測「人體與人臉」並保留主體，自動去除其餘背景。<br>
+            <span class="text-xs text-purple-500 mt-1 block">(首次使用需下載約幾MB模型，請耐心等候)</span>
+          </p>
+          <button id="btn-run-ai" class="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-lg font-bold py-3 rounded-xl shadow-md active:scale-95 transition-transform">
+            <i data-lucide="sparkles"></i> 啟動 AI 智慧去背
+          </button>
+          <div id="ai-loading" class="hidden flex-col items-center justify-center gap-2 py-2">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            <span class="text-sm text-purple-600 font-bold" id="ai-status-text">載入模型中...</span>
+          </div>
         </div>
 
         <!-- 手動模式控制項 (預設隱藏) -->
         <div id="manual-controls" class="flex flex-col gap-4 hidden">
+          <p class="text-xs text-red-500 font-medium text-center mb-[-5px]">
+            目前已鎖定防滑動，可直接在圖上塗抹。
+          </p>
           <div class="flex gap-2">
             <button id="btn-brush-erase" class="flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-red-400 bg-red-50 text-red-600">
               <i data-lucide="eraser" style="width: 24px; height: 24px;"></i>
@@ -139,7 +155,7 @@
         <!-- 共用操作按鈕群 -->
         <div class="grid grid-cols-2 gap-2 mt-1">
           <button id="btn-reset" class="flex items-center justify-center gap-1 bg-gray-100 text-gray-700 text-base font-bold py-2 rounded-xl active:scale-95 transition-transform">
-            <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i> 重設全部
+            <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i> 重設原圖
           </button>
           
           <button id="btn-save" class="flex items-center justify-center gap-1 bg-green-500 text-white text-base font-bold py-2 rounded-xl shadow-md active:scale-95 transition-transform">
@@ -163,20 +179,21 @@
 
     // 狀態變數
     let hasImage = false;
-    let activeClick = null; // 取代 targetColor，紀錄魔術棒點擊位置
-    let currentBaseImageData = null; // 紀錄魔術棒點擊前的畫面狀態
+    let activeClick = null; 
+    let currentBaseImageData = null; 
     let smartFillMode = 'contiguous'; // 'contiguous' 或 'global'
-    const FIXED_TOLERANCE = 30; // 固定容忍值，簡化操作
-    let appMode = 'smart'; // 'smart' 或 'manual'
+    const FIXED_TOLERANCE = 30; // 固定容忍值
+    let appMode = 'smart'; // 'smart' | 'ai' | 'manual'
     let brushMode = 'erase'; // 'erase' 或 'restore'
     let brushSize = 30;
     let isDrawing = false;
     let lastPos = null;
+    let isAiProcessing = false;
 
     // 復原/重做 狀態紀錄
     let history = [];
     let historyIndex = -1;
-    const MAX_HISTORY = 15; // 最多紀錄 15 步
+    const MAX_HISTORY = 15; 
 
     // DOM 元素參考
     const initialContainer = document.getElementById('initial-upload-container');
@@ -193,13 +210,19 @@
 
     // UI 控制元素
     const btnModeSmart = document.getElementById('btn-mode-smart');
+    const btnModeAi = document.getElementById('btn-mode-ai');
     const btnModeManual = document.getElementById('btn-mode-manual');
     const smartControls = document.getElementById('smart-controls');
+    const aiControls = document.getElementById('ai-controls');
     const manualControls = document.getElementById('manual-controls');
     
     const btnFillContiguous = document.getElementById('btn-fill-contiguous');
     const btnFillGlobal = document.getElementById('btn-fill-global');
     const smartHintText = document.getElementById('smart-hint-text');
+
+    const btnRunAi = document.getElementById('btn-run-ai');
+    const aiLoading = document.getElementById('ai-loading');
+    const aiStatusText = document.getElementById('ai-status-text');
 
     const btnBrushErase = document.getElementById('btn-brush-erase');
     const btnBrushRestore = document.getElementById('btn-brush-restore');
@@ -222,12 +245,10 @@
 
     // 儲存歷史狀態
     function saveState() {
-      // 捨棄當前指標之後的重做紀錄
       if (historyIndex < history.length - 1) {
         history = history.slice(0, historyIndex + 1);
       }
       
-      // 儲存當前畫面狀態、顏色與範圍模式
       history.push({
         imageData: ctx.getImageData(0, 0, imageWidth, imageHeight),
         preClickImageData: currentBaseImageData ? new ImageData(new Uint8ClampedArray(currentBaseImageData.data), imageWidth, imageHeight) : null,
@@ -235,7 +256,6 @@
         smartFillMode: smartFillMode
       });
       
-      // 限制紀錄數量
       if (history.length > MAX_HISTORY) {
         history.shift();
       } else {
@@ -259,6 +279,75 @@
       return Math.sqrt(Math.pow(r1 - r2, 2) + Math.pow(g1 - g2, 2) + Math.pow(b1 - b2, 2));
     }
 
+    // 動態載入外部腳本 (供 AI 使用)
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) {
+          resolve(); return;
+        }
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    // 執行 AI 人體去背
+    async function runAIBodyPix() {
+      if (isAiProcessing || !hasImage) return;
+      isAiProcessing = true;
+      
+      btnRunAi.classList.add('hidden');
+      aiLoading.classList.remove('hidden');
+      
+      try {
+        aiStatusText.innerText = "載入 AI 引擎 (1/2)...";
+        if (!window.tf) {
+          await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js');
+        }
+        
+        aiStatusText.innerText = "載入視覺模型 (2/2)...";
+        if (!window.bodyPix) {
+          await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js');
+        }
+        
+        aiStatusText.innerText = "正在精準辨識人像...";
+        // 載入 BodyPix 模型
+        const net = await bodyPix.load({
+          architecture: 'MobileNetV1',
+          outputStride: 16,
+          multiplier: 0.75,
+          quantBytes: 2
+        });
+        
+        // 使用「原圖」進行辨識，獲得遮罩
+        const segmentation = await net.segmentPerson(originalCanvas, {
+          internalResolution: 'medium',
+          segmentationThreshold: 0.6
+        });
+        
+        // 將目前的畫布資料讀出，並套用 AI 遮罩
+        const currentData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+        for (let i = 0; i < segmentation.data.length; i++) {
+          if (segmentation.data[i] === 0) { // 0 代表非人體(背景)
+            currentData.data[i * 4 + 3] = 0; // 將背景設為透明
+          }
+        }
+        
+        ctx.putImageData(currentData, 0, 0);
+        saveState(); // 存檔讓使用者可以復原
+        
+      } catch (err) {
+        alert('AI 模型載入失敗，請確認網路連線是否正常。');
+        console.error(err);
+      } finally {
+        isAiProcessing = false;
+        btnRunAi.classList.remove('hidden');
+        aiLoading.classList.add('hidden');
+      }
+    }
+
     // 處理圖片上傳
     function handleImageUpload(e) {
       const file = e.target.files[0];
@@ -268,7 +357,6 @@
       reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
-          // 限制最大尺寸防崩潰
           const MAX_DIM = 1080;
           let w = img.width;
           let h = img.height;
@@ -282,20 +370,16 @@
           imageWidth = w;
           imageHeight = h;
 
-          // 設定主 Canvas
           mainCanvas.width = w;
           mainCanvas.height = h;
           ctx.drawImage(img, 0, 0, w, h);
 
-          // 設定隱藏的備份 Canvas
           originalCanvas.width = w;
           originalCanvas.height = h;
           origCtx.drawImage(img, 0, 0, w, h);
 
-          // 儲存原始像素
           originalImageData = ctx.getImageData(0, 0, w, h);
 
-          // 重置狀態
           activeClick = null;
           currentBaseImageData = null;
           smartFillMode = 'contiguous';
@@ -306,12 +390,12 @@
           historyIndex = -1;
 
           updateUI();
-          saveState(); // 載入後存為第 0 步
+          saveState(); 
         };
         img.src = event.target.result;
       };
       reader.readAsDataURL(file);
-      e.target.value = ''; // 清除 input，允許重複選同一張圖
+      e.target.value = ''; 
     }
 
     // 魔術棒 (連通區域) 去背處理
@@ -321,7 +405,6 @@
       const { x: startX, y: startY } = activeClick;
       const originalData = currentBaseImageData.data;
       
-      // 建立新的 ImageData 以寫入
       const newImgData = new ImageData(
         new Uint8ClampedArray(originalData),
         imageWidth,
@@ -335,29 +418,24 @@
       const targetB = originalData[startIndex + 2];
       const targetA = originalData[startIndex + 3];
 
-      // 若點擊處已透明，則不作處理
       if (targetA === 0) {
         ctx.putImageData(newImgData, 0, 0);
         return;
       }
 
-      // 容忍值轉換 (0-100 映射到 0-441)
       const maxDist = 441.67; 
       const currentTol = (FIXED_TOLERANCE / 100) * maxDist;
 
       if (smartFillMode === 'global') {
-        // 全圖相似色去背
         for (let i = 0; i < data.length; i += 4) {
           const r = data[i];
           const g = data[i + 1];
           const b = data[i + 2];
-          
           if (data[i + 3] > 0 && colorDistance(r, g, b, targetR, targetG, targetB) <= currentTol) {
-            data[i + 3] = 0; // 設為透明
+            data[i + 3] = 0; 
           }
         }
       } else {
-        // 廣度優先搜尋 (BFS) 陣列 - 相鄰區域去背
         const visited = new Uint8Array(imageWidth * imageHeight);
         let head = 0;
         let tail = 1;
@@ -371,12 +449,9 @@
         while (head < tail) {
           const x = qX[head++];
           const y = qY[head-1];
-
           const idx = (y * imageWidth + x) * 4;
-          data[idx + 3] = 0; // 設為透明
+          data[idx + 3] = 0; 
 
-          // 檢查相鄰的四個像素
-          // 右
           if (x + 1 < imageWidth) {
             const nx = x + 1, ny = y, nIdx = ny * imageWidth + nx;
             if (!visited[nIdx]) {
@@ -387,7 +462,6 @@
               }
             }
           }
-          // 左
           if (x - 1 >= 0) {
             const nx = x - 1, ny = y, nIdx = ny * imageWidth + nx;
             if (!visited[nIdx]) {
@@ -398,7 +472,6 @@
               }
             }
           }
-          // 下
           if (y + 1 < imageHeight) {
             const nx = x, ny = y + 1, nIdx = ny * imageWidth + nx;
             if (!visited[nIdx]) {
@@ -409,7 +482,6 @@
               }
             }
           }
-          // 上
           if (y - 1 >= 0) {
             const nx = x, ny = y - 1, nIdx = ny * imageWidth + nx;
             if (!visited[nIdx]) {
@@ -450,7 +522,6 @@
         ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
       } else {
-        // 還原模式
         ctx.save();
         ctx.beginPath();
         ctx.arc(x, y, brushSize, 0, Math.PI * 2);
@@ -464,7 +535,7 @@
     // 事件監聽區
     // ----------------------------------------------------------------
 
-    // 處理筆刷游標位置與顯示
+    // 處理筆刷游標
     function updateBrushCursor(e) {
       if (appMode !== 'manual' || !hasImage) {
         brushCursor.classList.add('hidden');
@@ -474,7 +545,7 @@
       
       const rect = mainCanvas.getBoundingClientRect();
       const scaleX = mainCanvas.width / rect.width;
-      const cssSize = (brushSize * 2) / scaleX; // 將畫布的像素大小轉換為畫面上顯示的大小
+      const cssSize = (brushSize * 2) / scaleX; 
       
       brushCursor.style.width = `${cssSize}px`;
       brushCursor.style.height = `${cssSize}px`;
@@ -502,39 +573,42 @@
       }
     });
 
+    btnRunAi.addEventListener('click', runAIBodyPix);
+
     // Canvas 互動
     mainCanvas.addEventListener('pointerenter', updateBrushCursor);
     mainCanvas.addEventListener('pointerleave', () => brushCursor.classList.add('hidden'));
 
-    mainCanvas.addEventListener('pointerdown', (e) => {
-      if (!originalImageData) return;
+    // 【防誤觸機制改良】：魔術棒改用 click 觸發，因為手機上的 scroll (滑動) 不會觸發 click，只有純點擊會觸發。
+    mainCanvas.addEventListener('click', (e) => {
+      if (!originalImageData || appMode !== 'smart') return;
 
-      if (appMode === 'smart') {
-        // 魔術棒選色去背
-        const { x, y } = getCoordinates(e);
-        const ix = Math.floor(x);
-        const iy = Math.floor(y);
-        
-        // 檢查是否點擊在有效範圍內且該像素尚未透明
-        const data = ctx.getImageData(0, 0, imageWidth, imageHeight).data;
-        const idx = (iy * imageWidth + ix) * 4;
-        
-        if (idx >= 0 && idx < data.length && data[idx + 3] > 0) {
-          currentBaseImageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
-          activeClick = { x: ix, y: iy };
-          processSmartImage();
-          saveState(); // 儲存魔術棒去背結果
-          updateUI();
-        }
-      } else {
-        // 手動塗抹
-        mainCanvas.setPointerCapture(e.pointerId);
-        isDrawing = true;
-        const { x, y } = getCoordinates(e);
-        drawPoint(x, y);
-        lastPos = { x, y };
-        updateBrushCursor(e);
+      const { x, y } = getCoordinates(e);
+      const ix = Math.floor(x);
+      const iy = Math.floor(y);
+      
+      const data = ctx.getImageData(0, 0, imageWidth, imageHeight).data;
+      const idx = (iy * imageWidth + ix) * 4;
+      
+      if (idx >= 0 && idx < data.length && data[idx + 3] > 0) {
+        currentBaseImageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+        activeClick = { x: ix, y: iy };
+        processSmartImage();
+        saveState(); 
+        updateUI();
       }
+    });
+
+    // 手動塗抹仍然需要 pointerdown 來處理繪圖軌跡
+    mainCanvas.addEventListener('pointerdown', (e) => {
+      if (!originalImageData || appMode !== 'manual') return;
+
+      mainCanvas.setPointerCapture(e.pointerId);
+      isDrawing = true;
+      const { x, y } = getCoordinates(e);
+      drawPoint(x, y);
+      lastPos = { x, y };
+      updateBrushCursor(e);
     });
 
     mainCanvas.addEventListener('pointermove', (e) => {
@@ -568,7 +642,7 @@
         isDrawing = false;
         lastPos = null;
         mainCanvas.releasePointerCapture(e.pointerId);
-        saveState(); // 儲存手動塗抹狀態
+        saveState(); 
       }
     };
 
@@ -578,6 +652,12 @@
     // 模式切換
     btnModeSmart.addEventListener('click', () => {
       appMode = 'smart';
+      updateUI();
+      brushCursor.classList.add('hidden');
+    });
+
+    btnModeAi.addEventListener('click', () => {
+      appMode = 'ai';
       updateUI();
       brushCursor.classList.add('hidden');
     });
@@ -593,7 +673,6 @@
       updateUI();
       if (activeClick && currentBaseImageData) {
         processSmartImage();
-        // 覆寫目前歷史紀錄的影像
         if (history.length > 0) history[historyIndex].imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
       }
     });
@@ -603,7 +682,6 @@
       updateUI();
       if (activeClick && currentBaseImageData) {
         processSmartImage();
-        // 覆寫目前歷史紀錄的影像
         if (history.length > 0) history[historyIndex].imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
       }
     });
@@ -627,7 +705,7 @@
       smartFillMode = 'contiguous';
       appMode = 'smart';
       updateUI();
-      saveState(); // 儲存重設狀態
+      saveState();
     });
 
     // 存檔按鈕
@@ -646,17 +724,14 @@
     // ----------------------------------------------------------------
     
     function updateUndoRedoUI() {
-      // 根據目前指標位置決定按鈕是否可以點擊
       btnUndo.disabled = historyIndex <= 0;
       btnRedo.disabled = historyIndex >= history.length - 1;
       
-      // 更新顏色外觀
       btnUndo.classList.toggle('text-blue-600', historyIndex > 0);
       btnRedo.classList.toggle('text-blue-600', historyIndex < history.length - 1);
     }
 
     function updateUI() {
-      // 顯示/隱藏 主視窗
       if (hasImage) {
         initialContainer.classList.add('hidden');
         editorContainer.classList.remove('hidden');
@@ -665,44 +740,60 @@
         editorContainer.classList.add('hidden');
       }
 
-      // 更新模式頁籤外觀
+      // 共用按鈕重置
+      btnModeSmart.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors text-gray-500";
+      btnModeAi.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors text-gray-500";
+      btnModeManual.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors text-gray-500";
+      
+      smartControls.classList.add('hidden');
+      aiControls.classList.add('hidden');
+      manualControls.classList.add('hidden');
+      
+      // 依模式更新
       if (appMode === 'smart') {
-        btnModeSmart.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors bg-white text-blue-600 shadow";
-        btnModeManual.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors text-gray-500";
+        btnModeSmart.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors bg-white text-blue-600 shadow";
         smartControls.classList.remove('hidden');
-        manualControls.classList.add('hidden');
+        
         mainCanvas.classList.remove('cursor-none');
         mainCanvas.classList.add('cursor-crosshair');
+        // 解除防滑動限制
+        mainCanvas.classList.remove('touch-none');
         
-        // 遮罩提示
         hintIcon.setAttribute('data-lucide', 'mouse-pointer-2');
         hintText.innerText = activeClick ? '繼續點擊圖片中想去除的背景' : '請點擊圖片選擇要去背的背景顏色';
         
-        // 去背範圍外觀
         if (smartFillMode === 'contiguous') {
           btnFillContiguous.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-blue-400 bg-blue-50 text-blue-600";
           btnFillGlobal.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-transparent bg-gray-100 text-gray-500";
-          smartHintText.innerText = '點擊圖片，僅會去除與點擊處「相連」的相近顏色。';
         } else {
           btnFillContiguous.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-transparent bg-gray-100 text-gray-500";
           btnFillGlobal.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-blue-400 bg-blue-50 text-blue-600";
-          smartHintText.innerText = '點擊圖片，會將整張圖片中「所有」相近的顏色去除。';
         }
+
+      } else if (appMode === 'ai') {
+        btnModeAi.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors bg-white text-purple-600 shadow";
+        aiControls.classList.remove('hidden');
+        
+        mainCanvas.classList.remove('cursor-none', 'cursor-crosshair');
+        // 解除防滑動限制
+        mainCanvas.classList.remove('touch-none');
+        
+        hintIcon.setAttribute('data-lucide', 'sparkles');
+        hintText.innerText = '點擊下方按鈕開始自動辨識';
 
       } else {
         // Manual mode
-        btnModeSmart.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors text-gray-500";
-        btnModeManual.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-base font-bold transition-colors bg-white text-purple-600 shadow";
-        smartControls.classList.add('hidden');
+        btnModeManual.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors bg-white text-red-600 shadow";
         manualControls.classList.remove('hidden');
+        
         mainCanvas.classList.add('cursor-none');
         mainCanvas.classList.remove('cursor-crosshair');
+        // 加上防滑動限制，確保繪畫不中斷
+        mainCanvas.classList.add('touch-none');
         
-        // 遮罩提示
         hintIcon.setAttribute('data-lucide', 'brush');
         hintText.innerText = '使用筆刷塗抹來去除或還原';
 
-        // 筆刷按鈕狀態
         if (brushMode === 'erase') {
           btnBrushErase.className = "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-red-400 bg-red-50 text-red-600";
           btnBrushRestore.className = "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-transparent bg-gray-100 text-gray-500";
@@ -712,7 +803,6 @@
         }
       }
       
-      // 重新渲染 icon 確保正確顯示
       lucide.createIcons();
     }
 
