@@ -7,7 +7,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
-    <!-- 加入 JSZip 函式庫以支援多檔打包 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
@@ -24,7 +23,6 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* 全局客製化細緻卷軸 */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
@@ -73,7 +71,6 @@
             flex-shrink: 0; overflow-y: auto; position: relative;
         }
 
-        /* 磁浮置頂區塊設計 */
         .sticky-section {
             position: sticky;
             top: -20px; 
@@ -295,7 +292,6 @@
         .eyedropper-cursor { cursor: crosshair !important; }
         .brush-cursor-mode { cursor: none !important; }
 
-        /* 贊助按鈕設計 */
         .sponsor-btn {
             position: absolute;
             bottom: 20px;
@@ -640,7 +636,7 @@
                         <b>立體與變形</b>：文字可獨立調整傾斜角度，支援動態陰影效果。<br>
                         <b>去背/填色</b>：切換模式。魔術棒可點擊透明處填色，新增「畫筆工具」可自由塗抹 (支援快捷鍵 <kbd>[</kbd> <kbd>]</kbd> 調整筆刷)。<br>
                         <b>分割匯出</b>：選擇九宮格或16宮格，可自動依比例放大裁切並打包 ZIP 下載。<br>
-                        <b>復原</b>：<kbd>Ctrl+Z</kbd> / <b>重做</b>：<kbd>Ctrl+Y</kbd>
+                        <b>全域復原</b>：<kbd>Ctrl+Z</kbd> / <b>全域重做</b>：<kbd>Ctrl+Y</kbd> (支援所有圖形、裁切、文字操作！)
                     </div>
                 </div>
             </aside>
@@ -666,6 +662,7 @@
         let lockedCropData = null;               
         let isUserInteractingWithCropBox = false;
         let isSyncing = false;                   
+        let previousCropData = null;
 
         let annotations = [];
         let selectedAnnoId = null;
@@ -714,7 +711,6 @@
             previewBg:        $('preview-bg'),        previewBox:       $('preview-box'),
             customSizeBox:    $('custom-size-box'),   customW:          $('custom-w'), customH: $('custom-h'),
             
-            // 去背與填色UI
             btnWandToggle:    $('btn-wand-toggle'),   wandSettings:     $('wand-settings'),
             btnActionErase:   $('btn-action-erase'),  btnActionFill:    $('btn-action-fill'),
             fillColorRow:     $('fill-color-row'),    btnEyedropper:    $('btn-eyedropper'), fillColor: $('fill-color'),
@@ -730,7 +726,6 @@
             btnModeMove:      $('btn-mode-move'),     btnModeCrop:      $('btn-mode-crop'),
             modeBadge:        $('mode-badge'),        annoOverlay:      $('anno-overlay'),
             
-            // 網格與磁吸UI
             showGrid:         $('show-grid'),         snapGrid:         $('snap-grid'),
             gridSize:         $('grid-size'),         gridSizeVal:      $('grid-size-val'),
 
@@ -741,22 +736,17 @@
             arrowSize:        $('arrow-size'),        arrowSizeVal:     $('arrow-size-val'),
             textContent:      $('text-content'),      textFont:         $('text-font'),
             fontSize:         $('font-size'),         fontSizeVal:      $('font-size-val'),
-            
             textSkewX:        $('text-skew-x'),       textSkewXVal:     $('text-skew-x-val'),
             textSkewY:        $('text-skew-y'),       textSkewYVal:     $('text-skew-y-val'),
-            
             annoShadow:       $('anno-shadow'),
-            
             textColor:        $('text-color'),
             annoAngle:        $('anno-angle'),        annoAngleVal:     $('anno-angle-val'),
             btnDeleteAnno:    $('btn-delete-anno'),
 
-            // 匯出格式與九宮格/16宮格
             exportFormat:     $('export-format'),
             exportSlice:      $('export-slice'),
         };
 
-        // 更新匯出尺寸文字的函數
         function updateStatSize() {
             let splits = 1;
             if (DOM.exportSlice.value === '3x3') splits = 3;
@@ -764,26 +754,18 @@
             DOM.statSize.textContent = `${targetWidth * splits} × ${targetHeight * splits} px`;
         }
 
-        /* ══ 本地儲存：全域狀態記憶引擎 ══ */
+        /* ══ 本地儲存設定 ══ */
         function loadSettings() {
             const saved = localStorage.getItem('simpleImgEditorSettings');
             if (saved) {
                 try {
                     const settings = JSON.parse(saved);
-                    
                     if (settings.presetSize) {
                         DOM.presetItems.forEach(i => i.classList.remove('active'));
-                        let matched = false;
                         DOM.presetItems.forEach(i => {
-                            if (i.dataset.w === 'custom' && settings.presetSize === 'custom') {
-                                i.classList.add('active');
-                                matched = true;
-                            } else if (`${i.dataset.w}x${i.dataset.h}` === settings.presetSize) {
-                                i.classList.add('active');
-                                matched = true;
-                            }
+                            if (i.dataset.w === 'custom' && settings.presetSize === 'custom') i.classList.add('active');
+                            else if (`${i.dataset.w}x${i.dataset.h}` === settings.presetSize) i.classList.add('active');
                         });
-
                         if (settings.presetSize === 'custom') {
                             isCustomSize = true;
                             DOM.customSizeBox.classList.remove('hidden');
@@ -799,84 +781,136 @@
                             targetHeight = h || 320;
                         }
                     }
-                    
-                    if (settings.tolerance) {
-                        DOM.tolerance.value = settings.tolerance;
-                        DOM.tolVal.textContent = settings.tolerance;
-                    }
+                    if (settings.tolerance) { DOM.tolerance.value = settings.tolerance; DOM.tolVal.textContent = settings.tolerance; }
                     if (settings.contiguous !== undefined) DOM.contiguous.checked = settings.contiguous;
                     if (settings.limitToCrop !== undefined) DOM.limitToCrop.checked = settings.limitToCrop;
-                    if (settings.brushSize) {
-                        DOM.brushSize.value = settings.brushSize;
-                        DOM.brushSizeVal.textContent = settings.brushSize;
-                    }
-                    
-                    if (settings.borderRadius) {
-                        DOM.borderRadius.value = settings.borderRadius;
-                        DOM.radiusVal.textContent = settings.borderRadius;
-                    }
-                    
+                    if (settings.brushSize) { DOM.brushSize.value = settings.brushSize; DOM.brushSizeVal.textContent = settings.brushSize; }
+                    if (settings.borderRadius) { DOM.borderRadius.value = settings.borderRadius; DOM.radiusVal.textContent = settings.borderRadius; }
                     if (settings.showGrid !== undefined) DOM.showGrid.checked = settings.showGrid;
-                    if (settings.snapGrid !== undefined) {
-                        DOM.snapGrid.checked = settings.snapGrid;
-                        DOM.annoAngle.step = settings.snapGrid ? 15 : 1;
-                    }
-                    if (settings.gridSize) {
-                        DOM.gridSize.value = settings.gridSize;
-                        DOM.gridSizeVal.textContent = settings.gridSize;
-                    }
-                    
+                    if (settings.snapGrid !== undefined) { DOM.snapGrid.checked = settings.snapGrid; DOM.annoAngle.step = settings.snapGrid ? 15 : 1; }
+                    if (settings.gridSize) { DOM.gridSize.value = settings.gridSize; DOM.gridSizeVal.textContent = settings.gridSize; }
                     if (settings.exportFormat) DOM.exportFormat.value = settings.exportFormat;
                     if (settings.exportSlice) DOM.exportSlice.value = settings.exportSlice;
                     if (settings.previewBg) DOM.previewBg.value = settings.previewBg;
 
                     DOM.previewBox.style.background = DOM.previewBg.value === 'transparent' ? '' : DOM.previewBg.value;
                     updateStatSize();
-
-                } catch(e) {
-                    console.error("讀取本地設定失敗", e);
-                }
+                } catch(e) { console.error("讀取本地設定失敗", e); }
             }
         }
 
         function saveSettings() {
             let activePreset = '370x320';
-            if (isCustomSize) {
-                activePreset = 'custom';
-            } else {
+            if (isCustomSize) activePreset = 'custom';
+            else {
                 const activeEl = document.querySelector('.preset-item.active');
-                if (activeEl) {
-                    activePreset = activeEl.dataset.w === 'custom' ? 'custom' : `${activeEl.dataset.w}x${activeEl.dataset.h}`;
-                }
+                if (activeEl) activePreset = activeEl.dataset.w === 'custom' ? 'custom' : `${activeEl.dataset.w}x${activeEl.dataset.h}`;
             }
-
             const settings = {
-                presetSize: activePreset,
-                customW: DOM.customW.value,
-                customH: DOM.customH.value,
-                tolerance: DOM.tolerance.value,
-                contiguous: DOM.contiguous.checked,
-                limitToCrop: DOM.limitToCrop.checked,
-                brushSize: DOM.brushSize.value,
-                borderRadius: DOM.borderRadius.value,
-                showGrid: DOM.showGrid.checked,
-                snapGrid: DOM.snapGrid.checked,
-                gridSize: DOM.gridSize.value,
-                exportFormat: DOM.exportFormat.value,
-                exportSlice: DOM.exportSlice.value,
-                previewBg: DOM.previewBg.value
+                presetSize: activePreset, customW: DOM.customW.value, customH: DOM.customH.value,
+                tolerance: DOM.tolerance.value, contiguous: DOM.contiguous.checked, limitToCrop: DOM.limitToCrop.checked,
+                brushSize: DOM.brushSize.value, borderRadius: DOM.borderRadius.value,
+                showGrid: DOM.showGrid.checked, snapGrid: DOM.snapGrid.checked, gridSize: DOM.gridSize.value,
+                exportFormat: DOM.exportFormat.value, exportSlice: DOM.exportSlice.value, previewBg: DOM.previewBg.value
             };
             localStorage.setItem('simpleImgEditorSettings', JSON.stringify(settings));
         }
 
-        // 啟動時先讀取設定
         loadSettings();
         
-        DOM.exportSlice.addEventListener('change', () => {
-            saveSettings();
+        DOM.exportSlice.addEventListener('change', () => { saveSettings(); updateStatSize(); updatePreview(); });
+
+        /* ══ 歷史紀錄全域封裝引擎 (Undo / Redo) ══ */
+        function saveState() {
+            if (!cropper) return;
+            const state = {
+                src: wandCanvas.toDataURL('image/png'),
+                annotations: JSON.parse(JSON.stringify(annotations)), // 深度拷貝當前所有標註與文字狀態
+                cropData: cropper.getData(),
+                targetWidth: targetWidth,
+                targetHeight: targetHeight,
+                isCustomSize: isCustomSize,
+                presetSize: document.querySelector('.preset-item.active')?.dataset.w === 'custom' ? 'custom' : `${targetWidth}x${targetHeight}`
+            };
+            
+            if (currentIndex < history.length - 1) {
+                history = history.slice(0, currentIndex + 1);
+            }
+            history.push(state);
+            
+            // 限制歷史紀錄 20 步以防記憶體爆炸
+            if (history.length > 20) {
+                history.shift();
+            } else {
+                currentIndex++;
+            }
+            updateUndoRedo();
+        }
+
+        function updateUndoRedo() {
+            DOM.btnUndo.style.display = currentIndex > 0 ? 'flex' : 'none';
+            DOM.btnRedo.style.display = currentIndex < history.length - 1 ? 'flex' : 'none';
+        }
+
+        function restore(idx) {
+            currentIndex = idx; 
+            const state = history[idx];
+            
+            // 復原標註與文字
+            annotations = JSON.parse(JSON.stringify(state.annotations));
+            selectedAnnoId = null; 
+            
+            // 復原畫布尺寸
+            targetWidth = state.targetWidth;
+            targetHeight = state.targetHeight;
+            isCustomSize = state.isCustomSize;
             updateStatSize();
-            updatePreview(); // 更新預覽區的輔助線
-        });
+            
+            // 復原 UI 選項按鈕狀態
+            DOM.presetItems.forEach(i => {
+                i.classList.remove('active');
+                if (state.presetSize === 'custom' && i.dataset.w === 'custom') i.classList.add('active');
+                else if (`${i.dataset.w}x${i.dataset.h}` === state.presetSize) i.classList.add('active');
+            });
+            if (isCustomSize) {
+                DOM.customSizeBox.classList.remove('hidden');
+                DOM.customW.value = targetWidth;
+                DOM.customH.value = targetHeight;
+            } else {
+                DOM.customSizeBox.classList.add('hidden');
+            }
+            
+            // 復原影像與裁切框
+            const img = new Image(); 
+            img.onload = () => {
+                wandCanvas.width = img.width; wandCanvas.height = img.height;
+                wandCtx.clearRect(0, 0, wandCanvas.width, wandCanvas.height);
+                wandCtx.drawImage(img, 0, 0);
+                
+                originalImageSrc = state.src;
+                updateCropperImagesFast(state.src);
+                
+                if (cropper && state.cropData) {
+                    isUserInteractingWithCropBox = true;
+                    if (!isCustomSize) cropper.setAspectRatio(targetWidth / targetHeight);
+                    else cropper.setAspectRatio(NaN);
+                    
+                    cropper.setData(state.cropData);
+                    lockedCropData = state.cropData;
+                    isUserInteractingWithCropBox = false;
+                }
+                
+                renderAnnotationList();
+                DOM.annoSettings.classList.add('hidden'); 
+                updateUndoRedo(); 
+                updatePreview();
+                rebuildAnnoOverlay();
+            };
+            img.src = state.src;
+        }
+
+        DOM.btnUndo.onclick = () => { if (currentIndex > 0) restore(currentIndex - 1); };
+        DOM.btnRedo.onclick = () => { if (currentIndex < history.length - 1) restore(currentIndex + 1); };
 
         /* ══ 檔案與截圖處理 ══ */
         DOM.dropZone.ondragover  = e => { e.preventDefault(); DOM.dropZone.classList.add('dragover'); };
@@ -888,10 +922,7 @@
         
         DOM.btnNew.onclick = () => DOM.fileInput.click();
         DOM.btnBrowseZone.onclick = (e) => { e.stopPropagation(); DOM.fileInput.click(); };
-        DOM.dropZone.onclick = (e) => {
-            if(e.target.closest('.upload-actions')) return; 
-            DOM.fileInput.click(); 
-        };
+        DOM.dropZone.onclick = (e) => { if(e.target.closest('.upload-actions')) return; DOM.fileInput.click(); };
         DOM.fileInput.onchange = e => { if (e.target.files.length) handleFile(e.target.files[0]); };
 
         document.addEventListener('paste', (e) => {
@@ -909,50 +940,30 @@
 
         async function captureScreen() {
             try {
-                const stream = await navigator.mediaDevices.getDisplayMedia({ 
-                    video: { cursor: "always" }, 
-                    audio: false 
-                });
-                
+                const stream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: false });
                 const video = document.createElement('video');
                 video.srcObject = stream;
-                
                 video.onloadedmetadata = () => {
                     video.play();
                     const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    
                     stream.getTracks().forEach(track => track.stop());
-
-                    canvas.toBlob((blob) => {
-                        const file = new File([blob], "screen_capture.png", { type: "image/png" });
-                        handleFile(file);
-                    }, 'image/png');
+                    canvas.toBlob((blob) => { handleFile(new File([blob], "screen_capture.png", { type: "image/png" })); }, 'image/png');
                 };
-            } catch (err) {
-                console.error("螢幕擷取失敗或被取消:", err);
-            }
+            } catch (err) { console.error("螢幕擷取失敗或被取消:", err); }
         }
         
         DOM.btnCaptureZone.onclick = (e) => { e.stopPropagation(); captureScreen(); };
         DOM.btnCaptureHeader.onclick = captureScreen;
 
         function handleFile(file) {
-            if (!file.type.startsWith('image/')) {
-                alert('請上傳有效的圖片檔案。');
-                return;
-            }
-            
+            if (!file.type.startsWith('image/')) { alert('請上傳有效的圖片檔案。'); return; }
             currentFilename = file.name.replace(/\.[^/.]+$/, "");
-            
             const reader = new FileReader();
             reader.onload = e => {
-                history = []; currentIndex = -1;
                 originalImageSrc = e.target.result;
-                saveHistory(originalImageSrc);
                 initEditor(originalImageSrc);
             };
             reader.readAsDataURL(file);
@@ -972,7 +983,6 @@
             
             DOM.mainImage.onload = () => {
                 DOM.mainImage.onload = null;
-                
                 wandCanvas.width = DOM.mainImage.naturalWidth;
                 wandCanvas.height = DOM.mainImage.naturalHeight;
                 wandCtx.clearRect(0, 0, wandCanvas.width, wandCanvas.height);
@@ -980,11 +990,13 @@
 
                 cropper = _createCropper('move');
                 updateModeUI();
+                
+                // 重置所有全域歷史狀態
+                history = []; currentIndex = -1; annotations = [];
+                renderAnnotationList();
+                saveState();
             };
-            
-            if(DOM.btnWandToggle.classList.contains('btn-primary')) {
-                toggleWandMenu(); 
-            }
+            if(DOM.btnWandToggle.classList.contains('btn-primary')) toggleWandMenu(); 
         }
 
         function updateCropperImagesFast(newSrc) {
@@ -1006,26 +1018,28 @@
         function _createCropper(mode, savedData) {
             const isMoveMode = mode === 'move';
             return new Cropper(DOM.mainImage, {
-                viewMode:         0, 
-                dragMode:         isMoveMode ? 'move' : 'crop',
-                aspectRatio:      isCustomSize ? NaN : (targetWidth / targetHeight),
-                autoCropArea:     0.9,
-                background:       false,
-                movable:          isMoveMode,
-                zoomable:         true,
-                cropBoxMovable:   !isMoveMode,
-                cropBoxResizable: !isMoveMode,
-                restore:          false,
+                viewMode: 0, dragMode: isMoveMode ? 'move' : 'crop',
+                aspectRatio: isCustomSize ? NaN : (targetWidth / targetHeight),
+                autoCropArea: 0.9, background: false, movable: isMoveMode, zoomable: true,
+                cropBoxMovable: !isMoveMode, cropBoxResizable: !isMoveMode, restore: false,
                 
                 cropstart: (e) => {
                     const action = e.detail.action;
                     if (['crop', 'e', 'w', 's', 'n', 'se', 'sw', 'ne', 'nw', 'all'].includes(action)) {
                         isUserInteractingWithCropBox = true;
+                        if (cropper) previousCropData = cropper.getData(); // 紀錄拖曳前的裁切框狀態
                     }
                 },
                 cropend: () => {
                     isUserInteractingWithCropBox = false;
-                    if (cropper) lockedCropData = cropper.getData();
+                    if (cropper && previousCropData) {
+                        const newData = cropper.getData();
+                        if (!lockedCropData || Math.abs(newData.x - lockedCropData.x) > 0.1 || Math.abs(newData.y - lockedCropData.y) > 0.1 ||
+                            Math.abs(newData.width - lockedCropData.width) > 0.1 || Math.abs(newData.height - lockedCropData.height) > 0.1) {
+                            lockedCropData = newData;
+                            saveState(); // 紀錄裁切框被移動的狀態
+                        }
+                    }
                 },
                 ready() {
                     if (savedData) {
@@ -1037,43 +1051,31 @@
                         } catch(e){}
                     }
                     lockedCropData = this.cropper.getData(); 
-                    
-                    updatePreview();
-                    rebuildAnnoOverlay();
+                    updatePreview(); rebuildAnnoOverlay();
                     const overlay = DOM.editorArea.querySelector('.switching-overlay');
                     if (overlay) overlay.remove();
                     isSwitching = false;
                 },
                 crop: () => {
                     if (!cropper || isSyncing) return;
-
                     if (isUserInteractingWithCropBox) {
                         lockedCropData = cropper.getData();
-
                         if (isCustomSize && !isUpdatingFromInput) {
                             const cropData = cropper.getData(true);
                             targetWidth = Math.max(1, Math.round(cropData.width));
                             targetHeight = Math.max(1, Math.round(cropData.height));
-                            
                             if (document.activeElement !== DOM.customW) DOM.customW.value = targetWidth;
                             if (document.activeElement !== DOM.customH) DOM.customH.value = targetHeight;
                             updateStatSize();
                         }
                     } else if (lockedCropData) {
                         const currentData = cropper.getData();
-                        if (Math.abs(currentData.x - lockedCropData.x) > 0.1 ||
-                            Math.abs(currentData.y - lockedCropData.y) > 0.1 ||
-                            Math.abs(currentData.width - lockedCropData.width) > 0.1 ||
-                            Math.abs(currentData.height - lockedCropData.height) > 0.1) {
-                            
-                            isSyncing = true; 
-                            cropper.setData(lockedCropData); 
-                            isSyncing = false;
+                        if (Math.abs(currentData.x - lockedCropData.x) > 0.1 || Math.abs(currentData.y - lockedCropData.y) > 0.1 ||
+                            Math.abs(currentData.width - lockedCropData.width) > 0.1 || Math.abs(currentData.height - lockedCropData.height) > 0.1) {
+                            isSyncing = true; cropper.setData(lockedCropData); isSyncing = false;
                         }
                     }
-
-                    updatePreview(); 
-                    rebuildAnnoOverlay();
+                    updatePreview(); rebuildAnnoOverlay();
                 }
             });
         }
@@ -1083,32 +1085,20 @@
 
         function switchMode(mode) {
             if (mode === currentMode || !cropper || isSwitching) return;
-            isSwitching = true;
-            currentMode = mode;
-            setEraserTool(null); 
-
-            const savedData = {
-                canvas: cropper.getCanvasData(),
-                crop:   cropper.getData()
-            };
-
+            isSwitching = true; currentMode = mode; setEraserTool(null); 
+            const savedData = { canvas: cropper.getCanvasData(), crop: cropper.getData() };
             const overlay = document.createElement('div');
             overlay.className = 'switching-overlay';
             DOM.editorArea.appendChild(overlay);
-
-            cropper.destroy();
-            cropper = null;
+            cropper.destroy(); cropper = null;
             cropper = _createCropper(mode, savedData);
             updateModeUI();
         }
 
         function updateModeUI() {
             const mv = currentMode === 'move';
-            DOM.btnModeMove.classList.toggle('active', mv);
-            DOM.btnModeCrop.classList.toggle('active', !mv);
-            DOM.modeBadge.textContent = mv
-                ? '📷 移動圖片模式 — 拖曳圖片本身'
-                : '✂️ 調整選區模式 — 拖曳裁切框';
+            DOM.btnModeMove.classList.toggle('active', mv); DOM.btnModeCrop.classList.toggle('active', !mv);
+            DOM.modeBadge.textContent = mv ? '📷 移動圖片模式 — 拖曳圖片本身' : '✂️ 調整選區模式 — 拖曳裁切框';
         }
 
         /* ══ 畫布規格按鈕處理 ══ */
@@ -1116,121 +1106,68 @@
             item.onclick = () => {
                 DOM.presetItems.forEach(i => i.classList.remove('active'));
                 item.classList.add('active');
-                
                 const wData = item.dataset.w;
                 if (wData === 'custom') {
-                    isCustomSize = true;
-                    DOM.customSizeBox.classList.remove('hidden');
-                    
+                    isCustomSize = true; DOM.customSizeBox.classList.remove('hidden');
                     if (cropper) {
-                        isUserInteractingWithCropBox = true;
-                        cropper.setAspectRatio(NaN); 
+                        isUserInteractingWithCropBox = true; cropper.setAspectRatio(NaN); 
                         const cropData = cropper.getData(true);
-                        targetWidth = Math.max(1, Math.round(cropData.width));
-                        targetHeight = Math.max(1, Math.round(cropData.height));
-                        DOM.customW.value = targetWidth;
-                        DOM.customH.value = targetHeight;
-                        updateStatSize();
-                        lockedCropData = cropper.getData(); 
-                        isUserInteractingWithCropBox = false;
-                        
-                        updatePreview();
-                        rebuildAnnoOverlay();
+                        targetWidth = Math.max(1, Math.round(cropData.width)); targetHeight = Math.max(1, Math.round(cropData.height));
+                        DOM.customW.value = targetWidth; DOM.customH.value = targetHeight;
+                        updateStatSize(); lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false;
+                        updatePreview(); rebuildAnnoOverlay();
                     }
                 } else {
-                    isCustomSize = false;
-                    DOM.customSizeBox.classList.add('hidden');
-                    targetWidth  = parseInt(wData);
-                    targetHeight = parseInt(item.dataset.h);
-                    
+                    isCustomSize = false; DOM.customSizeBox.classList.add('hidden');
+                    targetWidth = parseInt(wData); targetHeight = parseInt(item.dataset.h);
                     if (cropper) {
-                        isUserInteractingWithCropBox = true;
-                        cropper.setAspectRatio(targetWidth / targetHeight);
-                        lockedCropData = cropper.getData(); 
-                        isUserInteractingWithCropBox = false;
+                        isUserInteractingWithCropBox = true; cropper.setAspectRatio(targetWidth / targetHeight);
+                        lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false;
                     }
-                    
-                    updateStatSize();
-                    updatePreview();
-                    rebuildAnnoOverlay();
+                    updateStatSize(); updatePreview(); rebuildAnnoOverlay();
                 }
-                saveSettings();
+                saveSettings(); saveState(); // 紀錄尺寸變更歷史
             };
         });
 
+        DOM.customW.onchange = () => saveState();
+        DOM.customH.onchange = () => saveState();
+        
         DOM.customW.oninput = () => {
-            isUpdatingFromInput = true;
-            targetWidth  = Math.max(1, parseInt(DOM.customW.value) || 1);
-            updateStatSize();
+            isUpdatingFromInput = true; targetWidth = Math.max(1, parseInt(DOM.customW.value) || 1); updateStatSize();
             if (cropper) {
-                isUserInteractingWithCropBox = true;
-                const cropData = cropper.getData(true);
-                cropper.setData({ width: targetWidth, height: cropData.height });
-                lockedCropData = cropper.getData();
-                isUserInteractingWithCropBox = false;
+                isUserInteractingWithCropBox = true; const cropData = cropper.getData(true);
+                cropper.setData({ width: targetWidth, height: cropData.height }); lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false;
             }
-            rebuildAnnoOverlay();
-            updatePreview();
-            isUpdatingFromInput = false;
-            saveSettings();
+            rebuildAnnoOverlay(); updatePreview(); isUpdatingFromInput = false; saveSettings();
         };
 
         DOM.customH.oninput = () => {
-            isUpdatingFromInput = true;
-            targetHeight = Math.max(1, parseInt(DOM.customH.value) || 1);
-            updateStatSize();
+            isUpdatingFromInput = true; targetHeight = Math.max(1, parseInt(DOM.customH.value) || 1); updateStatSize();
             if (cropper) {
-                isUserInteractingWithCropBox = true;
-                const cropData = cropper.getData(true);
-                cropper.setData({ width: cropData.width, height: targetHeight });
-                lockedCropData = cropper.getData();
-                isUserInteractingWithCropBox = false;
+                isUserInteractingWithCropBox = true; const cropData = cropper.getData(true);
+                cropper.setData({ width: cropData.width, height: targetHeight }); lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false;
             }
-            rebuildAnnoOverlay();
-            updatePreview();
-            isUpdatingFromInput = false;
-            saveSettings();
+            rebuildAnnoOverlay(); updatePreview(); isUpdatingFromInput = false; saveSettings();
         };
 
         /* ══ 圖片圓角 ══ */
-        DOM.borderRadius.oninput = () => {
-            DOM.radiusVal.textContent = DOM.borderRadius.value;
-            updatePreview();
-            saveSettings();
-        };
-
+        DOM.borderRadius.onchange = () => saveState();
+        DOM.borderRadius.oninput = () => { DOM.radiusVal.textContent = DOM.borderRadius.value; updatePreview(); saveSettings(); };
 
         /* ══ 網格與磁吸系統 ══ */
-        DOM.showGrid.onchange = () => {
-            rebuildAnnoOverlay();
-            saveSettings();
-        };
-        
-        DOM.snapGrid.onchange = () => {
-            DOM.annoAngle.step = DOM.snapGrid.checked ? 15 : 1;
-            saveSettings();
-        };
-
-        DOM.gridSize.oninput = () => {
-            DOM.gridSizeVal.textContent = DOM.gridSize.value;
-            rebuildAnnoOverlay();
-            saveSettings();
-        };
-
+        DOM.showGrid.onchange = () => { rebuildAnnoOverlay(); saveSettings(); };
+        DOM.snapGrid.onchange = () => { DOM.annoAngle.step = DOM.snapGrid.checked ? 15 : 1; saveSettings(); };
+        DOM.gridSize.oninput = () => { DOM.gridSizeVal.textContent = DOM.gridSize.value; rebuildAnnoOverlay(); saveSettings(); };
 
         /* ══ 智慧去背與填色系統 ══ */
         DOM.btnWandToggle.onclick = toggleWandMenu;
-        
         function toggleWandMenu() {
             const isActive = DOM.btnWandToggle.classList.contains('btn-primary');
             if (isActive) {
-                DOM.btnWandToggle.classList.replace('btn-primary', 'btn-outline');
-                DOM.wandSettings.classList.add('hidden');
-                setEraserTool(null);
+                DOM.btnWandToggle.classList.replace('btn-primary', 'btn-outline'); DOM.wandSettings.classList.add('hidden'); setEraserTool(null);
             } else {
-                DOM.btnWandToggle.classList.replace('btn-outline', 'btn-primary');
-                DOM.wandSettings.classList.remove('hidden');
-                if (!activeEraserTool) setEraserTool('wand');
+                DOM.btnWandToggle.classList.replace('btn-outline', 'btn-primary'); DOM.wandSettings.classList.remove('hidden'); if (!activeEraserTool) setEraserTool('wand');
             }
         }
 
@@ -1239,22 +1176,16 @@
 
         function setProcessAction(action) {
             currentProcessAction = action;
-            DOM.btnActionErase.classList.toggle('btn-primary', action === 'erase');
-            DOM.btnActionErase.classList.toggle('btn-outline', action !== 'erase');
-            DOM.btnActionFill.classList.toggle('btn-primary', action === 'fill');
-            DOM.btnActionFill.classList.toggle('btn-outline', action !== 'fill');
-            
-            DOM.fillColorRow.classList.toggle('hidden', action === 'erase');
-            updateShapePreviewColor();
+            DOM.btnActionErase.classList.toggle('btn-primary', action === 'erase'); DOM.btnActionErase.classList.toggle('btn-outline', action !== 'erase');
+            DOM.btnActionFill.classList.toggle('btn-primary', action === 'fill'); DOM.btnActionFill.classList.toggle('btn-outline', action !== 'fill');
+            DOM.fillColorRow.classList.toggle('hidden', action === 'erase'); updateShapePreviewColor();
         }
 
         function updateShapePreviewColor() {
             if (currentProcessAction === 'fill') {
-                DOM.shapePreview.style.borderColor = DOM.fillColor.value;
-                DOM.shapePreview.style.background = DOM.fillColor.value + '40';
+                DOM.shapePreview.style.borderColor = DOM.fillColor.value; DOM.shapePreview.style.background = DOM.fillColor.value + '40';
             } else {
-                DOM.shapePreview.style.borderColor = '#FF3B30';
-                DOM.shapePreview.style.background = 'rgba(255, 59, 48, 0.1)';
+                DOM.shapePreview.style.borderColor = '#FF3B30'; DOM.shapePreview.style.background = 'rgba(255, 59, 48, 0.1)';
             }
         }
         DOM.fillColor.oninput = updateShapePreviewColor;
@@ -1262,88 +1193,46 @@
         DOM.btnEyedropper.onclick = async () => {
             if (window.EyeDropper) {
                 try {
-                    const eyeDropper = new EyeDropper();
-                    const result = await eyeDropper.open();
-                    DOM.fillColor.value = result.sRGBHex;
-                    updateShapePreviewColor();
-                } catch(e) { console.log('使用者取消取色'); }
-                return;
+                    const eyeDropper = new EyeDropper(); const result = await eyeDropper.open();
+                    DOM.fillColor.value = result.sRGBHex; updateShapePreviewColor();
+                } catch(e) { console.log('使用者取消取色'); } return;
             }
-            
             isEyedropperActive = !isEyedropperActive;
-            DOM.btnEyedropper.classList.toggle('btn-primary', isEyedropperActive);
-            DOM.btnEyedropper.classList.toggle('btn-outline', !isEyedropperActive);
-            if (isEyedropperActive) {
-                DOM.eraserOverlay.classList.add('eyedropper-cursor');
-            } else {
-                DOM.eraserOverlay.classList.remove('eyedropper-cursor');
-            }
+            DOM.btnEyedropper.classList.toggle('btn-primary', isEyedropperActive); DOM.btnEyedropper.classList.toggle('btn-outline', !isEyedropperActive);
+            if (isEyedropperActive) DOM.eraserOverlay.classList.add('eyedropper-cursor'); else DOM.eraserOverlay.classList.remove('eyedropper-cursor');
         };
 
-        DOM.tolerance.oninput = () => { 
-            DOM.tolVal.textContent = DOM.tolerance.value; 
-            saveSettings(); 
-        };
-        DOM.brushSize.oninput = () => { 
-            DOM.brushSizeVal.textContent = DOM.brushSize.value; 
-            saveSettings(); 
-        };
+        DOM.tolerance.oninput = () => { DOM.tolVal.textContent = DOM.tolerance.value; saveSettings(); };
+        DOM.brushSize.oninput = () => { DOM.brushSizeVal.textContent = DOM.brushSize.value; saveSettings(); };
+        DOM.contiguous.addEventListener('change', saveSettings); DOM.limitToCrop.addEventListener('change', saveSettings);
         
-        DOM.contiguous.addEventListener('change', saveSettings);
-        DOM.limitToCrop.addEventListener('change', saveSettings);
-        
-        DOM.btnEraseWand.onclick = () => setEraserTool('wand');
-        DOM.btnEraseBrush.onclick = () => setEraserTool('brush');
-        DOM.btnEraseRect.onclick = () => setEraserTool('rect');
-        DOM.btnEraseCircle.onclick = () => setEraserTool('circle');
+        DOM.btnEraseWand.onclick = () => setEraserTool('wand'); DOM.btnEraseBrush.onclick = () => setEraserTool('brush');
+        DOM.btnEraseRect.onclick = () => setEraserTool('rect'); DOM.btnEraseCircle.onclick = () => setEraserTool('circle');
 
         function setEraserTool(tool) {
-            if (activeEraserTool === tool) tool = null; 
-            activeEraserTool = tool;
-            
-            DOM.btnEraseWand.classList.toggle('btn-primary', tool === 'wand');
-            DOM.btnEraseWand.classList.toggle('btn-outline', tool !== 'wand');
-            DOM.btnEraseBrush.classList.toggle('btn-primary', tool === 'brush');
-            DOM.btnEraseBrush.classList.toggle('btn-outline', tool !== 'brush');
-            DOM.btnEraseRect.classList.toggle('btn-primary', tool === 'rect');
-            DOM.btnEraseRect.classList.toggle('btn-outline', tool !== 'rect');
-            DOM.btnEraseCircle.classList.toggle('btn-primary', tool === 'circle');
-            DOM.btnEraseCircle.classList.toggle('btn-outline', tool !== 'circle');
+            if (activeEraserTool === tool) tool = null; activeEraserTool = tool;
+            DOM.btnEraseWand.classList.toggle('btn-primary', tool === 'wand'); DOM.btnEraseWand.classList.toggle('btn-outline', tool !== 'wand');
+            DOM.btnEraseBrush.classList.toggle('btn-primary', tool === 'brush'); DOM.btnEraseBrush.classList.toggle('btn-outline', tool !== 'brush');
+            DOM.btnEraseRect.classList.toggle('btn-primary', tool === 'rect'); DOM.btnEraseRect.classList.toggle('btn-outline', tool !== 'rect');
+            DOM.btnEraseCircle.classList.toggle('btn-primary', tool === 'circle'); DOM.btnEraseCircle.classList.toggle('btn-outline', tool !== 'circle');
             
             if (tool) {
-                document.querySelectorAll('.wand-only').forEach(el => {
-                    el.style.display = tool === 'wand' ? 'flex' : 'none';
-                });
-                document.querySelectorAll('.brush-only').forEach(el => {
-                    el.style.display = tool === 'brush' ? 'flex' : 'none';
-                });
-                
+                document.querySelectorAll('.wand-only').forEach(el => { el.style.display = tool === 'wand' ? 'flex' : 'none'; });
+                document.querySelectorAll('.brush-only').forEach(el => { el.style.display = tool === 'brush' ? 'flex' : 'none'; });
                 DOM.eraserOverlay.classList.remove('hidden');
                 if (cropper) cropper.setDragMode('none');
-                
-                if (tool === 'brush') {
-                    DOM.eraserOverlay.classList.add('brush-cursor-mode');
-                    DOM.brushCursor.classList.remove('hidden');
-                } else {
-                    DOM.eraserOverlay.classList.remove('brush-cursor-mode');
-                    DOM.brushCursor.classList.add('hidden');
-                }
-                
+                if (tool === 'brush') { DOM.eraserOverlay.classList.add('brush-cursor-mode'); DOM.brushCursor.classList.remove('hidden'); } 
+                else { DOM.eraserOverlay.classList.remove('brush-cursor-mode'); DOM.brushCursor.classList.add('hidden'); }
             } else {
-                DOM.eraserOverlay.classList.add('hidden');
-                isEyedropperActive = false; 
+                DOM.eraserOverlay.classList.add('hidden'); isEyedropperActive = false; 
                 DOM.btnEyedropper.classList.replace('btn-primary', 'btn-outline');
-                DOM.eraserOverlay.classList.remove('eyedropper-cursor');
-                DOM.eraserOverlay.classList.remove('brush-cursor-mode');
-                DOM.brushCursor.classList.add('hidden');
-                
+                DOM.eraserOverlay.classList.remove('eyedropper-cursor'); DOM.eraserOverlay.classList.remove('brush-cursor-mode'); DOM.brushCursor.classList.add('hidden');
                 if (cropper) cropper.setDragMode(currentMode === 'move' ? 'move' : 'crop');
             }
         }
 
         function screenToImage(clientX, clientY) {
-            const cd = cropper.getCanvasData();
-            const rect = DOM.eraserOverlay.getBoundingClientRect();
+            const cd = cropper.getCanvasData(); const rect = DOM.eraserOverlay.getBoundingClientRect();
             const x = Math.floor((clientX - rect.left - cd.left) * (wandCanvas.width  / cd.width));
             const y = Math.floor((clientY - rect.top  - cd.top)  * (wandCanvas.height / cd.height));
             return {x, y};
@@ -1351,123 +1240,66 @@
 
         DOM.eraserOverlay.addEventListener('mousedown', e => {
             if (e.button !== 0) return;
-
             if (isEyedropperActive) {
                 const pt = screenToImage(e.clientX, e.clientY);
                 if (pt.x >= 0 && pt.x < wandCanvas.width && pt.y >= 0 && pt.y < wandCanvas.height) {
                     const imgData = wandCtx.getImageData(pt.x, pt.y, 1, 1).data;
-                    if (imgData[3] > 0) {
-                        DOM.fillColor.value = rgbToHex(imgData[0], imgData[1], imgData[2]);
-                        updateShapePreviewColor();
-                    }
+                    if (imgData[3] > 0) { DOM.fillColor.value = rgbToHex(imgData[0], imgData[1], imgData[2]); updateShapePreviewColor(); }
                 }
-                isEyedropperActive = false;
-                DOM.btnEyedropper.classList.remove('btn-primary');
-                DOM.btnEyedropper.classList.add('btn-outline');
-                DOM.eraserOverlay.classList.remove('eyedropper-cursor');
-                return;
+                isEyedropperActive = false; DOM.btnEyedropper.classList.remove('btn-primary'); DOM.btnEyedropper.classList.add('btn-outline'); DOM.eraserOverlay.classList.remove('eyedropper-cursor'); return;
             }
-
             if (!activeEraserTool || !cropper) return;
             
             if (activeEraserTool === 'wand') {
                 const pt = screenToImage(e.clientX, e.clientY);
-                if (pt.x >= 0 && pt.x < wandCanvas.width && pt.y >= 0 && pt.y < wandCanvas.height) {
-                    floodFill(pt.x, pt.y);
-                }
-                return;
+                if (pt.x >= 0 && pt.x < wandCanvas.width && pt.y >= 0 && pt.y < wandCanvas.height) floodFill(pt.x, pt.y); return;
             }
-            
-            if (activeEraserTool === 'brush') {
-                isDrawingBrush = true;
-                lastBrushPt = screenToImage(e.clientX, e.clientY);
-                return;
-            }
+            if (activeEraserTool === 'brush') { isDrawingBrush = true; lastBrushPt = screenToImage(e.clientX, e.clientY); return; }
 
             if (['rect', 'circle'].includes(activeEraserTool)) {
-                isDrawingEraseShape = true;
-                eraseStartX = e.clientX;
-                eraseStartY = e.clientY;
-                
+                isDrawingEraseShape = true; eraseStartX = e.clientX; eraseStartY = e.clientY;
                 savedWandImageData = wandCtx.getImageData(0, 0, wandCanvas.width, wandCanvas.height);
-                
                 DOM.shapePreview.className = activeEraserTool === 'circle' ? 'circle' : '';
                 const rect = DOM.eraserOverlay.getBoundingClientRect();
-                DOM.shapePreview.style.left = (eraseStartX - rect.left) + 'px';
-                DOM.shapePreview.style.top = (eraseStartY - rect.top) + 'px';
-                DOM.shapePreview.style.width = '0px';
-                DOM.shapePreview.style.height = '0px';
-                DOM.shapePreview.classList.remove('hidden');
+                DOM.shapePreview.style.left = (eraseStartX - rect.left) + 'px'; DOM.shapePreview.style.top = (eraseStartY - rect.top) + 'px';
+                DOM.shapePreview.style.width = '0px'; DOM.shapePreview.style.height = '0px'; DOM.shapePreview.classList.remove('hidden');
             }
         });
 
         document.addEventListener('mousemove', e => {
             const rect = DOM.eraserOverlay.getBoundingClientRect();
-            const currentX = Math.max(rect.left, Math.min(e.clientX, rect.right));
-            const currentY = Math.max(rect.top, Math.min(e.clientY, rect.bottom));
+            const currentX = Math.max(rect.left, Math.min(e.clientX, rect.right)); const currentY = Math.max(rect.top, Math.min(e.clientY, rect.bottom));
             
             if (activeEraserTool === 'brush' && !DOM.eraserOverlay.classList.contains('hidden')) {
-                const cd = cropper.getCanvasData();
-                const zoomRatio = cd.width / wandCanvas.width; 
-                const displaySize = parseInt(DOM.brushSize.value) * zoomRatio;
-                
-                DOM.brushCursor.style.width = displaySize + 'px';
-                DOM.brushCursor.style.height = displaySize + 'px';
-                DOM.brushCursor.style.left = (currentX - rect.left) + 'px';
-                DOM.brushCursor.style.top = (currentY - rect.top) + 'px';
-                
-                if (currentProcessAction === 'fill') {
-                    DOM.brushCursor.style.borderColor = DOM.fillColor.value;
-                    DOM.brushCursor.style.background = DOM.fillColor.value + '40';
-                } else {
-                    DOM.brushCursor.style.borderColor = 'rgba(0,0,0,0.8)';
-                    DOM.brushCursor.style.background = 'rgba(255,255,255,0.2)';
-                }
+                const cd = cropper.getCanvasData(); const zoomRatio = cd.width / wandCanvas.width; const displaySize = parseInt(DOM.brushSize.value) * zoomRatio;
+                DOM.brushCursor.style.width = displaySize + 'px'; DOM.brushCursor.style.height = displaySize + 'px';
+                DOM.brushCursor.style.left = (currentX - rect.left) + 'px'; DOM.brushCursor.style.top = (currentY - rect.top) + 'px';
+                if (currentProcessAction === 'fill') { DOM.brushCursor.style.borderColor = DOM.fillColor.value; DOM.brushCursor.style.background = DOM.fillColor.value + '40'; } 
+                else { DOM.brushCursor.style.borderColor = 'rgba(0,0,0,0.8)'; DOM.brushCursor.style.background = 'rgba(255,255,255,0.2)'; }
             }
 
             if (isDrawingBrush) {
-                const currPt = screenToImage(currentX, currentY);
-                applyBrushStepToCanvas(lastBrushPt, currPt);
-                lastBrushPt = currPt;
-                
+                const currPt = screenToImage(currentX, currentY); applyBrushStepToCanvas(lastBrushPt, currPt); lastBrushPt = currPt;
                 if (!isRenderingErase) {
                     isRenderingErase = true;
                     requestAnimationFrame(() => {
-                        updatePreview();
-                        const tempSrc = wandCanvas.toDataURL('image/png');
-                        updateCropperImagesFast(tempSrc);
-                        isRenderingErase = false;
+                        updatePreview(); const tempSrc = wandCanvas.toDataURL('image/png'); updateCropperImagesFast(tempSrc); isRenderingErase = false;
                     });
-                }
-                return;
+                } return;
             }
 
             if (isDrawingEraseShape) {
-                const left = Math.min(eraseStartX, currentX) - rect.left;
-                const top = Math.min(eraseStartY, currentY) - rect.top;
-                const width = Math.abs(currentX - eraseStartX);
-                const height = Math.abs(currentY - eraseStartY);
-                
-                DOM.shapePreview.style.left = left + 'px';
-                DOM.shapePreview.style.top = top + 'px';
-                DOM.shapePreview.style.width = width + 'px';
-                DOM.shapePreview.style.height = height + 'px';
+                const left = Math.min(eraseStartX, currentX) - rect.left; const top = Math.min(eraseStartY, currentY) - rect.top;
+                const width = Math.abs(currentX - eraseStartX); const height = Math.abs(currentY - eraseStartY);
+                DOM.shapePreview.style.left = left + 'px'; DOM.shapePreview.style.top = top + 'px'; DOM.shapePreview.style.width = width + 'px'; DOM.shapePreview.style.height = height + 'px';
 
                 if (!isRenderingErase) {
                     isRenderingErase = true;
                     requestAnimationFrame(() => {
-                        if (!isDrawingEraseShape) {
-                            isRenderingErase = false;
-                            return;
-                        }
+                        if (!isDrawingEraseShape) { isRenderingErase = false; return; }
                         wandCtx.putImageData(savedWandImageData, 0, 0);
-                        
-                        const pt1 = screenToImage(eraseStartX, eraseStartY);
-                        const pt2 = screenToImage(currentX, currentY);
-                        applyProcessShapeToCanvas(pt1, pt2, activeEraserTool);
-                        
-                        updatePreview();
-                        isRenderingErase = false;
+                        const pt1 = screenToImage(eraseStartX, eraseStartY); const pt2 = screenToImage(currentX, currentY);
+                        applyProcessShapeToCanvas(pt1, pt2, activeEraserTool); updatePreview(); isRenderingErase = false;
                     });
                 }
             }
@@ -1475,130 +1307,59 @@
 
         document.addEventListener('mouseup', e => {
             if (isDrawingBrush) {
-                isDrawingBrush = false;
-                originalImageSrc = wandCanvas.toDataURL('image/png');
-                updateCropperImagesFast(originalImageSrc); 
-                saveHistory(originalImageSrc);
-                updatePreview();
-                return;
+                isDrawingBrush = false; originalImageSrc = wandCanvas.toDataURL('image/png'); updateCropperImagesFast(originalImageSrc); 
+                saveState(); // 畫筆結束紀錄歷史
+                updatePreview(); return;
             }
-
             if (!isDrawingEraseShape) return;
-            isDrawingEraseShape = false;
-            DOM.shapePreview.classList.add('hidden');
-            
+            isDrawingEraseShape = false; DOM.shapePreview.classList.add('hidden');
             const rect = DOM.eraserOverlay.getBoundingClientRect();
-            const currentX = Math.max(rect.left, Math.min(e.clientX, rect.right));
-            const currentY = Math.max(rect.top, Math.min(e.clientY, rect.bottom));
+            const currentX = Math.max(rect.left, Math.min(e.clientX, rect.right)); const currentY = Math.max(rect.top, Math.min(e.clientY, rect.bottom));
             
-            if (Math.abs(currentX - eraseStartX) < 5 && Math.abs(currentY - eraseStartY) < 5) {
-                wandCtx.putImageData(savedWandImageData, 0, 0);
-                updatePreview();
-                return;
-            }
+            if (Math.abs(currentX - eraseStartX) < 5 && Math.abs(currentY - eraseStartY) < 5) { wandCtx.putImageData(savedWandImageData, 0, 0); updatePreview(); return; }
             
-            const pt1 = screenToImage(eraseStartX, eraseStartY);
-            const pt2 = screenToImage(currentX, currentY);
-            
-            wandCtx.putImageData(savedWandImageData, 0, 0);
-            applyProcessShapeToCanvas(pt1, pt2, activeEraserTool);
-            
-            originalImageSrc = wandCanvas.toDataURL('image/png');
-            updateCropperImagesFast(originalImageSrc); 
-            saveHistory(originalImageSrc);
+            const pt1 = screenToImage(eraseStartX, eraseStartY); const pt2 = screenToImage(currentX, currentY);
+            wandCtx.putImageData(savedWandImageData, 0, 0); applyProcessShapeToCanvas(pt1, pt2, activeEraserTool);
+            originalImageSrc = wandCanvas.toDataURL('image/png'); updateCropperImagesFast(originalImageSrc); 
+            saveState(); // 拉框結束紀錄歷史
             updatePreview();
         });
 
         function applyBrushStepToCanvas(pt1, pt2) {
             wandCtx.save();
-            
-            if (DOM.limitToCrop.checked) {
-                const crop = cropper.getData(true);
-                wandCtx.beginPath();
-                wandCtx.rect(crop.x, crop.y, crop.width, crop.height);
-                wandCtx.clip();
-            }
-            
-            if (currentProcessAction === 'erase') {
-                wandCtx.globalCompositeOperation = 'destination-out';
-                wandCtx.strokeStyle = 'rgba(0,0,0,1)';
-            } else {
-                wandCtx.globalCompositeOperation = 'source-over';
-                wandCtx.strokeStyle = DOM.fillColor.value;
-            }
-            
-            wandCtx.lineWidth = parseInt(DOM.brushSize.value) || 20;
-            wandCtx.lineCap = 'round';
-            wandCtx.lineJoin = 'round';
-            wandCtx.beginPath();
-            wandCtx.moveTo(pt1.x, pt1.y);
-            wandCtx.lineTo(pt2.x, pt2.y);
-            wandCtx.stroke();
-            
-            wandCtx.restore();
+            if (DOM.limitToCrop.checked) { const crop = cropper.getData(true); wandCtx.beginPath(); wandCtx.rect(crop.x, crop.y, crop.width, crop.height); wandCtx.clip(); }
+            if (currentProcessAction === 'erase') { wandCtx.globalCompositeOperation = 'destination-out'; wandCtx.strokeStyle = 'rgba(0,0,0,1)'; } 
+            else { wandCtx.globalCompositeOperation = 'source-over'; wandCtx.strokeStyle = DOM.fillColor.value; }
+            wandCtx.lineWidth = parseInt(DOM.brushSize.value) || 20; wandCtx.lineCap = 'round'; wandCtx.lineJoin = 'round';
+            wandCtx.beginPath(); wandCtx.moveTo(pt1.x, pt1.y); wandCtx.lineTo(pt2.x, pt2.y); wandCtx.stroke(); wandCtx.restore();
         }
 
         function applyProcessShapeToCanvas(pt1, pt2, shapeType) {
             wandCtx.save();
-            
-            if (DOM.limitToCrop.checked) {
-                const crop = cropper.getData(true);
-                wandCtx.beginPath();
-                wandCtx.rect(crop.x, crop.y, crop.width, crop.height);
-                wandCtx.clip();
-            }
-            
-            if (currentProcessAction === 'erase') {
-                wandCtx.globalCompositeOperation = 'destination-out';
-                wandCtx.fillStyle = 'rgba(0,0,0,1)';
-            } else {
-                wandCtx.globalCompositeOperation = 'source-over';
-                wandCtx.fillStyle = DOM.fillColor.value;
-            }
-            
+            if (DOM.limitToCrop.checked) { const crop = cropper.getData(true); wandCtx.beginPath(); wandCtx.rect(crop.x, crop.y, crop.width, crop.height); wandCtx.clip(); }
+            if (currentProcessAction === 'erase') { wandCtx.globalCompositeOperation = 'destination-out'; wandCtx.fillStyle = 'rgba(0,0,0,1)'; } 
+            else { wandCtx.globalCompositeOperation = 'source-over'; wandCtx.fillStyle = DOM.fillColor.value; }
             wandCtx.beginPath();
-            
-            const minX = Math.min(pt1.x, pt2.x);
-            const minY = Math.min(pt1.y, pt2.y);
-            const width = Math.abs(pt2.x - pt1.x);
-            const height = Math.abs(pt2.y - pt1.y);
-            
-            if (shapeType === 'rect') {
-                wandCtx.rect(minX, minY, width, height);
-            } else if (shapeType === 'circle') {
-                const cx = minX + width / 2;
-                const cy = minY + height / 2;
-                wandCtx.ellipse(cx, cy, width / 2, height / 2, 0, 0, 2 * Math.PI);
-            }
-            
-            wandCtx.fill();
-            wandCtx.restore();
+            const minX = Math.min(pt1.x, pt2.x); const minY = Math.min(pt1.y, pt2.y); const width = Math.abs(pt2.x - pt1.x); const height = Math.abs(pt2.y - pt1.y);
+            if (shapeType === 'rect') wandCtx.rect(minX, minY, width, height);
+            else if (shapeType === 'circle') { const cx = minX + width / 2; const cy = minY + height / 2; wandCtx.ellipse(cx, cy, width / 2, height / 2, 0, 0, 2 * Math.PI); }
+            wandCtx.fill(); wandCtx.restore();
         }
 
         function floodFill(sx, sy) {
-            const tol = parseInt(DOM.tolerance.value);
-            const contig = DOM.contiguous.checked;
-            const limitToCrop = DOM.limitToCrop.checked;
-            const isErase = currentProcessAction === 'erase';
-            const fillRgb = hexToRgb(DOM.fillColor.value);
-            
+            const tol = parseInt(DOM.tolerance.value); const contig = DOM.contiguous.checked; const limitToCrop = DOM.limitToCrop.checked;
+            const isErase = currentProcessAction === 'erase'; const fillRgb = hexToRgb(DOM.fillColor.value);
             const imgData = wandCtx.getImageData(0, 0, wandCanvas.width, wandCanvas.height);
-            const data = imgData.data, w = wandCanvas.width;
-            const i0 = (sy * w + sx) * 4;
+            const data = imgData.data, w = wandCanvas.width; const i0 = (sy * w + sx) * 4;
             const r0 = data[i0], g0 = data[i0+1], b0 = data[i0+2], a0 = data[i0+3];
-            
             const isStartTransparent = (a0 === 0);
-            
             if (isStartTransparent && isErase) return;
 
             let minX = 0, maxX = w, minY = 0, maxY = wandCanvas.height;
             if (limitToCrop) {
                 const crop = cropper.getData(true); 
-                minX = Math.max(0, Math.floor(crop.x));
-                maxX = Math.min(w, Math.ceil(crop.x + crop.width));
-                minY = Math.max(0, Math.floor(crop.y));
-                maxY = Math.min(wandCanvas.height, Math.ceil(crop.y + crop.height));
-                
+                minX = Math.max(0, Math.floor(crop.x)); maxX = Math.min(w, Math.ceil(crop.x + crop.width));
+                minY = Math.max(0, Math.floor(crop.y)); maxY = Math.min(wandCanvas.height, Math.ceil(crop.y + crop.height));
                 if (sx < minX || sx >= maxX || sy < minY || sy >= maxY) return;
             }
 
@@ -1608,23 +1369,11 @@
             };
 
             const applyPixel = p => {
-                if (isErase) {
-                    data[p+3] = 0;
-                } else {
-                    data[p]   = fillRgb.r;
-                    data[p+1] = fillRgb.g;
-                    data[p+2] = fillRgb.b;
-                    data[p+3] = 255;
-                }
+                if (isErase) data[p+3] = 0; else { data[p] = fillRgb.r; data[p+1] = fillRgb.g; data[p+2] = fillRgb.b; data[p+3] = 255; }
             };
             
             if (!contig) {
-                for (let y = minY; y < maxY; y++) {
-                    for (let x = minX; x < maxX; x++) {
-                        const i = (y * w + x) * 4;
-                        if (match(i)) applyPixel(i);
-                    }
-                }
+                for (let y = minY; y < maxY; y++) for (let x = minX; x < maxX; x++) { const i = (y * w + x) * 4; if (match(i)) applyPixel(i); }
             } else {
                 const stack = [[sx, sy]], visited = new Uint8Array(w * wandCanvas.height);
                 while (stack.length) {
@@ -1633,19 +1382,14 @@
                     const p = v * 4;
                     if (match(p)) {
                         applyPixel(p);
-                        if (x > minX) stack.push([x-1,y]); 
-                        if (x < maxX-1) stack.push([x+1,y]);
-                        if (y > minY) stack.push([x,y-1]); 
-                        if (y < maxY-1) stack.push([x,y+1]);
+                        if (x > minX) stack.push([x-1,y]); if (x < maxX-1) stack.push([x+1,y]);
+                        if (y > minY) stack.push([x,y-1]); if (y < maxY-1) stack.push([x,y+1]);
                     }
                 }
             }
-            wandCtx.putImageData(imgData, 0, 0);
-            originalImageSrc = wandCanvas.toDataURL('image/png');
-            
-            updatePreview();
-            updateCropperImagesFast(originalImageSrc); 
-            saveHistory(originalImageSrc);
+            wandCtx.putImageData(imgData, 0, 0); originalImageSrc = wandCanvas.toDataURL('image/png');
+            updatePreview(); updateCropperImagesFast(originalImageSrc); 
+            saveState(); // 魔術棒處理結束紀錄歷史
         }
 
         /* ══ 標註系統 ══ */
@@ -1653,6 +1397,7 @@
             const id = Date.now();
             annotations.push({ id, type:'arrow', x:targetWidth/2, y:targetHeight/2, angle:0, color:'#FF3B30', size:100, skewX:0, skewY:0, hasShadow:true });
             renderAnnotationList(); selectAnnotation(id); updatePreview(); rebuildAnnoOverlay();
+            saveState(); // 新增圖形紀錄歷史
         };
         
         DOM.btnAddText.onclick = () => {
@@ -1660,21 +1405,14 @@
             const defaultFont = "'Noto Sans TC', 'Inter', sans-serif";
             annotations.push({ id, type:'text', x:targetWidth/2, y:targetHeight/2, angle:0, color:'#000000', fontSize:40, fontFamily: defaultFont, content:'新文字', skewX:0, skewY:0, hasShadow:true });
             renderAnnotationList(); selectAnnotation(id); updatePreview(); rebuildAnnoOverlay();
-            
-            setTimeout(() => {
-                DOM.textContent.focus();
-                DOM.textContent.select();
-            }, 50);
+            saveState(); // 新增文字紀錄歷史
+            setTimeout(() => { DOM.textContent.focus(); DOM.textContent.select(); }, 50);
         };
 
         function renderAnnotationList() {
             DOM.annotationList.innerHTML = '';
             if (!annotations.length) {
-                DOM.annotationList.innerHTML = `
-                    <div style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:12px 0;">
-                        <i class="fa-solid fa-ghost" style="font-size:1.5rem; opacity:0.3; margin-bottom:8px; display:block;"></i>
-                        尚無標註，點擊上方新增
-                    </div>`;
+                DOM.annotationList.innerHTML = `<div style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:12px 0;"><i class="fa-solid fa-ghost" style="font-size:1.5rem; opacity:0.3; margin-bottom:8px; display:block;"></i>尚無標註，點擊上方新增</div>`;
                 return;
             }
             annotations.forEach((anno, idx) => {
@@ -1689,30 +1427,18 @@
         }
 
         function selectAnnotation(id) {
-            selectedAnnoId = id;
-            renderAnnotationList();
-            rebuildAnnoOverlay();
+            selectedAnnoId = id; renderAnnotationList(); rebuildAnnoOverlay();
             const anno = annotations.find(a => a.id === id);
             if (!anno) { DOM.annoSettings.classList.add('hidden'); return; }
             DOM.annoSettings.classList.remove('hidden');
-            DOM.arrowProps.classList.toggle('hidden', anno.type !== 'arrow');
-            DOM.textProps.classList.toggle('hidden',  anno.type !== 'text');
-            
+            DOM.arrowProps.classList.toggle('hidden', anno.type !== 'arrow'); DOM.textProps.classList.toggle('hidden',  anno.type !== 'text');
             DOM.annoShadow.checked = anno.hasShadow !== false;
-            
-            if (anno.type === 'arrow') {
-                DOM.arrowColor.value = anno.color;
-                DOM.arrowSize.value = anno.size; DOM.arrowSizeVal.textContent = anno.size;
-            } else {
-                DOM.textContent.value = anno.content;
-                DOM.fontSize.value = anno.fontSize; DOM.fontSizeVal.textContent = anno.fontSize;
-                DOM.textColor.value = anno.color;
-                DOM.textFont.value = anno.fontFamily || "'Noto Sans TC', 'Inter', sans-serif";
-                
-                DOM.textSkewX.value = anno.skewX || 0;
-                DOM.textSkewXVal.textContent = anno.skewX || 0;
-                DOM.textSkewY.value = anno.skewY || 0;
-                DOM.textSkewYVal.textContent = anno.skewY || 0;
+            if (anno.type === 'arrow') { DOM.arrowColor.value = anno.color; DOM.arrowSize.value = anno.size; DOM.arrowSizeVal.textContent = anno.size; } 
+            else {
+                DOM.textContent.value = anno.content; DOM.fontSize.value = anno.fontSize; DOM.fontSizeVal.textContent = anno.fontSize;
+                DOM.textColor.value = anno.color; DOM.textFont.value = anno.fontFamily || "'Noto Sans TC', 'Inter', sans-serif";
+                DOM.textSkewX.value = anno.skewX || 0; DOM.textSkewXVal.textContent = anno.skewX || 0;
+                DOM.textSkewY.value = anno.skewY || 0; DOM.textSkewYVal.textContent = anno.skewY || 0;
             }
             DOM.annoAngle.value = anno.angle; DOM.annoAngleVal.textContent = anno.angle;
         }
@@ -1721,46 +1447,31 @@
             annotations = annotations.filter(a => a.id !== id);
             if (selectedAnnoId === id) selectedAnnoId = null;
             renderAnnotationList(); selectAnnotation(null); updatePreview(); rebuildAnnoOverlay();
+            saveState(); // 刪除圖形紀錄歷史
         }
 
         DOM.btnDeleteAnno.onclick = () => { if (selectedAnnoId) deleteAnnotation(selectedAnnoId); };
 
         function syncSelected() {
             if (!selectedAnnoId) return;
-            const anno = annotations.find(a => a.id === selectedAnnoId);
-            if (!anno) return;
-            
+            const anno = annotations.find(a => a.id === selectedAnnoId); if (!anno) return;
             anno.hasShadow = DOM.annoShadow.checked;
-            
             if (anno.type === 'arrow') {
-                anno.color = DOM.arrowColor.value;
-                anno.size = parseInt(DOM.arrowSize.value); DOM.arrowSizeVal.textContent = anno.size;
+                anno.color = DOM.arrowColor.value; anno.size = parseInt(DOM.arrowSize.value); DOM.arrowSizeVal.textContent = anno.size;
             } else {
-                anno.content = DOM.textContent.value;
-                anno.fontSize = parseInt(DOM.fontSize.value); DOM.fontSizeVal.textContent = anno.fontSize;
-                anno.color = DOM.textColor.value;
-                anno.fontFamily = DOM.textFont.value; 
-                
-                anno.skewX = parseInt(DOM.textSkewX.value) || 0;
-                DOM.textSkewXVal.textContent = anno.skewX;
-                anno.skewY = parseInt(DOM.textSkewY.value) || 0;
-                DOM.textSkewYVal.textContent = anno.skewY;
+                anno.content = DOM.textContent.value; anno.fontSize = parseInt(DOM.fontSize.value); DOM.fontSizeVal.textContent = anno.fontSize;
+                anno.color = DOM.textColor.value; anno.fontFamily = DOM.textFont.value; 
+                anno.skewX = parseInt(DOM.textSkewX.value) || 0; DOM.textSkewXVal.textContent = anno.skewX;
+                anno.skewY = parseInt(DOM.textSkewY.value) || 0; DOM.textSkewYVal.textContent = anno.skewY;
             }
             anno.angle = parseInt(DOM.annoAngle.value); DOM.annoAngleVal.textContent = anno.angle;
             updatePreview(); rebuildAnnoOverlay();
         }
 
-        [DOM.arrowColor, DOM.arrowSize,
-         DOM.textContent, DOM.fontSize, DOM.textColor, DOM.textFont, DOM.annoAngle,
-         DOM.textSkewX, DOM.textSkewY, DOM.annoShadow
-        ].forEach(el => { 
+        [DOM.arrowColor, DOM.arrowSize, DOM.textContent, DOM.fontSize, DOM.textColor, DOM.textFont, DOM.annoAngle, DOM.textSkewX, DOM.textSkewY, DOM.annoShadow].forEach(el => { 
             if(el) { 
-                if (el.type === 'checkbox') {
-                    el.onchange = syncSelected;
-                } else {
-                    el.oninput = syncSelected; 
-                    el.onchange = syncSelected; 
-                }
+                if (el.type === 'checkbox') { el.onchange = () => { syncSelected(); saveState(); }; } 
+                else { el.oninput = syncSelected; el.onchange = () => { syncSelected(); saveState(); }; }
             }
         });
 
@@ -1769,114 +1480,56 @@
             
             if (activeEraserTool === 'brush' && !isInputActive) {
                 if (e.key === '[' || e.key === ']') {
-                    let currentSize = parseInt(DOM.brushSize.value);
-                    currentSize += (e.key === '[') ? -5 : 5;
-                    currentSize = Math.max(1, Math.min(150, currentSize));
-                    DOM.brushSize.value = currentSize;
-                    DOM.brushSizeVal.textContent = currentSize;
-                    saveSettings();
-                    
+                    let currentSize = parseInt(DOM.brushSize.value); currentSize += (e.key === '[') ? -5 : 5;
+                    currentSize = Math.max(1, Math.min(150, currentSize)); DOM.brushSize.value = currentSize; DOM.brushSizeVal.textContent = currentSize; saveSettings();
                     if (!DOM.eraserOverlay.classList.contains('hidden') && cropper) {
-                        const cd = cropper.getCanvasData();
-                        const zoomRatio = cd.width / wandCanvas.width;
-                        const displaySize = currentSize * zoomRatio;
-                        DOM.brushCursor.style.width = displaySize + 'px';
-                        DOM.brushCursor.style.height = displaySize + 'px';
+                        const cd = cropper.getCanvasData(); const zoomRatio = cd.width / wandCanvas.width; const displaySize = currentSize * zoomRatio;
+                        DOM.brushCursor.style.width = displaySize + 'px'; DOM.brushCursor.style.height = displaySize + 'px';
                     }
                 }
             }
-            
-            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnnoId && !isInputActive) {
-                deleteAnnotation(selectedAnnoId);
-                return;
-            }
-            
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey && !isInputActive) {
-                e.preventDefault();
-                if (currentIndex > 0) restore(currentIndex - 1);
-            }
-            
-            if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z')) && !isInputActive) {
-                e.preventDefault();
-                if (currentIndex < history.length - 1) restore(currentIndex + 1);
-            }
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnnoId && !isInputActive) { deleteAnnotation(selectedAnnoId); return; }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey && !isInputActive) { e.preventDefault(); if (currentIndex > 0) restore(currentIndex - 1); }
+            if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z')) && !isInputActive) { e.preventDefault(); if (currentIndex < history.length - 1) restore(currentIndex + 1); }
         });
 
         /* ══ 標註把手浮層 ══ */
         function rebuildAnnoOverlay() {
             DOM.annoOverlay.innerHTML = '';
             if (!cropper) return;
-            const canvasData = cropper.getCanvasData();
-            const cropData   = cropper.getData();
-            
-            const nw = canvasData.naturalWidth  || DOM.mainImage.naturalWidth  || 1;
-            const nh = canvasData.naturalHeight || DOM.mainImage.naturalHeight || 1;
-            const scaleX = canvasData.width  / nw;
-            const scaleY = canvasData.height / nh;
-            const cropScaleX = targetWidth  / cropData.width;
-            const cropScaleY = targetHeight / cropData.height;
+            const canvasData = cropper.getCanvasData(); const cropData = cropper.getData();
+            const nw = canvasData.naturalWidth || DOM.mainImage.naturalWidth || 1; const nh = canvasData.naturalHeight || DOM.mainImage.naturalHeight || 1;
+            const scaleX = canvasData.width / nw; const scaleY = canvasData.height / nh;
+            const cropScaleX = targetWidth / cropData.width; const cropScaleY = targetHeight / cropData.height;
             
             function toWrapperPx(ax, ay) {
-                const imgX = ax / cropScaleX + cropData.x;
-                const imgY = ay / cropScaleY + cropData.y;
+                const imgX = ax / cropScaleX + cropData.x; const imgY = ay / cropScaleY + cropData.y;
                 return { x: canvasData.left + imgX * scaleX, y: canvasData.top + imgY * scaleY };
             }
 
             if (DOM.showGrid.checked) {
-                const tl = toWrapperPx(0, 0);
-                const br = toWrapperPx(targetWidth, targetHeight);
+                const tl = toWrapperPx(0, 0); const br = toWrapperPx(targetWidth, targetHeight);
                 const gridDiv = document.createElement('div');
-                gridDiv.style.position = 'absolute';
-                gridDiv.style.left = tl.x + 'px';
-                gridDiv.style.top = tl.y + 'px';
-                gridDiv.style.width = (br.x - tl.x) + 'px';
-                gridDiv.style.height = (br.y - tl.y) + 'px';
-                gridDiv.style.pointerEvents = 'none';
-                gridDiv.style.border = '1px solid rgba(0, 122, 255, 0.4)';
-                gridDiv.style.boxSizing = 'border-box';
-                gridDiv.style.zIndex = '40'; 
+                gridDiv.style.position = 'absolute'; gridDiv.style.left = tl.x + 'px'; gridDiv.style.top = tl.y + 'px';
+                gridDiv.style.width = (br.x - tl.x) + 'px'; gridDiv.style.height = (br.y - tl.y) + 'px';
+                gridDiv.style.pointerEvents = 'none'; gridDiv.style.border = '1px solid rgba(0, 122, 255, 0.4)'; gridDiv.style.boxSizing = 'border-box'; gridDiv.style.zIndex = '40'; 
 
-                const gridSize = parseInt(DOM.gridSize.value) || 20;
-                const bgSizeX = (gridSize / cropScaleX) * scaleX;
-                const bgSizeY = (gridSize / cropScaleY) * scaleY;
+                const gridSize = parseInt(DOM.gridSize.value) || 20; const bgSizeX = (gridSize / cropScaleX) * scaleX; const bgSizeY = (gridSize / cropScaleY) * scaleY;
+                gridDiv.style.backgroundImage = `linear-gradient(to right, rgba(0, 122, 255, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 122, 255, 0.2) 1px, transparent 1px)`;
+                gridDiv.style.backgroundSize = `${bgSizeX}px ${bgSizeY}px`; gridDiv.style.backgroundPosition = '0 0';
 
-                gridDiv.style.backgroundImage = `
-                    linear-gradient(to right, rgba(0, 122, 255, 0.2) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(0, 122, 255, 0.2) 1px, transparent 1px)
-                `;
-                gridDiv.style.backgroundSize = `${bgSizeX}px ${bgSizeY}px`;
-                gridDiv.style.backgroundPosition = '0 0';
-
-                const centerDiv = document.createElement('div');
-                centerDiv.style.position = 'absolute';
-                centerDiv.style.left = '50%'; centerDiv.style.top = '0';
-                centerDiv.style.width = '1px'; centerDiv.style.height = '100%';
-                centerDiv.style.backgroundColor = 'rgba(255, 59, 48, 0.4)';
-                gridDiv.appendChild(centerDiv);
-
-                const centerDivH = document.createElement('div');
-                centerDivH.style.position = 'absolute';
-                centerDivH.style.left = '0'; centerDivH.style.top = '50%';
-                centerDivH.style.width = '100%'; centerDivH.style.height = '1px';
-                centerDivH.style.backgroundColor = 'rgba(255, 59, 48, 0.4)';
-                gridDiv.appendChild(centerDivH);
-
+                const centerDiv = document.createElement('div'); centerDiv.style.position = 'absolute'; centerDiv.style.left = '50%'; centerDiv.style.top = '0'; centerDiv.style.width = '1px'; centerDiv.style.height = '100%'; centerDiv.style.backgroundColor = 'rgba(255, 59, 48, 0.4)'; gridDiv.appendChild(centerDiv);
+                const centerDivH = document.createElement('div'); centerDivH.style.position = 'absolute'; centerDivH.style.left = '0'; centerDivH.style.top = '50%'; centerDivH.style.width = '100%'; centerDivH.style.height = '1px'; centerDivH.style.backgroundColor = 'rgba(255, 59, 48, 0.4)'; gridDiv.appendChild(centerDivH);
                 DOM.annoOverlay.appendChild(gridDiv);
             }
 
             annotations.forEach(anno => {
-                const pos    = toWrapperPx(anno.x, anno.y);
+                const pos = toWrapperPx(anno.x, anno.y);
                 const handle = document.createElement('div');
                 handle.className = `anno-handle${selectedAnnoId === anno.id ? ' selected' : ''}`;
-                handle.style.left = pos.x + 'px';
-                handle.style.top  = pos.y + 'px';
-                handle.innerHTML = `<i class="fa-solid ${anno.type === 'arrow' ? 'fa-arrow-left' : 'fa-font'}" style="font-size:9px;color:white;pointer-events:none"></i>`;
-                handle.style.zIndex = '50';
-                handle.onmousedown = e => {
-                    e.preventDefault(); e.stopPropagation();
-                    selectAnnotation(anno.id);
-                    startHandleDrag(e, anno);
-                };
+                handle.style.left = pos.x + 'px'; handle.style.top = pos.y + 'px';
+                handle.innerHTML = `<i class="fa-solid ${anno.type === 'arrow' ? 'fa-arrow-left' : 'fa-font'}" style="font-size:9px;color:white;pointer-events:none"></i>`; handle.style.zIndex = '50';
+                handle.onmousedown = e => { e.preventDefault(); e.stopPropagation(); selectAnnotation(anno.id); startHandleDrag(e, anno); };
                 DOM.annoOverlay.appendChild(handle);
             });
         }
@@ -1884,241 +1537,118 @@
         let _dragAnno = null, _dragStartX, _dragStartY, _dragAnnoX0, _dragAnnoY0, _dragRX, _dragRY;
 
         function startHandleDrag(e, anno) {
-            _dragAnno   = anno;
-            _dragStartX = e.clientX; _dragStartY = e.clientY;
-            _dragAnnoX0 = anno.x;    _dragAnnoY0 = anno.y;
-            const canvasData = cropper.getCanvasData();
-            const cropData   = cropper.getData();
-            const nw = canvasData.naturalWidth  || DOM.mainImage.naturalWidth  || 1;
-            const nh = canvasData.naturalHeight || DOM.mainImage.naturalHeight || 1;
-            _dragRX = (targetWidth  / cropData.width)  / (canvasData.width  / nw);
-            _dragRY = (targetHeight / cropData.height) / (canvasData.height / nh);
+            _dragAnno = anno; _dragStartX = e.clientX; _dragStartY = e.clientY; _dragAnnoX0 = anno.x; _dragAnnoY0 = anno.y;
+            const canvasData = cropper.getCanvasData(); const cropData = cropper.getData();
+            const nw = canvasData.naturalWidth || DOM.mainImage.naturalWidth || 1; const nh = canvasData.naturalHeight || DOM.mainImage.naturalHeight || 1;
+            _dragRX = (targetWidth / cropData.width) / (canvasData.width / nw); _dragRY = (targetHeight / cropData.height) / (canvasData.height / nh);
         }
 
         document.addEventListener('mousemove', e => {
             if (!_dragAnno) return;
-            
-            let nextX = _dragAnnoX0 + (e.clientX - _dragStartX) * _dragRX;
-            let nextY = _dragAnnoY0 + (e.clientY - _dragStartY) * _dragRY;
-
+            let nextX = _dragAnnoX0 + (e.clientX - _dragStartX) * _dragRX; let nextY = _dragAnnoY0 + (e.clientY - _dragStartY) * _dragRY;
             if (DOM.snapGrid.checked) {
-                const gridSize = parseInt(DOM.gridSize.value) || 20;
-                const centerX = targetWidth / 2;
-                const centerY = targetHeight / 2;
-                const snapThreshold = 15; 
-
-                let snappedX = Math.round(nextX / gridSize) * gridSize;
-                let snappedY = Math.round(nextY / gridSize) * gridSize;
-
-                if (Math.abs(nextX - centerX) < snapThreshold) snappedX = centerX;
-                if (Math.abs(nextY - centerY) < snapThreshold) snappedY = centerY;
-
-                nextX = snappedX;
-                nextY = snappedY;
+                const gridSize = parseInt(DOM.gridSize.value) || 20; const centerX = targetWidth / 2; const centerY = targetHeight / 2; const snapThreshold = 15; 
+                let snappedX = Math.round(nextX / gridSize) * gridSize; let snappedY = Math.round(nextY / gridSize) * gridSize;
+                if (Math.abs(nextX - centerX) < snapThreshold) snappedX = centerX; if (Math.abs(nextY - centerY) < snapThreshold) snappedY = centerY;
+                nextX = snappedX; nextY = snappedY;
             }
-
-            _dragAnno.x = nextX;
-            _dragAnno.y = nextY;
-            updatePreview(); rebuildAnnoOverlay();
+            _dragAnno.x = nextX; _dragAnno.y = nextY; updatePreview(); rebuildAnnoOverlay();
         });
         
-        document.addEventListener('mouseup', () => { _dragAnno = null; });
+        document.addEventListener('mouseup', () => { 
+            if (_dragAnno) {
+                _dragAnno = null; 
+                saveState(); // 拖曳放開後紀錄歷史
+            }
+        });
 
         /* ══ 預覽背景 ══ */
-        DOM.previewBg.onchange = () => {
-            const v = DOM.previewBg.value;
-            DOM.previewBox.style.background = v === 'transparent' ? '' : v;
-            saveSettings();
-        };
-
-        /* ══ Undo / Redo ══ */
-        function saveHistory(src) {
-            if (currentIndex < history.length - 1) history = history.slice(0, currentIndex + 1);
-            history.push(src); currentIndex++; updateUndoRedo();
-        }
-        function updateUndoRedo() {
-            DOM.btnUndo.style.display = currentIndex > 0 ? 'flex' : 'none';
-            DOM.btnRedo.style.display = currentIndex < history.length - 1 ? 'flex' : 'none';
-        }
-        DOM.btnUndo.onclick = () => { if (currentIndex > 0) restore(currentIndex - 1); };
-        DOM.btnRedo.onclick = () => { if (currentIndex < history.length - 1) restore(currentIndex + 1); };
-        
-        function restore(idx) {
-            currentIndex = idx; originalImageSrc = history[idx];
-            
-            const img = new Image(); 
-            img.onload = () => {
-                wandCanvas.width = img.width; wandCanvas.height = img.height;
-                wandCtx.clearRect(0, 0, wandCanvas.width, wandCanvas.height);
-                wandCtx.drawImage(img, 0, 0);
-                
-                updateCropperImagesFast(originalImageSrc);
-                updateUndoRedo(); 
-                updatePreview();
-            };
-            img.src = originalImageSrc;
-        }
+        DOM.previewBg.onchange = () => { const v = DOM.previewBg.value; DOM.previewBox.style.background = v === 'transparent' ? '' : v; saveSettings(); };
 
         /* ══ 預覽 & Canvas 合成 (超解析度引擎支援) ══ */
         function updatePreview() {
             if (!cropper) return;
-            // 預覽時不需要放大，傳入 1 倍
             const canvas = getFinalCanvas(1);
             if (!canvas) return;
-            
             DOM.previewContainer.innerHTML = '';
-            
             const imgWrapper = document.createElement('div');
-            imgWrapper.style.position = 'relative';
-            imgWrapper.style.display = 'flex'; 
-            imgWrapper.style.maxWidth = '100%';
-            imgWrapper.style.maxHeight = '100%';
+            imgWrapper.style.position = 'relative'; imgWrapper.style.display = 'flex'; imgWrapper.style.maxWidth = '100%'; imgWrapper.style.maxHeight = '100%';
             
-            const img = new Image();
-            img.src = canvas.toDataURL();
-            img.style.cssText = 'max-width:100%; max-height:100%; width:auto; height:auto; display:block;';
-            imgWrapper.appendChild(img);
+            const img = new Image(); img.src = canvas.toDataURL(); img.style.cssText = 'max-width:100%; max-height:100%; width:auto; height:auto; display:block;'; imgWrapper.appendChild(img);
             
-            // 加入動態的九宮格/16宮格預覽輔助線
             const sliceMode = DOM.exportSlice.value;
             if (sliceMode !== 'none') {
                 const gridOverlay = document.createElement('div');
-                gridOverlay.style.position = 'absolute';
-                gridOverlay.style.top = '0';
-                gridOverlay.style.left = '0';
-                gridOverlay.style.width = '100%';
-                gridOverlay.style.height = '100%';
-                gridOverlay.style.pointerEvents = 'none';
-                gridOverlay.style.boxSizing = 'border-box';
-                gridOverlay.style.border = '1px solid rgba(255, 59, 48, 0.8)';
-                
+                gridOverlay.style.position = 'absolute'; gridOverlay.style.top = '0'; gridOverlay.style.left = '0'; gridOverlay.style.width = '100%'; gridOverlay.style.height = '100%';
+                gridOverlay.style.pointerEvents = 'none'; gridOverlay.style.boxSizing = 'border-box'; gridOverlay.style.border = '1px solid rgba(255, 59, 48, 0.8)';
                 let bgImage = '';
                 if (sliceMode === '3x3') {
-                    bgImage = `
-                        linear-gradient(to right, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px)), 
-                        linear-gradient(to bottom, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px))
-                    `;
+                    bgImage = `linear-gradient(to right, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px)), linear-gradient(to bottom, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px))`;
                 } else if (sliceMode === '4x4') {
-                    bgImage = `
-                        linear-gradient(to right, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px)),
-                        linear-gradient(to bottom, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px))
-                    `;
+                    bgImage = `linear-gradient(to right, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px)), linear-gradient(to bottom, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px))`;
                 }
-                
-                gridOverlay.style.backgroundImage = bgImage;
-                imgWrapper.appendChild(gridOverlay);
+                gridOverlay.style.backgroundImage = bgImage; imgWrapper.appendChild(gridOverlay);
             }
-            
             DOM.previewContainer.appendChild(imgWrapper);
         }
 
-        // 加入 exportScale 參數，支援無損超高解析度繪製
         function getFinalCanvas(exportScale = 1) {
             if (!cropper) return null;
             const cropData = cropper.getData(true);
             if (!cropData || cropData.width <= 0 || cropData.height <= 0) return null;
             
-            const finalWidth = targetWidth * exportScale;
-            const finalHeight = targetHeight * exportScale;
-
-            const final = document.createElement('canvas');
-            final.width = finalWidth;
-            final.height = finalHeight;
+            const finalWidth = targetWidth * exportScale; const finalHeight = targetHeight * exportScale;
+            const final = document.createElement('canvas'); final.width = finalWidth; final.height = finalHeight;
             const ctx = final.getContext('2d');
             
             const format = DOM.exportFormat.value;
-            if (format === 'image/jpeg') {
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillRect(0, 0, final.width, final.height);
-            }
+            if (format === 'image/jpeg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, final.width, final.height); }
 
-            // 【核心：套用放大矩陣】
             ctx.scale(exportScale, exportScale);
             
             const radiusPercent = parseInt(DOM.borderRadius.value) || 0;
             ctx.save(); 
             if (radiusPercent > 0) {
-                const maxRadius = Math.min(targetWidth, targetHeight) / 2;
-                const radiusPx = (radiusPercent / 50) * maxRadius;
-                
+                const maxRadius = Math.min(targetWidth, targetHeight) / 2; const radiusPx = (radiusPercent / 50) * maxRadius;
                 ctx.beginPath();
-                if (ctx.roundRect) {
-                    ctx.roundRect(0, 0, targetWidth, targetHeight, radiusPx);
-                } else {
-                    ctx.moveTo(radiusPx, 0);
-                    ctx.lineTo(targetWidth - radiusPx, 0);
-                    ctx.quadraticCurveTo(targetWidth, 0, targetWidth, radiusPx);
-                    ctx.lineTo(targetWidth, targetHeight - radiusPx);
-                    ctx.quadraticCurveTo(targetWidth, targetHeight, targetWidth - radiusPx, targetHeight);
-                    ctx.lineTo(radiusPx, targetHeight);
-                    ctx.quadraticCurveTo(0, targetHeight, 0, targetHeight - radiusPx);
-                    ctx.lineTo(0, radiusPx);
-                    ctx.quadraticCurveTo(0, 0, radiusPx, 0);
+                if (ctx.roundRect) ctx.roundRect(0, 0, targetWidth, targetHeight, radiusPx);
+                else {
+                    ctx.moveTo(radiusPx, 0); ctx.lineTo(targetWidth - radiusPx, 0); ctx.quadraticCurveTo(targetWidth, 0, targetWidth, radiusPx);
+                    ctx.lineTo(targetWidth, targetHeight - radiusPx); ctx.quadraticCurveTo(targetWidth, targetHeight, targetWidth - radiusPx, targetHeight);
+                    ctx.lineTo(radiusPx, targetHeight); ctx.quadraticCurveTo(0, targetHeight, 0, targetHeight - radiusPx);
+                    ctx.lineTo(0, radiusPx); ctx.quadraticCurveTo(0, 0, radiusPx, 0);
                 }
-                ctx.closePath();
-                ctx.clip(); 
+                ctx.closePath(); ctx.clip(); 
             }
             
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(
-                wandCanvas, 
-                cropData.x, cropData.y, cropData.width, cropData.height,
-                0, 0, targetWidth, targetHeight
-            );
-            
+            ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(wandCanvas, cropData.x, cropData.y, cropData.width, cropData.height, 0, 0, targetWidth, targetHeight);
             ctx.restore(); 
             
             annotations.forEach(anno => {
                 ctx.save();
-                
                 if (anno.hasShadow !== false) {
                     const scale = Math.max(targetWidth, targetHeight) / 500;
-                    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-                    // HTML5 Canvas 的 Shadow 參數不受 scale 矩陣影響，因此需手動乘上倍率確保等比放大
-                    ctx.shadowBlur = 8 * scale * exportScale;
-                    ctx.shadowOffsetX = 2 * scale * exportScale;
-                    ctx.shadowOffsetY = 2 * scale * exportScale;
-                } else {
-                    ctx.shadowColor = 'transparent';
-                    ctx.shadowBlur = 0;
-                    ctx.shadowOffsetX = 0;
-                    ctx.shadowOffsetY = 0;
-                }
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'; ctx.shadowBlur = 8 * scale * exportScale;
+                    ctx.shadowOffsetX = 2 * scale * exportScale; ctx.shadowOffsetY = 2 * scale * exportScale;
+                } else { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; }
 
-                ctx.translate(anno.x, anno.y);
-                ctx.rotate(anno.angle * Math.PI / 180);
+                ctx.translate(anno.x, anno.y); ctx.rotate(anno.angle * Math.PI / 180);
                 
                 if (anno.type === 'text' && (anno.skewX !== 0 || anno.skewY !== 0)) {
-                    const skewXRad = (anno.skewX || 0) * Math.PI / 180;
-                    const skewYRad = (anno.skewY || 0) * Math.PI / 180;
+                    const skewXRad = (anno.skewX || 0) * Math.PI / 180; const skewYRad = (anno.skewY || 0) * Math.PI / 180;
                     ctx.transform(1, Math.tan(skewYRad), Math.tan(skewXRad), 1, 0, 0);
                 }
                 
                 if (anno.type === 'arrow') {
-                    const s = anno.size / 100;
-                    ctx.fillStyle = anno.color;
-                    ctx.beginPath();
-                    // 套用重構後的向左實心箭頭比例
-                    ctx.moveTo(-50 * s, 0);          
-                    ctx.lineTo(-10 * s, -40 * s);    
-                    ctx.lineTo(-10 * s, -20 * s);    
-                    ctx.lineTo(50 * s, -20 * s);     
-                    ctx.lineTo(50 * s, 20 * s);      
-                    ctx.lineTo(-10 * s, 20 * s);     
-                    ctx.lineTo(-10 * s, 40 * s);     
-                    ctx.closePath();
-                    ctx.fill();
+                    const s = anno.size / 100; ctx.fillStyle = anno.color; ctx.beginPath();
+                    ctx.moveTo(-50 * s, 0); ctx.lineTo(-10 * s, -40 * s); ctx.lineTo(-10 * s, -20 * s); ctx.lineTo(50 * s, -20 * s); ctx.lineTo(50 * s, 20 * s); ctx.lineTo(-10 * s, 20 * s); ctx.lineTo(-10 * s, 40 * s);     
+                    ctx.closePath(); ctx.fill();
                 } else {
                     const fontFamily = anno.fontFamily || "'Noto Sans TC', 'Inter', sans-serif";
-                    ctx.font = `bold ${anno.fontSize}px ${fontFamily}`;
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-                    ctx.lineWidth = Math.max(anno.fontSize * 0.15, 4);
-                    ctx.lineJoin = 'round';
-                    ctx.strokeText(anno.content, 0, 0);
-                    ctx.fillStyle = anno.color;
-                    ctx.fillText(anno.content, 0, 0);
+                    ctx.font = `bold ${anno.fontSize}px ${fontFamily}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = Math.max(anno.fontSize * 0.15, 4); ctx.lineJoin = 'round';
+                    ctx.strokeText(anno.content, 0, 0); ctx.fillStyle = anno.color; ctx.fillText(anno.content, 0, 0);
                 }
                 ctx.restore();
             });
@@ -2130,32 +1660,20 @@
             if (DOM.btnExport.disabled) return;
             DOM.btnExport.disabled = true;
             
-            const format = DOM.exportFormat.value;
-            let ext = format.split('/')[1];
-            if (ext === 'jpeg') ext = 'jpg';
+            const format = DOM.exportFormat.value; let ext = format.split('/')[1]; if (ext === 'jpeg') ext = 'jpg';
+            const sliceMode = DOM.exportSlice.value; let splits = 1;
+            if (sliceMode === '3x3') splits = 3; else if (sliceMode === '4x4') splits = 4;
             
-            const sliceMode = DOM.exportSlice.value;
-            let splits = 1;
-            if (sliceMode === '3x3') splits = 3;
-            else if (sliceMode === '4x4') splits = 4;
-            
-            // 【核心修正】: 依據切割模式生成倍數解析度的高畫質畫布
             const canvas = getFinalCanvas(splits);
-            if (!canvas) {
-                DOM.btnExport.disabled = false;
-                return;
-            }
+            if (!canvas) { DOM.btnExport.disabled = false; return; }
 
             const originalHTML = DOM.btnExport.innerHTML;
             
             if (splits > 1) {
                 DOM.btnExport.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 打包壓縮中...';
-                
                 try {
                     const zip = new JSZip();
-                    // 將放大的畫布等分切割，切出來的尺寸剛好等於使用者的目標單格尺寸，解析度 100% 不流失！
-                    const pieceW = Math.floor(canvas.width / splits);
-                    const pieceH = Math.floor(canvas.height / splits);
+                    const pieceW = Math.floor(canvas.width / splits); const pieceH = Math.floor(canvas.height / splits);
                     const promises = [];
 
                     for (let r = 0; r < splits; r++) {
@@ -2164,52 +1682,26 @@
                             const w = (c === splits - 1) ? canvas.width - pieceW * (splits - 1) : pieceW;
                             const h = (r === splits - 1) ? canvas.height - pieceH * (splits - 1) : pieceH;
                             
-                            const pieceCanvas = document.createElement('canvas');
-                            pieceCanvas.width = w;
-                            pieceCanvas.height = h;
-                            const pCtx = pieceCanvas.getContext('2d');
-                            pCtx.drawImage(canvas, c * pieceW, r * pieceH, w, h, 0, 0, w, h);
+                            const pieceCanvas = document.createElement('canvas'); pieceCanvas.width = w; pieceCanvas.height = h;
+                            const pCtx = pieceCanvas.getContext('2d'); pCtx.drawImage(canvas, c * pieceW, r * pieceH, w, h, 0, 0, w, h);
                             
                             const promise = new Promise((resolve) => {
-                                pieceCanvas.toBlob((blob) => {
-                                    zip.file(`${currentFilename}_part${idx}.${ext}`, blob);
-                                    resolve();
-                                }, format, format === 'image/jpeg' ? 0.92 : 1);
+                                pieceCanvas.toBlob((blob) => { zip.file(`${currentFilename}_part${idx}.${ext}`, blob); resolve(); }, format, format === 'image/jpeg' ? 0.92 : 1);
                             });
                             promises.push(promise);
                         }
                     }
-                    
                     await Promise.all(promises);
                     const content = await zip.generateAsync({ type: 'blob' });
-                    const link = document.createElement('a');
-                    link.download = `${currentFilename}_${sliceMode}_grid.zip`;
-                    link.href = URL.createObjectURL(content);
-                    link.click();
-                    
-                } catch(e) {
-                    console.error("打包網格失敗", e);
-                    alert("打包網格失敗，請重試！");
-                }
+                    const link = document.createElement('a'); link.download = `${currentFilename}_${sliceMode}_grid.zip`; link.href = URL.createObjectURL(content); link.click();
+                } catch(e) { console.error("打包網格失敗", e); alert("打包網格失敗，請重試！"); }
             } else {
-                const link = document.createElement('a');
-                link.download = `${currentFilename}_edited.${ext}`;
-                link.href = canvas.toDataURL(format, format === 'image/jpeg' ? 0.92 : 1);
-                link.click();
+                const link = document.createElement('a'); link.download = `${currentFilename}_edited.${ext}`; link.href = canvas.toDataURL(format, format === 'image/jpeg' ? 0.92 : 1); link.click();
             }
             
-            DOM.btnExport.innerHTML = '<i class="fa-solid fa-check"></i> 匯出成功';
-            DOM.btnExport.style.backgroundColor = '#34C759'; 
-            DOM.btnExport.style.borderColor = '#34C759';
-            
-            setTimeout(() => {
-                DOM.btnExport.innerHTML = originalHTML;
-                DOM.btnExport.style.backgroundColor = '';
-                DOM.btnExport.style.borderColor = '';
-                DOM.btnExport.disabled = false;
-            }, 2000);
+            DOM.btnExport.innerHTML = '<i class="fa-solid fa-check"></i> 匯出成功'; DOM.btnExport.style.backgroundColor = '#34C759'; DOM.btnExport.style.borderColor = '#34C759';
+            setTimeout(() => { DOM.btnExport.innerHTML = originalHTML; DOM.btnExport.style.backgroundColor = ''; DOM.btnExport.style.borderColor = ''; DOM.btnExport.disabled = false; }, 2000);
         };
-
     });
     </script>
 </body>
