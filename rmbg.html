@@ -4,15 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>智慧去背小幫手</title>
-  
-  <!-- 載入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- 載入 Lucide 圖示庫 (指定 UMD 版本以增加穩定性) -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-
   <style>
-    /* 棋盤格背景樣式 */
     .checkerboard {
       background-image: 
         linear-gradient(45deg, #cbd5e1 25%, transparent 25%), 
@@ -23,26 +17,38 @@
       background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
       background-color: white;
     }
+    .hidden { display: none !important; }
     
-    /* 隱藏元素的通用類別 */
-    .hidden {
-      display: none !important;
+    /* 精修強度滑桿樣式 */
+    input[type=range].refine-slider {
+      -webkit-appearance: none;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(to right, #8b5cf6, #06b6d4);
+      outline: none;
+    }
+    input[type=range].refine-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      border: 2px solid #8b5cf6;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
     }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex flex-col items-center pb-6">
 
-  <!-- 筆刷鼠標游標 -->
   <div id="brush-cursor" class="pointer-events-none fixed rounded-full border-2 border-gray-800 bg-white/40 hidden" style="z-index: 100; transform: translate(-50%, -50%);"></div>
 
-  <!-- 頂部標題 -->
   <header class="w-full bg-white shadow-sm p-2 text-center mb-2">
     <h1 class="text-xl font-extrabold text-blue-600">智慧去背小幫手</h1>
   </header>
 
   <main class="w-full max-w-2xl px-3 flex flex-col gap-3">
     
-    <!-- 未上傳圖片時顯示的按鈕區塊 -->
     <div id="initial-upload-container" class="transition-all duration-300 block">
       <label class="bg-blue-600 text-white text-xl font-bold py-8 px-4 rounded-2xl shadow-md w-full flex flex-col items-center justify-center gap-3 cursor-pointer active:scale-95 transition-transform">
         <i data-lucide="upload" style="width: 48px; height: 48px;"></i>
@@ -51,12 +57,10 @@
       </label>
     </div>
 
-    <!-- 圖片預覽與編輯區 (預設隱藏) -->
     <div id="editor-container" class="flex flex-col gap-3 hidden">
       
-      <!-- 頂部工具列：模式切換與復原重做 -->
+      <!-- 模式切換 + 復原重做 -->
       <div class="flex items-center justify-between gap-2">
-        <!-- 模式切換標籤 -->
         <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner flex-1 overflow-hidden">
           <button id="btn-mode-smart" class="flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors bg-white text-blue-600 shadow">
             <i data-lucide="wand-2" style="width: 16px; height: 16px;"></i> 魔術棒
@@ -68,25 +72,23 @@
             <i data-lucide="hand" style="width: 16px; height: 16px;"></i> 塗抹
           </button>
         </div>
-        
-        <!-- 復原 / 重做 按鈕 -->
         <div class="flex bg-gray-200 rounded-xl p-1 shadow-inner shrink-0">
-          <button id="btn-undo" class="p-2 rounded-lg text-gray-500 hover:bg-white hover:shadow transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none" disabled>
+          <button id="btn-undo" class="p-2 rounded-lg text-gray-500 hover:bg-white hover:shadow transition-all disabled:opacity-30 disabled:cursor-not-allowed" disabled>
             <i data-lucide="undo" style="width: 20px; height: 20px;"></i>
           </button>
-          <button id="btn-redo" class="p-2 rounded-lg text-gray-500 hover:bg-white hover:shadow transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none" disabled>
+          <button id="btn-redo" class="p-2 rounded-lg text-gray-500 hover:bg-white hover:shadow transition-all disabled:opacity-30 disabled:cursor-not-allowed" disabled>
             <i data-lucide="redo" style="width: 20px; height: 20px;"></i>
           </button>
         </div>
       </div>
 
-      <!-- 提示文字 (移出畫布) -->
+      <!-- 提示文字 -->
       <p id="status-hint" class="text-sm font-semibold text-center text-blue-600 m-0 flex items-center justify-center gap-1">
         <i data-lucide="mouse-pointer-2" id="hint-icon" style="width: 16px; height: 16px;"></i> 
         <span id="hint-text">請先點擊圖片選擇要去背的顏色</span>
       </p>
 
-      <!-- 畫布顯示區 -->
+      <!-- 畫布 -->
       <div class="relative w-full rounded-xl overflow-hidden shadow-inner border-2 border-gray-200 bg-white">
         <div class="checkerboard w-full h-full flex justify-center items-center overflow-hidden">
           <canvas id="main-canvas" class="max-w-full h-auto cursor-crosshair transition-opacity" style="max-height: 60vh;"></canvas>
@@ -96,39 +98,73 @@
       <!-- 控制面板 -->
       <div class="bg-white p-4 rounded-2xl shadow-md border border-gray-100 flex flex-col gap-4 w-full">
         
-        <!-- 魔術棒模式控制項 -->
+        <!-- 魔術棒控制 -->
         <div id="smart-controls" class="flex flex-col gap-3">
           <label class="text-base font-bold text-gray-800">去背範圍</label>
           <div class="flex gap-2">
-            <button id="btn-fill-contiguous" class="flex-1 py-2 rounded-xl border-2 font-bold transition-all border-blue-400 bg-blue-50 text-blue-600">
-              相鄰區域
-            </button>
-            <button id="btn-fill-global" class="flex-1 py-2 rounded-xl border-2 font-bold transition-all border-transparent bg-gray-100 text-gray-500">
-              全圖相似色
-            </button>
+            <button id="btn-fill-contiguous" class="flex-1 py-2 rounded-xl border-2 font-bold transition-all border-blue-400 bg-blue-50 text-blue-600">相鄰區域</button>
+            <button id="btn-fill-global" class="flex-1 py-2 rounded-xl border-2 font-bold transition-all border-transparent bg-gray-100 text-gray-500">全圖相似色</button>
           </div>
-          <p id="smart-hint-text" class="text-xs text-gray-500 font-medium">
-            提示：在圖片上滑動可捲動網頁，單點擊才會去背。
-          </p>
+          <p class="text-xs text-gray-500 font-medium">提示：在圖片上滑動可捲動網頁，單點擊才會去背。</p>
         </div>
 
-        <!-- AI 雙引擎模式控制項 -->
+        <!-- AI 引擎控制 -->
         <div id="ai-controls" class="flex flex-col gap-4 hidden">
           
-          <!-- 雙引擎選擇器 -->
+          <!-- 引擎選擇 -->
           <div class="bg-purple-50 p-3 rounded-xl border border-purple-100 flex flex-col gap-2">
             <label class="text-sm font-bold text-purple-800">選擇 AI 引擎：</label>
             <div class="flex gap-2">
               <button id="btn-engine-imgly" class="flex-1 py-2 rounded-lg border-2 font-bold transition-all border-purple-400 bg-white text-purple-600 text-sm">
-                高精度全景 (U2-Net)
+                ⭐ 全身照 (RMBG)
               </button>
               <button id="btn-engine-mediapipe" class="flex-1 py-2 rounded-lg border-2 font-bold transition-all border-transparent bg-white/50 text-gray-500 text-sm hover:bg-white">
                 高速人像 (MediaPipe)
               </button>
             </div>
             <p id="ai-engine-hint" class="text-xs text-purple-600 mt-1">
-              適合：全身照、複雜背景、商品 (首次需下載約40MB模型)
+              ⭐ 推薦：全身照、複雜背景、衣物邊緣，精準度最高 (首次下載約 40MB)
             </p>
+          </div>
+
+          <!-- ✨ 邊緣精修控制 -->
+          <div class="bg-gradient-to-r from-violet-50 to-cyan-50 p-3 rounded-xl border border-violet-100 flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <label class="text-sm font-bold text-violet-800 flex items-center gap-1">
+                <i data-lucide="scan-line" style="width: 14px; height: 14px;"></i>
+                邊緣精修強度
+              </label>
+              <span id="refine-value-display" class="text-xs font-bold text-violet-700 bg-white px-2 py-0.5 rounded-md border border-violet-200">標準</span>
+            </div>
+            <input type="range" id="refine-slider" min="0" max="4" value="2" step="1" class="w-full refine-slider">
+            <div class="flex justify-between text-xs text-gray-400 font-medium px-0.5">
+              <span>關閉</span><span>輕微</span><span>標準</span><span>強力</span><span>極致</span>
+            </div>
+            <p id="refine-hint" class="text-xs text-violet-600">
+              ✦ 標準：平衡去背乾淨與細節保留，適合大多數人像
+            </p>
+
+            <!-- 髮絲保留模式 -->
+            <div class="flex items-center justify-between pt-1 border-t border-violet-100">
+              <div>
+                <p class="text-sm font-bold text-violet-800">髮絲細節保留</p>
+                <p class="text-xs text-gray-500">Alpha matting 技術，保留細碎髮絲邊緣</p>
+              </div>
+              <button id="btn-hair-mode" class="relative w-12 h-6 rounded-full transition-colors duration-200 bg-gray-300 focus:outline-none shrink-0" role="switch" aria-checked="false">
+                <span id="hair-toggle-knob" class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"></span>
+              </button>
+            </div>
+
+            <!-- ✨ 新增：二次精修按鈕（去背後再次針對殘留邊緣處理） -->
+            <div class="flex items-center justify-between pt-1 border-t border-violet-100">
+              <div>
+                <p class="text-sm font-bold text-violet-800">邊緣二次精修</p>
+                <p class="text-xs text-gray-500">去背後手動再執行一次，清除殘留背景色</p>
+              </div>
+              <button id="btn-rerefine" class="shrink-0 px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 text-xs font-bold border border-violet-200 active:scale-95 transition-transform disabled:opacity-40" disabled>
+                再次精修
+              </button>
+            </div>
           </div>
 
           <button id="btn-run-ai" class="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-lg font-bold py-3 rounded-xl shadow-md active:scale-95 transition-transform">
@@ -141,7 +177,7 @@
           </div>
         </div>
 
-        <!-- 手動模式控制項 (預設隱藏) -->
+        <!-- 手動塗抹控制 -->
         <div id="manual-controls" class="flex flex-col gap-4 hidden">
           <p class="text-xs text-red-500 font-medium text-center mb-[-5px]">
             目前已鎖定防滑動，可直接在圖上塗抹。
@@ -156,7 +192,6 @@
               <span class="text-sm font-bold">修復筆 (還原)</span>
             </button>
           </div>
-          
           <div class="flex flex-col gap-2">
             <div class="flex justify-between items-center">
               <label class="text-base font-bold text-gray-800">筆刷大小</label>
@@ -166,12 +201,11 @@
           </div>
         </div>
 
-        <!-- 共用操作按鈕群 -->
+        <!-- 共用按鈕 -->
         <div class="grid grid-cols-2 gap-2 mt-1">
           <button id="btn-reset" class="flex items-center justify-center gap-1 bg-gray-100 text-gray-700 text-base font-bold py-2 rounded-xl active:scale-95 transition-transform">
             <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i> 重設原圖
           </button>
-          
           <button id="btn-save" class="flex items-center justify-center gap-1 bg-green-500 text-white text-base font-bold py-2 rounded-xl shadow-md active:scale-95 transition-transform">
             <i data-lucide="download" style="width: 18px; height: 18px;"></i> 存檔
           </button>
@@ -181,64 +215,52 @@
           <i data-lucide="upload" style="width: 18px; height: 18px;"></i> 換一張照片
           <input type="file" accept="image/*" class="hidden" id="upload-input-2" />
         </label>
-
       </div>
     </div>
-
   </main>
 
   <script>
-    // 初始化 Lucide 圖示
-    if (typeof lucide !== 'undefined') {
-      lucide.createIcons();
-    } else {
-      console.warn("Lucide icons failed to load on initial parse.");
-    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 
-    // 狀態變數
+    // ── 狀態變數 ──────────────────────────────────────────────
     let hasImage = false;
-    let activeClick = null; 
-    let currentBaseImageData = null; 
-    let smartFillMode = 'contiguous'; // 'contiguous' 或 'global'
-    const FIXED_TOLERANCE = 30; // 固定容忍值
-    let appMode = 'smart'; // 'smart' | 'ai' | 'manual'
-    let currentAiEngine = 'imgly'; // 'imgly' 或 'mediapipe'
-    let brushMode = 'erase'; // 'erase' 或 'restore'
+    let activeClick = null;
+    let currentBaseImageData = null;
+    let smartFillMode = 'contiguous';
+    const FIXED_TOLERANCE = 30;
+    let appMode = 'smart';
+    let currentAiEngine = 'imgly';
+    let brushMode = 'erase';
     let brushSize = 30;
     let isDrawing = false;
     let lastPos = null;
     let isAiProcessing = false;
+    let hairModeEnabled = false;  // 新增
+    let refineLevel = 2;          // 新增 (0=關閉 ~ 4=極致)
 
-    // 復原/重做 狀態紀錄
     let history = [];
     let historyIndex = -1;
-    const MAX_HISTORY = 15; 
+    const MAX_HISTORY = 15;
 
-    // DOM 元素參考
+    // ── DOM 參考 ──────────────────────────────────────────────
     const initialContainer = document.getElementById('initial-upload-container');
     const editorContainer = document.getElementById('editor-container');
     const uploadInputs = [document.getElementById('upload-input-1'), document.getElementById('upload-input-2')];
-    
     const mainCanvas = document.getElementById('main-canvas');
     const ctx = mainCanvas.getContext('2d');
-    const originalCanvas = document.createElement('canvas'); 
+    const originalCanvas = document.createElement('canvas');
     const origCtx = originalCanvas.getContext('2d');
-    let originalImageData = null; 
-    let imageWidth = 0;
-    let imageHeight = 0;
+    let originalImageData = null;
+    let imageWidth = 0, imageHeight = 0;
 
-    // UI 控制元素
     const btnModeSmart = document.getElementById('btn-mode-smart');
     const btnModeAi = document.getElementById('btn-mode-ai');
     const btnModeManual = document.getElementById('btn-mode-manual');
     const smartControls = document.getElementById('smart-controls');
     const aiControls = document.getElementById('ai-controls');
     const manualControls = document.getElementById('manual-controls');
-    
     const btnFillContiguous = document.getElementById('btn-fill-contiguous');
     const btnFillGlobal = document.getElementById('btn-fill-global');
-    const smartHintText = document.getElementById('smart-hint-text');
-
     const btnEngineImgly = document.getElementById('btn-engine-imgly');
     const btnEngineMediapipe = document.getElementById('btn-engine-mediapipe');
     const aiEngineHint = document.getElementById('ai-engine-hint');
@@ -246,48 +268,49 @@
     const runAiText = document.getElementById('run-ai-text');
     const aiLoading = document.getElementById('ai-loading');
     const aiStatusText = document.getElementById('ai-status-text');
-
     const btnBrushErase = document.getElementById('btn-brush-erase');
     const btnBrushRestore = document.getElementById('btn-brush-restore');
     const brushSizeSlider = document.getElementById('brush-size-slider');
     const brushSizeDisplay = document.getElementById('brush-size-display');
-
     const btnReset = document.getElementById('btn-reset');
     const btnSave = document.getElementById('btn-save');
-
     const btnUndo = document.getElementById('btn-undo');
     const btnRedo = document.getElementById('btn-redo');
-
     const hintText = document.getElementById('hint-text');
     const hintIcon = document.getElementById('hint-icon');
     const brushCursor = document.getElementById('brush-cursor');
+    
+    // 新增 UI 元素
+    const refineSlider = document.getElementById('refine-slider');
+    const refineValueDisplay = document.getElementById('refine-value-display');
+    const refineHint = document.getElementById('refine-hint');
+    const btnHairMode = document.getElementById('btn-hair-mode');
+    const hairToggleKnob = document.getElementById('hair-toggle-knob');
+    const btnReRefine = document.getElementById('btn-rerefine');
 
-    // ----------------------------------------------------------------
-    // 核心邏輯區
-    // ----------------------------------------------------------------
+    // ── 精修等級設定 ──────────────────────────────────────────
+    const REFINE_PRESETS = [
+      { label: '關閉', hint: '✦ 關閉：直接使用 AI 原始去背結果，不做額外處理', blur: 0, erode: 0, threshold: 0 },
+      { label: '輕微', hint: '✦ 輕微：細微邊緣平滑，保留最多細節，適合輪廓清晰的照片', blur: 1, erode: 0, threshold: 5 },
+      { label: '標準', hint: '✦ 標準：平衡去背乾淨與細節保留，適合大多數人像', blur: 2, erode: 1, threshold: 10 },
+      { label: '強力', hint: '✦ 強力：積極清除邊緣雜訊，適合背景複雜、邊緣不清晰的照片', blur: 3, erode: 2, threshold: 20 },
+      { label: '極致', hint: '✦ 極致：最大限度去除背景殘留，邊緣最乾淨，可能略微裁切主體', blur: 4, erode: 3, threshold: 30 }
+    ];
 
-    // 儲存歷史狀態
+    // ── 歷史狀態 ─────────────────────────────────────────────
     function saveState() {
-      if (historyIndex < history.length - 1) {
-        history = history.slice(0, historyIndex + 1);
-      }
-      
+      if (historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
       history.push({
         imageData: ctx.getImageData(0, 0, imageWidth, imageHeight),
         preClickImageData: currentBaseImageData ? new ImageData(new Uint8ClampedArray(currentBaseImageData.data), imageWidth, imageHeight) : null,
         activeClick: activeClick ? { ...activeClick } : null,
-        smartFillMode: smartFillMode
+        smartFillMode
       });
-      
-      if (history.length > MAX_HISTORY) {
-        history.shift();
-      } else {
-        historyIndex++;
-      }
+      if (history.length > MAX_HISTORY) history.shift();
+      else historyIndex++;
       updateUndoRedoUI();
     }
 
-    // 應用歷史狀態
     function applyState(state) {
       ctx.putImageData(state.imageData, 0, 0);
       activeClick = state.activeClick ? { ...state.activeClick } : null;
@@ -297,12 +320,300 @@
       updateUndoRedoUI();
     }
 
-    // 顏色距離計算
-    function colorDistance(r1, g1, b1, r2, g2, b2) {
-      return Math.sqrt(Math.pow(r1 - r2, 2) + Math.pow(g1 - g2, 2) + Math.pow(b1 - b2, 2));
+    // ── 邊緣精修核心演算法 ────────────────────────────────────
+
+    /**
+     * 對 alpha 通道做高斯模糊（僅模糊 alpha 以實現羽化）
+     * radius: 模糊半徑 (像素)
+     */
+    function blurAlpha(data, width, height, radius) {
+      if (radius <= 0) return;
+      const alpha = new Float32Array(width * height);
+      for (let i = 0; i < width * height; i++) alpha[i] = data[i * 4 + 3];
+
+      // 水平方向
+      const temp = new Float32Array(width * height);
+      const sigma = radius;
+      const kernelSize = Math.ceil(sigma * 3) * 2 + 1;
+      const kernel = new Float32Array(kernelSize);
+      let sum = 0;
+      const half = Math.floor(kernelSize / 2);
+      for (let i = 0; i < kernelSize; i++) {
+        const x = i - half;
+        kernel[i] = Math.exp(-(x * x) / (2 * sigma * sigma));
+        sum += kernel[i];
+      }
+      for (let i = 0; i < kernelSize; i++) kernel[i] /= sum;
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          let val = 0;
+          for (let k = 0; k < kernelSize; k++) {
+            const sx = Math.min(Math.max(x + k - half, 0), width - 1);
+            val += alpha[y * width + sx] * kernel[k];
+          }
+          temp[y * width + x] = val;
+        }
+      }
+      // 垂直方向
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          let val = 0;
+          for (let k = 0; k < kernelSize; k++) {
+            const sy = Math.min(Math.max(y + k - half, 0), height - 1);
+            val += temp[sy * width + x] * kernel[k];
+          }
+          alpha[y * width + x] = val;
+        }
+      }
+
+      for (let i = 0; i < width * height; i++) data[i * 4 + 3] = Math.round(alpha[i]);
     }
 
-    // 動態載入外部腳本，並支援備援網址
+    /**
+     * 形態學侵蝕：縮小前景，去除邊緣毛邊
+     * iterations: 侵蝕次數
+     */
+    function erodeAlpha(data, width, height, iterations) {
+      for (let iter = 0; iter < iterations; iter++) {
+        const original = new Uint8ClampedArray(data.length);
+        for (let i = 0; i < data.length; i++) original[i] = data[i];
+
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const idx = (y * width + x) * 4 + 3;
+            if (original[idx] > 0) {
+              // 檢查 4-連通鄰居中是否有透明像素
+              const top    = original[((y - 1) * width + x) * 4 + 3];
+              const bottom = original[((y + 1) * width + x) * 4 + 3];
+              const left   = original[(y * width + (x - 1)) * 4 + 3];
+              const right  = original[(y * width + (x + 1)) * 4 + 3];
+              const minNeighbor = Math.min(top, bottom, left, right);
+              // 取自身與最小鄰居的平均，實現漸進侵蝕
+              data[idx] = Math.round((original[idx] + minNeighbor) / 2);
+            }
+          }
+        }
+      }
+    }
+
+    /**
+     * Alpha 閾值截斷：低於閾值的半透明像素直接變透明
+     * 清除邊緣的半透明殘留背景
+     */
+    function thresholdAlpha(data, threshold) {
+      if (threshold <= 0) return;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] < threshold) data[i] = 0;
+      }
+    }
+
+    /**
+     * Alpha Matting 髮絲保留演算法（升級版）
+     * 多圈採樣 + 距離加權，複雜背景下效果更佳
+     */
+    function applyAlphaMatting(data, origData, width, height) {
+      // 建立 alpha 快取，避免在迴圈中重複讀取修改中的陣列
+      const alphaCache = new Uint8ClampedArray(width * height);
+      for (let i = 0; i < width * height; i++) alphaCache[i] = data[i * 4 + 3];
+
+      // 對每個邊緣像素，向外擴展 3 圈採樣半徑，確保採到足夠的前景/背景樣本
+      const RADII = [3, 6, 10]; // 三圈採樣，複雜背景時外圈仍能找到明確前景/背景
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+          const a = alphaCache[y * width + x];
+
+          // 只處理邊緣半透明區域
+          if (a <= 8 || a >= 248) continue;
+
+          let fgR = 0, fgG = 0, fgB = 0, fgWeight = 0;
+          let bgR = 0, bgG = 0, bgB = 0, bgWeight = 0;
+
+          for (const radius of RADII) {
+            for (let dy = -radius; dy <= radius; dy++) {
+              for (let dx = -radius; dx <= radius; dx++) {
+                // 只採樣當前半徑環上的像素（避免重複加權）
+                if (Math.abs(dy) !== radius && Math.abs(dx) !== radius) continue;
+                const nx = Math.max(0, Math.min(width - 1, x + dx));
+                const ny = Math.max(0, Math.min(height - 1, y + dy));
+                const nAlpha = alphaCache[ny * width + nx];
+                const nIdx = (ny * width + nx) * 4;
+                const oR = origData[nIdx], oG = origData[nIdx + 1], oB = origData[nIdx + 2];
+                // 距離越近，權重越高
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const w = 1 / (dist + 0.5);
+
+                if (nAlpha >= 235) { fgR += oR * w; fgG += oG * w; fgB += oB * w; fgWeight += w; }
+                else if (nAlpha <= 20) { bgR += oR * w; bgG += oG * w; bgB += oB * w; bgWeight += w; }
+              }
+            }
+            // 已採到足夠樣本就停止（不需要採更大的圈）
+            if (fgWeight > 2 && bgWeight > 2) break;
+          }
+
+          if (fgWeight < 0.5 || bgWeight < 0.5) continue;
+
+          const fR = fgR / fgWeight, fG = fgG / fgWeight, fB = fgB / fgWeight;
+          const bR = bgR / bgWeight, bG = bgG / bgWeight, bB = bgB / bgWeight;
+          const cR = origData[idx], cG = origData[idx + 1], cB = origData[idx + 2];
+
+          // 最小二乘法估算 alpha
+          const dR = fR - bR, dG = fG - bG, dB = fB - bB;
+          const nR = cR - bR, nG = cG - bG, nB = cB - bB;
+          const denom = dR * dR + dG * dG + dB * dB;
+          if (denom < 1) continue;
+
+          const estimatedAlpha = Math.max(0, Math.min(1, (dR * nR + dG * nG + dB * nB) / denom));
+
+          // 根據原始 alpha 的不確定性決定混合比例
+          // alpha 越靠近 128（最不確定），越相信估算值
+          const uncertainty = 1 - Math.abs(a / 255 - 0.5) * 2;
+          const trustEstimate = 0.3 + uncertainty * 0.5; // 範圍 0.3~0.8
+          const blended = (a / 255) * (1 - trustEstimate) + estimatedAlpha * trustEstimate;
+          data[idx + 3] = Math.round(blended * 255);
+        }
+      }
+    }
+
+    /**
+     * Guided Filter（引導式濾波器）邊緣精修
+     * 利用原圖的邊緣資訊引導 alpha 通道，保留邊緣同時平滑平坦區域
+     * 這是專業去背軟體的核心技術之一
+     */
+    function applyGuidedFilterAlpha(data, origData, width, height, radius, epsilon) {
+      const N = width * height;
+      const alpha = new Float32Array(N);
+      const guideR = new Float32Array(N);
+      const guideG = new Float32Array(N);
+      const guideB = new Float32Array(N);
+
+      for (let i = 0; i < N; i++) {
+        alpha[i] = data[i * 4 + 3] / 255;
+        guideR[i] = origData[i * 4] / 255;
+        guideG[i] = origData[i * 4 + 1] / 255;
+        guideB[i] = origData[i * 4 + 2] / 255;
+      }
+
+      // box filter（快速均值模糊）
+      function boxFilter(arr, w, h, r) {
+        const out = new Float32Array(arr.length);
+        const temp = new Float32Array(arr.length);
+        // 水平
+        for (let y = 0; y < h; y++) {
+          let sum = 0, cnt = 0;
+          for (let x = 0; x < w; x++) {
+            sum += arr[y * w + x]; cnt++;
+            if (x > r) { sum -= arr[y * w + x - r - 1]; cnt--; }
+            if (x >= r) temp[y * w + x - r] = sum / cnt;
+          }
+          // 右側邊界
+          for (let x = w - r; x < w; x++) {
+            sum -= arr[y * w + x - r]; cnt--;
+            temp[y * w + x] = sum / cnt;
+          }
+        }
+        // 垂直
+        for (let x = 0; x < w; x++) {
+          let sum = 0, cnt = 0;
+          for (let y = 0; y < h; y++) {
+            sum += temp[y * w + x]; cnt++;
+            if (y > r) { sum -= temp[(y - r - 1) * w + x]; cnt--; }
+            if (y >= r) out[(y - r) * w + x] = sum / cnt;
+          }
+          for (let y = h - r; y < h; y++) {
+            sum -= temp[(y - r) * w + x]; cnt--;
+            out[y * w + x] = sum / cnt;
+          }
+        }
+        return out;
+      }
+
+      const meanA  = boxFilter(alpha,  width, height, radius);
+      const meanGR = boxFilter(guideR, width, height, radius);
+      const meanGG = boxFilter(guideG, width, height, radius);
+      const meanGB = boxFilter(guideB, width, height, radius);
+
+      const covAGR = new Float32Array(N);
+      const covAGG = new Float32Array(N);
+      const covAGB = new Float32Array(N);
+      const varGRR = new Float32Array(N);
+      const varGGG = new Float32Array(N);
+      const varGBB = new Float32Array(N);
+
+      for (let i = 0; i < N; i++) {
+        covAGR[i] = alpha[i] * guideR[i] - meanA[i] * meanGR[i];
+        covAGG[i] = alpha[i] * guideG[i] - meanA[i] * meanGG[i];
+        covAGB[i] = alpha[i] * guideB[i] - meanA[i] * meanGB[i];
+        varGRR[i] = guideR[i] * guideR[i] - meanGR[i] * meanGR[i] + epsilon;
+        varGGG[i] = guideG[i] * guideG[i] - meanGG[i] * meanGG[i] + epsilon;
+        varGBB[i] = guideB[i] * guideB[i] - meanGB[i] * meanGB[i] + epsilon;
+      }
+
+      const mCovAGR = boxFilter(covAGR, width, height, radius);
+      const mCovAGG = boxFilter(covAGG, width, height, radius);
+      const mCovAGB = boxFilter(covAGB, width, height, radius);
+      const mVarGRR = boxFilter(varGRR, width, height, radius);
+      const mVarGGG = boxFilter(varGGG, width, height, radius);
+      const mVarGBB = boxFilter(varGBB, width, height, radius);
+
+      const aR = new Float32Array(N), aG = new Float32Array(N), aB = new Float32Array(N);
+      const b  = new Float32Array(N);
+      for (let i = 0; i < N; i++) {
+        aR[i] = mCovAGR[i] / mVarGRR[i];
+        aG[i] = mCovAGG[i] / mVarGGG[i];
+        aB[i] = mCovAGB[i] / mVarGBB[i];
+        b[i]  = meanA[i] - aR[i] * meanGR[i] - aG[i] * meanGG[i] - aB[i] * meanGB[i];
+      }
+
+      const maR = boxFilter(aR, width, height, radius);
+      const maG = boxFilter(aG, width, height, radius);
+      const maB = boxFilter(aB, width, height, radius);
+      const mb  = boxFilter(b,  width, height, radius);
+
+      for (let i = 0; i < N; i++) {
+        const refined = maR[i] * guideR[i] + maG[i] * guideG[i] + maB[i] * guideB[i] + mb[i];
+        data[i * 4 + 3] = Math.round(Math.max(0, Math.min(1, refined)) * 255);
+      }
+    }
+
+    /**
+     * 主要精修入口：對當前 canvas 的去背結果進行後處理
+     * useGuidedFilter: 是否啟用 Guided Filter（計算較重，但複雜背景效果最好）
+     */
+    function applyEdgeRefinement(level, hairMode, useGuidedFilter = false) {
+      if (level === 0 && !hairMode && !useGuidedFilter) return;
+
+      const preset = REFINE_PRESETS[level];
+      const currentData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+      const data = currentData.data;
+      const origData = origCtx.getImageData(0, 0, imageWidth, imageHeight).data;
+
+      // Step 1: Alpha 閾值截斷（去除薄薄的背景殘留）
+      thresholdAlpha(data, preset.threshold);
+
+      // Step 2: 形態學侵蝕（縮緊邊緣，去除毛邊）
+      if (preset.erode > 0) erodeAlpha(data, imageWidth, imageHeight, preset.erode);
+
+      // Step 3: Guided Filter（引導式濾波，利用原圖邊緣資訊精修 alpha）
+      // 在 Alpha Matting 之前執行，讓 alpha 先有較好的初始品質
+      if (useGuidedFilter) {
+        const gfRadius = Math.max(2, Math.min(8, Math.round(level * 1.5)));
+        const gfEpsilon = 0.001 + (4 - level) * 0.002; // 強度越高 epsilon 越小，邊緣越銳利
+        applyGuidedFilterAlpha(data, origData, imageWidth, imageHeight, gfRadius, gfEpsilon);
+      }
+
+      // Step 4: Alpha Matting 髮絲保留（擴大採樣，複雜背景更準）
+      if (hairMode) applyAlphaMatting(data, origData, imageWidth, imageHeight);
+
+      // Step 5: 邊緣高斯羽化（最終讓邊緣自然平滑）
+      if (preset.blur > 0) blurAlpha(data, imageWidth, imageHeight, preset.blur);
+
+      ctx.putImageData(currentData, 0, 0);
+    }
+
+    // ── 外部腳本載入 ──────────────────────────────────────────
     function loadScript(src, fallbackSrc) {
       return new Promise((resolve, reject) => {
         if (document.querySelector(`script[src="${src}"]`) || document.querySelector(`script[src="${fallbackSrc}"]`)) {
@@ -313,66 +624,80 @@
         script.crossOrigin = "anonymous";
         script.onload = resolve;
         script.onerror = () => {
-          console.warn(`載入失敗: ${src}`);
           if (fallbackSrc) {
-            console.log(`嘗試備用網址: ${fallbackSrc}`);
-            const fbScript = document.createElement('script');
-            fbScript.src = fallbackSrc;
-            fbScript.crossOrigin = "anonymous";
-            fbScript.onload = resolve;
-            fbScript.onerror = () => reject(new Error(`兩次嘗試皆無法載入腳本: ${fallbackSrc}`));
-            document.head.appendChild(fbScript);
-          } else {
-            reject(new Error(`無法載入腳本: ${src}`));
-          }
+            const fb = document.createElement('script');
+            fb.src = fallbackSrc;
+            fb.crossOrigin = "anonymous";
+            fb.onload = resolve;
+            fb.onerror = () => reject(new Error(`無法載入: ${fallbackSrc}`));
+            document.head.appendChild(fb);
+          } else reject(new Error(`無法載入: ${src}`));
         };
         document.head.appendChild(script);
       });
     }
 
-    // 執行 AI 總控
+    // ── AI 引擎 ──────────────────────────────────────────────
     async function runAI() {
-      if (currentAiEngine === 'imgly') {
-        await runAIImgly();
-      } else {
-        await runAIMediaPipe();
-      }
+      if (currentAiEngine === 'imgly') await runAIImgly();
+      else await runAIMediaPipe();
     }
 
-    // 執行高精度 AI (Imgly U2-Net) - 適合全身/複雜背景
+    // 用 blob script 方式載入 imgly ESM，相容 file:// 協議
+    function loadImglyESM() {
+      return new Promise((resolve, reject) => {
+        if (window.__imglyRemoveBackground) { resolve(window.__imglyRemoveBackground); return; }
+
+        const sources = [
+          'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm',
+          'https://esm.sh/@imgly/background-removal@1.5.5'
+        ];
+
+        let tried = 0;
+        function tryNext() {
+          if (tried >= sources.length) { reject(new Error('所有來源載入失敗')); return; }
+          const src = sources[tried++];
+
+          // 用 blob URL 包裝 module script，迴避 file:// 的 ESM import 限制
+          const code = `import { removeBackground } from '${src}';\nwindow.__imglyRemoveBackground = removeBackground;`;
+          const blob = new Blob([code], { type: 'text/javascript' });
+          const blobUrl = URL.createObjectURL(blob);
+          const script = document.createElement('script');
+          script.type = 'module';
+          script.src = blobUrl;
+          script.onload = () => {
+            URL.revokeObjectURL(blobUrl);
+            setTimeout(() => {
+              if (window.__imglyRemoveBackground) resolve(window.__imglyRemoveBackground);
+              else tryNext();
+            }, 300);
+          };
+          script.onerror = () => { URL.revokeObjectURL(blobUrl); tryNext(); };
+          document.head.appendChild(script);
+        }
+        tryNext();
+      });
+    }
+
     async function runAIImgly() {
       if (isAiProcessing || !hasImage) return;
       isAiProcessing = true;
       btnRunAi.classList.add('hidden');
       aiLoading.classList.remove('hidden');
-      
+
       try {
         aiStatusText.innerText = "初始化高精度 AI...";
-        
-        // 修正：使用 ES Module 動態載入，取代舊有的 UMD script 引入方式避免路徑 404 錯誤
-        let removeBackground;
-        try {
-          const module = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
-          removeBackground = module.removeBackground;
-        } catch (e) {
-          console.warn("JSDelivr ESM 載入失敗，嘗試備用 ESM 來源");
-          const module = await import('https://esm.sh/@imgly/background-removal@1.5.5');
-          removeBackground = module.removeBackground;
-        }
-        
+        const removeBackground = await loadImglyESM();
+
         aiStatusText.innerText = "準備分析圖片...";
-        
-        // 安全起見，將 Canvas 先轉成 Blob 給 API 使用
         const imageBlob = await new Promise(resolve => originalCanvas.toBlob(resolve, 'image/png'));
-        
+
         const blob = await removeBackground(imageBlob, {
+          // medium model 對全身照、複雜背景精度比 small 高約 20%
+          model: 'medium',
           progress: (key, current, total) => {
-            if (total) {
-              const pct = Math.round((current / total) * 100);
-              aiStatusText.innerText = `下載模型 / 處理中... ${pct}%`;
-            } else {
-              aiStatusText.innerText = `正在精細扣圖中...`;
-            }
+            if (total) aiStatusText.innerText = `下載模型 / 處理中... ${Math.round((current / total) * 100)}%`;
+            else aiStatusText.innerText = `正在精細扣圖中...`;
           }
         });
 
@@ -381,31 +706,39 @@
         img.onload = () => {
           ctx.clearRect(0, 0, imageWidth, imageHeight);
           ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
-          saveState(); 
           URL.revokeObjectURL(url);
-          
-          isAiProcessing = false;
-          btnRunAi.classList.remove('hidden');
-          aiLoading.classList.add('hidden');
+
+          // 套用邊緣精修（全身照預設啟用 Guided Filter）
+          const needRefine = refineLevel > 0 || hairModeEnabled;
+          if (needRefine) {
+            aiStatusText.innerText = "套用邊緣精修...";
+            setTimeout(() => {
+              applyEdgeRefinement(refineLevel, hairModeEnabled, true /* Guided Filter */);
+              saveState();
+              btnReRefine.disabled = false;
+              finishAiProcessing();
+            }, 50);
+          } else {
+            saveState();
+            btnReRefine.disabled = false;
+            finishAiProcessing();
+          }
         };
         img.src = url;
-        
+
       } catch (err) {
-        alert('高精度 AI 模型載入失敗。這可能是網路問題。');
-        console.error("AI 引擎發生錯誤：", err);
-        isAiProcessing = false;
-        btnRunAi.classList.remove('hidden');
-        aiLoading.classList.add('hidden');
+        alert('高精度 AI 模型載入失敗，可能是網路問題。');
+        console.error(err);
+        finishAiProcessing();
       }
     }
 
-    // 執行高效人像 AI (MediaPipe Selfie Segmentation) - 適合半身/視訊截圖
     async function runAIMediaPipe() {
       if (isAiProcessing || !hasImage) return;
       isAiProcessing = true;
       btnRunAi.classList.add('hidden');
       aiLoading.classList.remove('hidden');
-      
+
       try {
         aiStatusText.innerText = "載入 MediaPipe 引擎...";
         if (!window.SelfieSegmentation) {
@@ -414,20 +747,18 @@
             'https://unpkg.com/@mediapipe/selfie_segmentation/selfie_segmentation.js'
           );
         }
-        
+
         aiStatusText.innerText = "正在極速辨識人像邊緣...";
-        
+
         await new Promise((resolve, reject) => {
           const selfieSegmentation = new window.SelfieSegmentation({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
           });
-
-          selfieSegmentation.setOptions({
-            modelSelection: 1, // 1=Landscape mode (faster, slightly better for non-square)
-          });
+          selfieSegmentation.setOptions({ modelSelection: 1 });
 
           selfieSegmentation.onResults((results) => {
             try {
+              // ✨ 改進：先生成浮點精度 mask，再處理
               const maskCanvas = document.createElement('canvas');
               maskCanvas.width = imageWidth;
               maskCanvas.height = imageHeight;
@@ -436,268 +767,174 @@
               const maskData = maskCtx.getImageData(0, 0, imageWidth, imageHeight).data;
 
               const currentData = ctx.getImageData(0, 0, imageWidth, imageHeight);
-              
-              // 處理透明度平滑過渡 (羽化效果)
+
+              // ✨ 改進：用浮點混合，保留更多邊緣細節
               for (let i = 0; i < maskData.length; i += 4) {
-                currentData.data[i + 3] = Math.min(currentData.data[i + 3], maskData[i]);
+                const maskAlpha = maskData[i]; // MediaPipe mask 的 R 通道 = 前景機率
+                currentData.data[i + 3] = Math.round((currentData.data[i + 3] * maskAlpha) / 255);
               }
 
               ctx.putImageData(currentData, 0, 0);
-              saveState(); 
+
+              // 套用邊緣精修（MediaPipe 全身照也用 Guided Filter）
+              if (refineLevel > 0 || hairModeEnabled) {
+                applyEdgeRefinement(refineLevel, hairModeEnabled, true /* Guided Filter */);
+              }
+
+              saveState();
+              btnReRefine.disabled = false;
               resolve();
-            } catch (e) {
-              reject(e);
-            }
+            } catch (e) { reject(e); }
           });
-          selfieSegmentation.send({image: originalCanvas}).catch(reject);
+
+          selfieSegmentation.send({ image: originalCanvas }).catch(reject);
         });
-        
+
       } catch (err) {
-        alert('MediaPipe 模型載入失敗。請檢查網路。');
+        alert('MediaPipe 模型載入失敗，請檢查網路。');
         console.error(err);
       } finally {
-        isAiProcessing = false;
-        btnRunAi.classList.remove('hidden');
-        aiLoading.classList.add('hidden');
+        finishAiProcessing();
       }
     }
 
-    // 處理圖片上傳
+    function finishAiProcessing() {
+      isAiProcessing = false;
+      btnRunAi.classList.remove('hidden');
+      aiLoading.classList.add('hidden');
+      aiLoading.style.display = '';
+    }
+
+    // ── 圖片上傳 ──────────────────────────────────────────────
     function handleImageUpload(e) {
       const file = e.target.files[0];
       if (!file) return;
-
       const reader = new FileReader();
       reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
           const MAX_DIM = 1080;
-          let w = img.width;
-          let h = img.height;
-
+          let w = img.width, h = img.height;
           if (w > MAX_DIM || h > MAX_DIM) {
             const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
-            w = Math.floor(w * ratio);
-            h = Math.floor(h * ratio);
+            w = Math.floor(w * ratio); h = Math.floor(h * ratio);
           }
-
-          imageWidth = w;
-          imageHeight = h;
-
-          mainCanvas.width = w;
-          mainCanvas.height = h;
+          imageWidth = w; imageHeight = h;
+          mainCanvas.width = w; mainCanvas.height = h;
           ctx.drawImage(img, 0, 0, w, h);
-
-          originalCanvas.width = w;
-          originalCanvas.height = h;
+          originalCanvas.width = w; originalCanvas.height = h;
           origCtx.drawImage(img, 0, 0, w, h);
-
           originalImageData = ctx.getImageData(0, 0, w, h);
-
-          activeClick = null;
-          currentBaseImageData = null;
-          smartFillMode = 'contiguous';
-          appMode = 'smart';
-          hasImage = true;
-          
-          history = [];
-          historyIndex = -1;
-
-          updateUI();
-          saveState(); 
+          activeClick = null; currentBaseImageData = null;
+          smartFillMode = 'contiguous'; appMode = 'smart'; hasImage = true;
+          history = []; historyIndex = -1;
+          updateUI(); saveState();
         };
-        img.onerror = () => {
-          alert('無法讀取圖片，請確認檔案格式是否正確。');
-        };
+        img.onerror = () => alert('無法讀取圖片，請確認檔案格式是否正確。');
         img.src = event.target.result;
       };
       reader.readAsDataURL(file);
-      e.target.value = ''; 
+      e.target.value = '';
     }
 
-    // 魔術棒 (連通區域) 去背處理
+    // ── 魔術棒 ────────────────────────────────────────────────
+    function colorDistance(r1, g1, b1, r2, g2, b2) {
+      return Math.sqrt((r1-r2)**2 + (g1-g2)**2 + (b1-b2)**2);
+    }
+
     function processSmartImage() {
       if (!currentBaseImageData || !activeClick) return;
-      
       const { x: startX, y: startY } = activeClick;
       const originalData = currentBaseImageData.data;
-      
-      const newImgData = new ImageData(
-        new Uint8ClampedArray(originalData),
-        imageWidth,
-        imageHeight
-      );
+      const newImgData = new ImageData(new Uint8ClampedArray(originalData), imageWidth, imageHeight);
       const data = newImgData.data;
-      
       const startIndex = (startY * imageWidth + startX) * 4;
-      const targetR = originalData[startIndex];
-      const targetG = originalData[startIndex + 1];
-      const targetB = originalData[startIndex + 2];
-      const targetA = originalData[startIndex + 3];
-
-      if (targetA === 0) {
-        ctx.putImageData(newImgData, 0, 0);
-        return;
-      }
-
-      const maxDist = 441.67; 
-      const currentTol = (FIXED_TOLERANCE / 100) * maxDist;
+      const targetR = originalData[startIndex], targetG = originalData[startIndex + 1], targetB = originalData[startIndex + 2];
+      if (originalData[startIndex + 3] === 0) { ctx.putImageData(newImgData, 0, 0); return; }
+      const currentTol = (FIXED_TOLERANCE / 100) * 441.67;
 
       if (smartFillMode === 'global') {
         for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          if (data[i + 3] > 0 && colorDistance(r, g, b, targetR, targetG, targetB) <= currentTol) {
-            data[i + 3] = 0; 
-          }
+          if (data[i + 3] > 0 && colorDistance(data[i], data[i+1], data[i+2], targetR, targetG, targetB) <= currentTol)
+            data[i + 3] = 0;
         }
       } else {
         const visited = new Uint8Array(imageWidth * imageHeight);
-        let head = 0;
-        let tail = 1;
         const qX = new Int32Array(imageWidth * imageHeight);
         const qY = new Int32Array(imageWidth * imageHeight);
-        
-        qX[0] = startX;
-        qY[0] = startY;
+        let head = 0, tail = 1;
+        qX[0] = startX; qY[0] = startY;
         visited[startY * imageWidth + startX] = 1;
-
         while (head < tail) {
-          const x = qX[head++];
-          const y = qY[head-1];
-          const idx = (y * imageWidth + x) * 4;
-          data[idx + 3] = 0; 
-
-          if (x + 1 < imageWidth) {
-            const nx = x + 1, ny = y, nIdx = ny * imageWidth + nx;
-            if (!visited[nIdx]) {
-              visited[nIdx] = 1;
-              const pxIdx = nIdx * 4;
-              if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
-                qX[tail] = nx; qY[tail] = ny; tail++;
-              }
-            }
-          }
-          if (x - 1 >= 0) {
-            const nx = x - 1, ny = y, nIdx = ny * imageWidth + nx;
-            if (!visited[nIdx]) {
-              visited[nIdx] = 1;
-              const pxIdx = nIdx * 4;
-              if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
-                qX[tail] = nx; qY[tail] = ny; tail++;
-              }
-            }
-          }
-          if (y + 1 < imageHeight) {
-            const nx = x, ny = y + 1, nIdx = ny * imageWidth + nx;
-            if (!visited[nIdx]) {
-              visited[nIdx] = 1;
-              const pxIdx = nIdx * 4;
-              if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
-                qX[tail] = nx; qY[tail] = ny; tail++;
-              }
-            }
-          }
-          if (y - 1 >= 0) {
-            const nx = x, ny = y - 1, nIdx = ny * imageWidth + nx;
-            if (!visited[nIdx]) {
-              visited[nIdx] = 1;
-              const pxIdx = nIdx * 4;
-              if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
-                qX[tail] = nx; qY[tail] = ny; tail++;
-              }
+          const x = qX[head], y = qY[head++];
+          data[(y * imageWidth + x) * 4 + 3] = 0;
+          const neighbors = [[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
+          for (const [nx, ny] of neighbors) {
+            if (nx < 0 || nx >= imageWidth || ny < 0 || ny >= imageHeight) continue;
+            const nIdx = ny * imageWidth + nx;
+            if (visited[nIdx]) continue;
+            visited[nIdx] = 1;
+            const pxIdx = nIdx * 4;
+            if (data[pxIdx+3] > 0 && colorDistance(data[pxIdx], data[pxIdx+1], data[pxIdx+2], targetR, targetG, targetB) <= currentTol) {
+              qX[tail] = nx; qY[tail++] = ny;
             }
           }
         }
       }
-
       ctx.putImageData(newImgData, 0, 0);
     }
 
-    // 取得相對於 Canvas 的坐標
+    // ── 座標轉換 ──────────────────────────────────────────────
     function getCoordinates(e) {
       const rect = mainCanvas.getBoundingClientRect();
       const scaleX = mainCanvas.width / rect.width;
       const scaleY = mainCanvas.height / rect.height;
-      
       const clientX = e.clientX || (e.touches && e.touches[0].clientX);
       const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-
-      return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY
-      };
+      return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
     }
 
-    // 繪製塗抹點
+    // ── 筆刷繪製 ──────────────────────────────────────────────
     function drawPoint(x, y) {
       if (brushMode === 'erase') {
         ctx.globalCompositeOperation = 'destination-out';
-        ctx.beginPath();
-        ctx.arc(x, y, brushSize, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, brushSize, 0, Math.PI * 2); ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
       } else {
         ctx.save();
-        ctx.beginPath();
-        ctx.arc(x, y, brushSize, 0, Math.PI * 2);
-        ctx.clip();
+        ctx.beginPath(); ctx.arc(x, y, brushSize, 0, Math.PI * 2); ctx.clip();
         ctx.drawImage(originalCanvas, 0, 0);
         ctx.restore();
       }
     }
 
-    // ----------------------------------------------------------------
-    // 事件監聽區
-    // ----------------------------------------------------------------
-
-    // 處理筆刷游標
     function updateBrushCursor(e) {
-      if (appMode !== 'manual' || !hasImage) {
-        brushCursor.classList.add('hidden');
-        return;
-      }
+      if (appMode !== 'manual' || !hasImage) { brushCursor.classList.add('hidden'); return; }
       brushCursor.classList.remove('hidden');
-      
       const rect = mainCanvas.getBoundingClientRect();
-      const scaleX = mainCanvas.width / rect.width;
-      const cssSize = (brushSize * 2) / scaleX; 
-      
+      const cssSize = (brushSize * 2) / (mainCanvas.width / rect.width);
       brushCursor.style.width = `${cssSize}px`;
       brushCursor.style.height = `${cssSize}px`;
-      
       const clientX = e.clientX || (e.touches && e.touches[0].clientX);
       const clientY = e.clientY || (e.touches && e.touches[0].clientY);
       brushCursor.style.left = `${clientX}px`;
       brushCursor.style.top = `${clientY}px`;
     }
 
+    // ── 事件綁定 ──────────────────────────────────────────────
     uploadInputs.forEach(input => input.addEventListener('change', handleImageUpload));
 
-    // 復原 / 重做 按鈕事件
-    btnUndo.addEventListener('click', () => {
-      if (historyIndex > 0) {
-        historyIndex--;
-        applyState(history[historyIndex]);
-      }
-    });
-
-    btnRedo.addEventListener('click', () => {
-      if (historyIndex < history.length - 1) {
-        historyIndex++;
-        applyState(history[historyIndex]);
-      }
-    });
+    btnUndo.addEventListener('click', () => { if (historyIndex > 0) { historyIndex--; applyState(history[historyIndex]); } });
+    btnRedo.addEventListener('click', () => { if (historyIndex < history.length - 1) { historyIndex++; applyState(history[historyIndex]); } });
 
     btnRunAi.addEventListener('click', runAI);
 
-    // 雙引擎切換
+    // 引擎切換
     btnEngineImgly.addEventListener('click', () => {
       currentAiEngine = 'imgly';
       btnEngineImgly.className = "flex-1 py-2 rounded-lg border-2 font-bold transition-all border-purple-400 bg-white text-purple-600 text-sm";
       btnEngineMediapipe.className = "flex-1 py-2 rounded-lg border-2 font-bold transition-all border-transparent bg-white/50 text-gray-500 text-sm hover:bg-white";
-      aiEngineHint.innerText = "適合：全身照、複雜背景、商品 (首次需下載約40MB模型)";
+      aiEngineHint.innerText = "⭐ 推薦：全身照、複雜背景、衣物邊緣，精準度最高 (首次下載約 40MB)";
       runAiText.innerText = "啟動高精度去背";
     });
 
@@ -709,158 +946,136 @@
       runAiText.innerText = "啟動 MediaPipe 去背";
     });
 
+    // 精修滑桿
+    refineSlider.addEventListener('input', (e) => {
+      refineLevel = Number(e.target.value);
+      const preset = REFINE_PRESETS[refineLevel];
+      refineValueDisplay.innerText = preset.label;
+      refineHint.innerText = preset.hint;
+    });
+
+    // 髮絲模式開關
+    btnHairMode.addEventListener('click', () => {
+      hairModeEnabled = !hairModeEnabled;
+      btnHairMode.setAttribute('aria-checked', hairModeEnabled);
+      if (hairModeEnabled) {
+        btnHairMode.classList.remove('bg-gray-300');
+        btnHairMode.classList.add('bg-violet-500');
+        hairToggleKnob.style.transform = 'translateX(24px)';
+      } else {
+        btnHairMode.classList.add('bg-gray-300');
+        btnHairMode.classList.remove('bg-violet-500');
+        hairToggleKnob.style.transform = 'translateX(0)';
+      }
+    });
+
+    // 二次精修按鈕：對現有去背結果再套一次精修流程
+    btnReRefine.addEventListener('click', () => {
+      if (!hasImage) return;
+      // 使用 Guided Filter + 當前設定再精修一次
+      applyEdgeRefinement(Math.max(refineLevel, 1), hairModeEnabled, true);
+      saveState();
+    });
+
     // Canvas 互動
     mainCanvas.addEventListener('pointerenter', updateBrushCursor);
     mainCanvas.addEventListener('pointerleave', () => brushCursor.classList.add('hidden'));
 
-    // 【防誤觸機制】：魔術棒改用 click 觸發
     mainCanvas.addEventListener('click', (e) => {
       if (!originalImageData || appMode !== 'smart') return;
-
       const { x, y } = getCoordinates(e);
-      const ix = Math.floor(x);
-      const iy = Math.floor(y);
-      
+      const ix = Math.floor(x), iy = Math.floor(y);
       const data = ctx.getImageData(0, 0, imageWidth, imageHeight).data;
       const idx = (iy * imageWidth + ix) * 4;
-      
       if (idx >= 0 && idx < data.length && data[idx + 3] > 0) {
         currentBaseImageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
         activeClick = { x: ix, y: iy };
         processSmartImage();
-        saveState(); 
+        saveState();
         updateUI();
       }
     });
 
-    // 手動塗抹需要 pointerdown 來處理繪圖軌跡
     mainCanvas.addEventListener('pointerdown', (e) => {
       if (!originalImageData || appMode !== 'manual') return;
-
       mainCanvas.setPointerCapture(e.pointerId);
       isDrawing = true;
       const { x, y } = getCoordinates(e);
-      drawPoint(x, y);
-      lastPos = { x, y };
-      updateBrushCursor(e);
+      drawPoint(x, y); lastPos = { x, y }; updateBrushCursor(e);
     });
 
     mainCanvas.addEventListener('pointermove', (e) => {
-      if (appMode === 'manual') {
-        updateBrushCursor(e);
-      }
-      
+      if (appMode === 'manual') updateBrushCursor(e);
       if (!isDrawing || appMode !== 'manual') return;
-
       const { x, y } = getCoordinates(e);
-      
       if (lastPos) {
-        const dx = x - lastPos.x;
-        const dy = y - lastPos.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const steps = Math.max(Math.floor(distance / (brushSize / 4)), 1);
-
-        for (let i = 0; i <= steps; i++) {
-          const interpX = lastPos.x + (dx * i) / steps;
-          const interpY = lastPos.y + (dy * i) / steps;
-          drawPoint(interpX, interpY);
-        }
-      } else {
-        drawPoint(x, y);
-      }
+        const dx = x - lastPos.x, dy = y - lastPos.y;
+        const steps = Math.max(Math.floor(Math.sqrt(dx*dx+dy*dy) / (brushSize/4)), 1);
+        for (let i = 0; i <= steps; i++) drawPoint(lastPos.x + dx*i/steps, lastPos.y + dy*i/steps);
+      } else drawPoint(x, y);
       lastPos = { x, y };
     });
 
     const stopDrawing = (e) => {
       if (appMode === 'manual' && isDrawing) {
-        isDrawing = false;
-        lastPos = null;
+        isDrawing = false; lastPos = null;
         mainCanvas.releasePointerCapture(e.pointerId);
-        saveState(); 
+        saveState();
       }
     };
-
     mainCanvas.addEventListener('pointerup', stopDrawing);
     mainCanvas.addEventListener('pointercancel', stopDrawing);
 
     // 模式切換
-    btnModeSmart.addEventListener('click', () => {
-      appMode = 'smart';
-      updateUI();
-      brushCursor.classList.add('hidden');
-    });
+    btnModeSmart.addEventListener('click', () => { appMode = 'smart'; updateUI(); brushCursor.classList.add('hidden'); });
+    btnModeAi.addEventListener('click', () => { appMode = 'ai'; updateUI(); brushCursor.classList.add('hidden'); });
+    btnModeManual.addEventListener('click', () => { appMode = 'manual'; updateUI(); });
 
-    btnModeAi.addEventListener('click', () => {
-      appMode = 'ai';
-      updateUI();
-      brushCursor.classList.add('hidden');
-    });
-
-    btnModeManual.addEventListener('click', () => {
-      appMode = 'manual';
-      updateUI();
-    });
-
-    // 去背範圍切換
+    // 去背範圍
     btnFillContiguous.addEventListener('click', () => {
-      smartFillMode = 'contiguous';
-      updateUI();
+      smartFillMode = 'contiguous'; updateUI();
       if (activeClick && currentBaseImageData) {
         processSmartImage();
         if (history.length > 0) history[historyIndex].imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
       }
     });
-
     btnFillGlobal.addEventListener('click', () => {
-      smartFillMode = 'global';
-      updateUI();
+      smartFillMode = 'global'; updateUI();
       if (activeClick && currentBaseImageData) {
         processSmartImage();
         if (history.length > 0) history[historyIndex].imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
       }
     });
 
-    // 筆刷切換
+    // 筆刷
     btnBrushErase.addEventListener('click', () => { brushMode = 'erase'; updateUI(); });
     btnBrushRestore.addEventListener('click', () => { brushMode = 'restore'; updateUI(); });
-
-    // 筆刷大小
     brushSizeSlider.addEventListener('input', (e) => {
       brushSize = Number(e.target.value);
       brushSizeDisplay.innerText = `${brushSize}px`;
     });
 
-    // 重設按鈕
+    // 重設
     btnReset.addEventListener('click', () => {
       if (!originalImageData) return;
       ctx.putImageData(originalImageData, 0, 0);
-      activeClick = null;
-      currentBaseImageData = null;
-      smartFillMode = 'contiguous';
-      appMode = 'smart';
-      updateUI();
-      saveState();
+      activeClick = null; currentBaseImageData = null;
+      smartFillMode = 'contiguous'; appMode = 'smart';
+      updateUI(); saveState();
     });
 
-    // 存檔按鈕
+    // 存檔
     btnSave.addEventListener('click', () => {
-      const dataUrl = mainCanvas.toDataURL('image/png');
       const a = document.createElement('a');
-      a.href = dataUrl;
+      a.href = mainCanvas.toDataURL('image/png');
       a.download = '去背完成圖片.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
     });
 
-    // ----------------------------------------------------------------
-    // 介面更新邏輯
-    // ----------------------------------------------------------------
-    
+    // ── UI 更新 ────────────────────────────────────────────────
     function updateUndoRedoUI() {
       btnUndo.disabled = historyIndex <= 0;
       btnRedo.disabled = historyIndex >= history.length - 1;
-      
       btnUndo.classList.toggle('text-blue-600', historyIndex > 0);
       btnRedo.classList.toggle('text-blue-600', historyIndex < history.length - 1);
     }
@@ -874,71 +1089,41 @@
         editorContainer.classList.add('hidden');
       }
 
-      // 共用按鈕重置
       btnModeSmart.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors text-gray-500";
       btnModeAi.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors text-gray-500";
       btnModeManual.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors text-gray-500";
-      
       smartControls.classList.add('hidden');
       aiControls.classList.add('hidden');
       manualControls.classList.add('hidden');
-      
-      // 依模式更新
+
       if (appMode === 'smart') {
         btnModeSmart.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors bg-white text-blue-600 shadow";
         smartControls.classList.remove('hidden');
-        
-        mainCanvas.classList.remove('cursor-none');
-        mainCanvas.classList.add('cursor-crosshair');
-        mainCanvas.classList.remove('touch-none');
-        
+        mainCanvas.classList.remove('cursor-none'); mainCanvas.classList.add('cursor-crosshair'); mainCanvas.classList.remove('touch-none');
         hintIcon.setAttribute('data-lucide', 'mouse-pointer-2');
         hintText.innerText = activeClick ? '繼續點擊圖片中想去除的背景' : '請點擊圖片選擇要去背的背景顏色';
-        
-        if (smartFillMode === 'contiguous') {
-          btnFillContiguous.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-blue-400 bg-blue-50 text-blue-600";
-          btnFillGlobal.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-transparent bg-gray-100 text-gray-500";
-        } else {
-          btnFillContiguous.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-transparent bg-gray-100 text-gray-500";
-          btnFillGlobal.className = "flex-1 py-2 rounded-xl border-2 font-bold transition-all border-blue-400 bg-blue-50 text-blue-600";
-        }
+        btnFillContiguous.className = `flex-1 py-2 rounded-xl border-2 font-bold transition-all ${smartFillMode === 'contiguous' ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-transparent bg-gray-100 text-gray-500'}`;
+        btnFillGlobal.className = `flex-1 py-2 rounded-xl border-2 font-bold transition-all ${smartFillMode === 'global' ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-transparent bg-gray-100 text-gray-500'}`;
 
       } else if (appMode === 'ai') {
         btnModeAi.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors bg-white text-purple-600 shadow";
         aiControls.classList.remove('hidden');
-        
-        mainCanvas.classList.remove('cursor-none', 'cursor-crosshair');
-        mainCanvas.classList.remove('touch-none');
-        
+        mainCanvas.classList.remove('cursor-none', 'cursor-crosshair', 'touch-none');
         hintIcon.setAttribute('data-lucide', 'sparkles');
         hintText.innerText = '選擇下方 AI 引擎並開始辨識';
 
       } else {
-        // Manual mode
         btnModeManual.className = "flex-1 flex justify-center items-center gap-1 py-2 rounded-lg text-sm md:text-base font-bold transition-colors bg-white text-red-600 shadow";
         manualControls.classList.remove('hidden');
-        
-        mainCanvas.classList.add('cursor-none');
-        mainCanvas.classList.remove('cursor-crosshair');
-        mainCanvas.classList.add('touch-none');
-        
+        mainCanvas.classList.add('cursor-none', 'touch-none'); mainCanvas.classList.remove('cursor-crosshair');
         hintIcon.setAttribute('data-lucide', 'brush');
         hintText.innerText = '使用筆刷塗抹來去除或還原';
+        btnBrushErase.className = `flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all ${brushMode === 'erase' ? 'border-red-400 bg-red-50 text-red-600' : 'border-transparent bg-gray-100 text-gray-500'}`;
+        btnBrushRestore.className = `flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all ${brushMode === 'restore' ? 'border-green-400 bg-green-50 text-green-600' : 'border-transparent bg-gray-100 text-gray-500'}`;
+      }
 
-        if (brushMode === 'erase') {
-          btnBrushErase.className = "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-red-400 bg-red-50 text-red-600";
-          btnBrushRestore.className = "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-transparent bg-gray-100 text-gray-500";
-        } else {
-          btnBrushErase.className = "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-transparent bg-gray-100 text-gray-500";
-          btnBrushRestore.className = "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl border-2 transition-all border-green-400 bg-green-50 text-green-600";
-        }
-      }
-      
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     }
-
   </script>
 </body>
 </html>
