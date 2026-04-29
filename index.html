@@ -332,7 +332,7 @@
                 <i class="fa-solid fa-wand-magic-sparkles"></i>
                 <div>
                     <h1>簡單的圖片工具</h1>
-                    <p>裁切・去背・網格對齊・標註變形</p>
+                    <p>裁切・去背・網格對齊・單格獨立圓角</p>
                 </div>
             </div>
             <div class="header-actions">
@@ -556,7 +556,7 @@
                     
                     <div class="export-info mb-2">
                         <div>輸出總尺寸：<b id="stat-size">370 × 320 px</b></div>
-                        <div>防殘留邊界：<b>內縮 1 px</b></div>
+                        <div>防殘留邊界：<b>內縮 1 px (圓角獨立)</b></div>
                     </div>
                     <button id="btn-export" class="btn btn-primary w-100" style="transition: background-color 0.3s;" disabled>
                         <i class="fa-solid fa-download"></i> 下載圖片
@@ -634,9 +634,9 @@
                         <b>調整選區</b>：切換模式後拖曳邊框，圖片不動。<br><br>
                         <b>標註與磁吸</b>：拖曳藍點移動位置。開啟「磁吸」時，會自動吸附網格與中心點，角度以 15 度為單位。<br>
                         <b>立體與變形</b>：文字可獨立調整傾斜角度，支援動態陰影效果。<br>
-                        <b>去背/填色</b>：切換模式。魔術棒可點擊透明處填色，新增「畫筆工具」可自由塗抹 (支援快捷鍵 <kbd>[</kbd> <kbd>]</kbd> 調整筆刷)。<br>
-                        <b>分割匯出</b>：選擇九宮格或16宮格，可自動依比例放大裁切並打包 ZIP 下載。<br>
-                        <b>全域復原</b>：<kbd>Ctrl+Z</kbd> / <b>全域重做</b>：<kbd>Ctrl+Y</kbd> (支援所有圖形、裁切、文字操作！)
+                        <b>去背/填色</b>：切換模式。魔術棒可點擊透明處填色，新增「畫筆工具」可自由塗抹。<br>
+                        <b>分割匯出</b>：選擇九宮格或16宮格，單張完美獨立圓角且邊緣向內微縮防漏光！<br>
+                        <b>全域復原</b>：<kbd>Ctrl+Z</kbd> / <b>全域重做</b>：<kbd>Ctrl+Y</kbd>
                     </div>
                 </div>
             </aside>
@@ -819,6 +819,7 @@
         loadSettings();
         
         DOM.exportSlice.addEventListener('change', () => { saveSettings(); updateStatSize(); updatePreview(); rebuildAnnoOverlay(); });
+        DOM.exportFormat.addEventListener('change', () => { saveSettings(); updatePreview(); });
 
         /* ══ 歷史紀錄全域封裝引擎 (Undo / Redo) ══ */
         function saveState() {
@@ -1015,7 +1016,7 @@
                 viewMode: 0, dragMode: isMoveMode ? 'move' : 'crop',
                 aspectRatio: isCustomSize ? NaN : (targetWidth / targetHeight),
                 autoCropArea: 0.9, background: false, movable: isMoveMode, zoomable: true,
-                guides: false, // 關閉原生 3x3 虛線，交給我們的紅線與自訂網格
+                guides: false, // 關閉原生 3x3 虛線，交給我們的自訂網格
                 cropBoxMovable: !isMoveMode, cropBoxResizable: !isMoveMode, restore: false,
                 
                 cropstart: (e) => {
@@ -1519,7 +1520,7 @@
                 DOM.annoOverlay.appendChild(gridDiv);
             }
 
-            // 新增：主編輯區即時顯示九宮格/16宮格切割輔助線
+            // 主編輯區即時顯示九宮格/16宮格切割輔助線
             const sliceMode = DOM.exportSlice.value;
             if (sliceMode !== 'none') {
                 const tl = toWrapperPx(0, 0); const br = toWrapperPx(targetWidth, targetHeight);
@@ -1608,51 +1609,100 @@
             DOM.previewContainer.appendChild(imgWrapper);
         }
 
+        // 核心渲染引擎：支援單張獨立圓角、內縮邊界，並確保標註完美切斷
         function getFinalCanvas(exportScale = 1) {
             if (!cropper) return null;
             const cropData = cropper.getData(true);
             if (!cropData || cropData.width <= 0 || cropData.height <= 0) return null;
             
-            const finalWidth = targetWidth * exportScale; const finalHeight = targetHeight * exportScale;
-            const final = document.createElement('canvas'); final.width = finalWidth; final.height = finalHeight;
+            const sliceMode = DOM.exportSlice.value;
+            let splits = 1;
+            if (sliceMode === '3x3') splits = 3;
+            else if (sliceMode === '4x4') splits = 4;
+
+            const finalWidth = targetWidth * exportScale;
+            const finalHeight = targetHeight * exportScale;
+            const final = document.createElement('canvas');
+            final.width = finalWidth;
+            final.height = finalHeight;
             const ctx = final.getContext('2d');
             
             const format = DOM.exportFormat.value;
-            if (format === 'image/jpeg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, final.width, final.height); }
+            if (format === 'image/jpeg') {
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, final.width, final.height);
+            }
 
             ctx.scale(exportScale, exportScale);
             
             const radiusPercent = parseInt(DOM.borderRadius.value) || 0;
-            ctx.save(); 
-            if (radiusPercent > 0) {
-                const maxRadius = Math.min(targetWidth, targetHeight) / 2; const radiusPx = (radiusPercent / 50) * maxRadius;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(0, 0, targetWidth, targetHeight, radiusPx);
-                else {
-                    ctx.moveTo(radiusPx, 0); ctx.lineTo(targetWidth - radiusPx, 0); ctx.quadraticCurveTo(targetWidth, 0, targetWidth, radiusPx);
-                    ctx.lineTo(targetWidth, targetHeight - radiusPx); ctx.quadraticCurveTo(targetWidth, targetHeight, targetWidth - radiusPx, targetHeight);
-                    ctx.lineTo(radiusPx, targetHeight); ctx.quadraticCurveTo(0, targetHeight, 0, targetHeight - radiusPx);
-                    ctx.lineTo(0, radiusPx); ctx.quadraticCurveTo(0, 0, radiusPx, 0);
+            // 如果是分割模式，預設上下左右往內縮 1 像素 (以 final 輸出的解析度為準)
+            const inset = splits > 1 ? (1 / exportScale) : 0;
+            
+            ctx.save();
+            ctx.beginPath();
+            
+            const pieceW = targetWidth / splits;
+            const pieceH = targetHeight / splits;
+            const maxRadius = Math.min(pieceW, pieceH) / 2;
+            const radiusPx = (radiusPercent / 50) * maxRadius;
+
+            // 為每一小格繪製獨立的裁切路徑 (支援圓角與內縮)
+            for (let r = 0; r < splits; r++) {
+                for (let c = 0; c < splits; c++) {
+                    const px = c * pieceW + inset;
+                    const py = r * pieceH + inset;
+                    const pw = pieceW - inset * 2;
+                    const ph = pieceH - inset * 2;
+
+                    if (pw > 0 && ph > 0) {
+                        if (radiusPx > 0) {
+                            if (ctx.roundRect) {
+                                ctx.roundRect(px, py, pw, ph, radiusPx);
+                            } else {
+                                ctx.moveTo(px + radiusPx, py);
+                                ctx.lineTo(px + pw - radiusPx, py);
+                                ctx.quadraticCurveTo(px + pw, py, px + pw, py + radiusPx);
+                                ctx.lineTo(px + pw, py + ph - radiusPx);
+                                ctx.quadraticCurveTo(px + pw, py + ph, px + pw - radiusPx, py + ph);
+                                ctx.lineTo(px + radiusPx, py + ph);
+                                ctx.quadraticCurveTo(px, py + ph, px, py + ph - radiusPx);
+                                ctx.lineTo(px, py + radiusPx);
+                                ctx.quadraticCurveTo(px, py, px + radiusPx, py);
+                            }
+                        } else {
+                            ctx.rect(px, py, pw, ph);
+                        }
+                    }
                 }
-                ctx.closePath(); ctx.clip(); 
             }
+            ctx.closePath();
+            ctx.clip(); 
             
-            ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+            // 繪製原圖
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(wandCanvas, cropData.x, cropData.y, cropData.width, cropData.height, 0, 0, targetWidth, targetHeight);
-            ctx.restore(); 
             
+            // 繪製標註 (在裁切範圍內繪製，確保跨界的標註被乾淨切斷)
             annotations.forEach(anno => {
                 ctx.save();
                 if (anno.hasShadow !== false) {
                     const scale = Math.max(targetWidth, targetHeight) / 500;
-                    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'; ctx.shadowBlur = 8 * scale * exportScale;
-                    ctx.shadowOffsetX = 2 * scale * exportScale; ctx.shadowOffsetY = 2 * scale * exportScale;
-                } else { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; }
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+                    ctx.shadowBlur = 8 * scale * exportScale;
+                    ctx.shadowOffsetX = 2 * scale * exportScale;
+                    ctx.shadowOffsetY = 2 * scale * exportScale;
+                } else {
+                    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+                }
 
-                ctx.translate(anno.x, anno.y); ctx.rotate(anno.angle * Math.PI / 180);
+                ctx.translate(anno.x, anno.y);
+                ctx.rotate(anno.angle * Math.PI / 180);
                 
                 if (anno.type === 'text' && (anno.skewX !== 0 || anno.skewY !== 0)) {
-                    const skewXRad = (anno.skewX || 0) * Math.PI / 180; const skewYRad = (anno.skewY || 0) * Math.PI / 180;
+                    const skewXRad = (anno.skewX || 0) * Math.PI / 180;
+                    const skewYRad = (anno.skewY || 0) * Math.PI / 180;
                     ctx.transform(1, Math.tan(skewYRad), Math.tan(skewXRad), 1, 0, 0);
                 }
                 
@@ -1668,6 +1718,8 @@
                 }
                 ctx.restore();
             });
+            ctx.restore();
+            
             return final;
         }
 
@@ -1706,11 +1758,11 @@
                                 pCtx.fillRect(0, 0, w, h);
                             }
                             
-                            const inset = 1;
+                            // 直接從已完美裁切與內縮的大畫布中，取出對應的區塊
                             pCtx.drawImage(
                                 canvas, 
-                                c * pieceW + inset, r * pieceH + inset, w - inset * 2, h - inset * 2, 
-                                inset, inset, w - inset * 2, h - inset * 2
+                                c * pieceW, r * pieceH, w, h, 
+                                0, 0, w, h
                             );
                             
                             const promise = new Promise((resolve) => {
