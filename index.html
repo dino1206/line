@@ -65,30 +65,45 @@
         .workspace { display: flex; gap: 16px; flex-grow: 1; min-height: 0; }
         
         .sidebar {
-            width: 340px; background: var(--surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            width: 320px; background: var(--surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--surface-border); border-radius: var(--border-radius);
-            display: flex; flex-direction: column; gap: 20px; padding: 20px; box-shadow: var(--shadow);
+            display: flex; flex-direction: column; padding: 16px; box-shadow: var(--shadow);
             flex-shrink: 0; overflow-y: auto; position: relative;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .sticky-section {
-            position: sticky;
-            top: -20px; 
-            z-index: 100;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            margin: -20px -20px 0 -20px;
-            padding: 20px 20px 16px 20px;
-            border-bottom: 1px solid rgba(0,0,0,0.08);
-            box-shadow: 0 6px 16px -8px rgba(0,0,0,0.1);
-            border-top-left-radius: var(--border-radius);
-            border-top-right-radius: var(--border-radius);
-            display: flex; flex-direction: column; gap: 12px;
-        }
+        .sidebar.collapsed { width: 0 !important; padding: 0 !important; margin: 0 !important; opacity: 0; border: none; overflow: hidden; }
 
-        .section { display: flex; flex-direction: column; gap: 12px; }
-        .section h3 { font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 8px; margin-bottom: 4px; color: var(--primary); }
+        /* 可收納面板樣式 (Accordion) */
+        details.section {
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid var(--surface-border);
+            border-radius: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+            overflow: hidden;
+        }
+        details.section summary {
+            list-style: none; padding: 12px; cursor: pointer;
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(255, 255, 255, 0.8); color: var(--primary); font-size: 0.95rem; user-select: none;
+        }
+        details.section summary::-webkit-details-marker { display: none; }
+        details.section summary h3 { margin: 0; padding: 0; font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--primary); }
+        details.section summary i.fa-chevron-down { transition: transform 0.3s ease; color: var(--text-muted); font-size: 0.8rem; }
+        details.section[open] summary i.fa-chevron-down { transform: rotate(180deg); }
+        .section-content { padding: 12px; border-top: 1px solid rgba(0,0,0,0.05); }
+
+        /* 圖層清單樣式 */
+        .layer-list-container { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow-y: auto; margin-top: 8px;}
+        .layer-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 10px; background: white; border: 1px solid #d2d2d7; border-radius: 8px;
+            cursor: pointer; font-size: 0.85rem; transition: all 0.2s;
+        }
+        .layer-item.active { border-color: var(--primary); background: rgba(0,122,255,0.08); font-weight: 600; box-shadow: 0 0 0 2px rgba(0,122,255,0.1); }
+        .layer-item .layer-vis, .layer-item .layer-del { opacity: 0.6; transition: opacity 0.2s; }
+        .layer-item .layer-vis:hover, .layer-item .layer-del:hover { opacity: 1; }
 
         .btn {
             padding: 10px 14px; border-radius: 10px; border: none; font-family: inherit; font-size: 0.9rem; font-weight: 500;
@@ -105,12 +120,11 @@
         .w-100 { width: 100%; }
         .mb-2 { margin-bottom: 8px; }
         .mt-2 { margin-top: 8px; }
-        .mt-auto { margin-top: auto; }
 
         .editor-area {
             flex-grow: 1; background: #e5e5ea; border-radius: var(--border-radius);
             display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
-            border: 1px solid rgba(0,0,0,0.1); min-height: 400px;
+            border: 1px solid rgba(0,0,0,0.1); min-height: 400px; transition: width 0.3s ease;
         }
 
         .upload-box { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: background 0.3s ease; }
@@ -133,21 +147,14 @@
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100;
             box-shadow: 0 8px 30px rgba(0,0,0,0.12);
         }
-        .tool-panel .mode-label {
-            font-size: 0.75rem; color: var(--text-muted); padding: 0 6px;
-            border-right: 1px solid #d2d2d7; margin-right: 4px;
-        }
-
+        .tool-panel .mode-label { font-size: 0.75rem; color: var(--text-muted); padding: 0 6px; border-right: 1px solid #d2d2d7; margin-right: 4px; }
         .mode-badge {
             position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.6); color: white;
-            font-size: 0.75rem; padding: 4px 12px; border-radius: 20px;
+            background: rgba(0,0,0,0.6); color: white; font-size: 0.75rem; padding: 4px 12px; border-radius: 20px;
             z-index: 101; pointer-events: none; white-space: nowrap;
         }
 
-        .control-box {
-            background: #f9f9fb; padding: 12px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05);
-        }
+        .control-box { background: #f9f9fb; padding: 12px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05); }
 
         .form-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; margin-bottom: 8px; }
         .form-row:last-child { margin-bottom: 0; }
@@ -172,26 +179,13 @@
         .preview-container img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
 
         .color-picker { width: 30px; height: 30px; border: none; padding: 0; background: none; cursor: pointer; border-radius: 6px; overflow: hidden; flex-shrink: 0; }
-
         input[type="range"] { -webkit-appearance: none; height: 4px; background: #d2d2d7; border-radius: 2px; cursor: pointer; flex: 1; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: white; border: 1.5px solid var(--primary); border-radius: 50%; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
-
-        input[type="number"] {
-            width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px solid #d2d2d7;
-            font-size: 0.85rem; font-family: inherit; text-align: center;
-        }
+        input[type="number"] { width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px solid #d2d2d7; font-size: 0.85rem; font-family: inherit; text-align: center; }
         input[type="number"]:focus { outline: none; border-color: var(--primary); }
-        
-        select.form-select {
-            appearance: auto;
-            text-align: left;
-            padding-left: 12px;
-            font-weight: 500;
-        }
+        select.form-select { appearance: auto; text-align: left; padding-left: 12px; font-weight: 500; }
 
-        .d-flex { display: flex; }
-        .gap-2 { gap: 8px; }
-        .align-center { align-items: center; }
+        .d-flex { display: flex; } .gap-2 { gap: 8px; } .align-center { align-items: center; }
 
         .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .preset-item { 
@@ -208,10 +202,7 @@
         .export-info div:last-child { margin-bottom: 0; }
         .export-info b { color: var(--text-main); }
 
-        .custom-size-box {
-            background: rgba(0,122,255,0.05); border: 1px dashed var(--primary);
-            border-radius: 10px; padding: 10px; margin-top: 4px;
-        }
+        .custom-size-box { background: rgba(0,122,255,0.05); border: 1px dashed var(--primary); border-radius: 10px; padding: 10px; margin-top: 4px; }
         .custom-size-box label { font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 6px; text-align: center; }
         .custom-size-row { display: flex; align-items: center; gap: 8px; }
         .custom-size-row span { font-size: 0.85rem; color: var(--text-muted); flex-shrink: 0; }
@@ -222,105 +213,41 @@
             display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 0.82rem; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .annotation-item:hover { border-color: var(--primary); }
-        .annotation-item.active { 
-            border-color: var(--primary); 
-            background: rgba(0,122,255,0.07); 
-            font-weight: 600;
-            box-shadow: 0 0 0 3px rgba(0,122,255,0.1);
-        }
+        .annotation-item.active { border-color: var(--primary); background: rgba(0,122,255,0.07); font-weight: 600; box-shadow: 0 0 0 3px rgba(0,122,255,0.1); }
         .annotation-item .delete-btn { color: #FF3B30; cursor: pointer; padding: 4px 6px; border-radius: 4px; }
         .annotation-item .delete-btn:hover { background: rgba(255,59,48,0.1); }
 
         .anno-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; pointer-events: none; }
         .anno-handle {
-            position: absolute; width: 26px; height: 26px;
-            background: rgba(0,122,255,0.85); border: 2.5px solid white;
-            border-radius: 50%; transform: translate(-50%, -50%);
-            cursor: grab; pointer-events: all;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.35);
-            transition: background 0.15s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-            user-select: none;
+            position: absolute; width: 26px; height: 26px; background: rgba(0,122,255,0.85); border: 2.5px solid white;
+            border-radius: 50%; transform: translate(-50%, -50%); cursor: grab; pointer-events: all;
+            display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+            transition: background 0.15s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); user-select: none;
         }
         .anno-handle:hover { background: var(--primary-hover); transform: translate(-50%, -50%) scale(1.1); }
-        .anno-handle.selected { 
-            background: #FF3B30; 
-            transform: translate(-50%, -50%) scale(1.2); 
-            box-shadow: 0 4px 12px rgba(255,59,48,0.4);
-        }
+        .anno-handle.selected { background: #FF3B30; transform: translate(-50%, -50%) scale(1.2); box-shadow: 0 4px 12px rgba(255,59,48,0.4); }
 
         .angle-wheel { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
-        .angle-display {
-            background: var(--primary); color: white; border-radius: 6px;
-            padding: 2px 8px; font-size: 0.78rem; font-weight: 600; min-width: 44px; text-align: center; flex-shrink: 0;
-        }
+        .angle-display { background: var(--primary); color: white; border-radius: 6px; padding: 2px 8px; font-size: 0.78rem; font-weight: 600; min-width: 44px; text-align: center; flex-shrink: 0; }
         .section-divider { height: 1px; background: rgba(0,0,0,0.06); margin: 6px 0; }
+        .switching-overlay { position: absolute; inset: 0; background: rgba(229,229,234,0.6); z-index: 200; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: var(--text-muted); border-radius: var(--border-radius); }
 
-        .switching-overlay {
-            position: absolute; inset: 0; background: rgba(229,229,234,0.6);
-            z-index: 200; display: flex; align-items: center; justify-content: center;
-            font-size: 0.85rem; color: var(--text-muted); border-radius: var(--border-radius);
-        }
-
-        #eraser-overlay {
-            position: absolute; inset: 0; z-index: 60; 
-            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20" stroke="white" stroke-width="3" stroke-linecap="round"/><path d="M12 2v20M2 12h20" stroke="%23FF3B30" stroke-width="1" stroke-linecap="round"/><circle cx="12" cy="12" r="1.5" fill="%23FF3B30"/></svg>') 12 12, crosshair;
-        }
-        
-        #shape-preview {
-            position: absolute;
-            border: 2px dashed #FF3B30;
-            background: rgba(255, 59, 48, 0.1);
-            z-index: 61; 
-            pointer-events: none;
-            box-sizing: border-box;
-        }
+        #eraser-overlay { position: absolute; inset: 0; z-index: 60; cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20" stroke="white" stroke-width="3" stroke-linecap="round"/><path d="M12 2v20M2 12h20" stroke="%23FF3B30" stroke-width="1" stroke-linecap="round"/><circle cx="12" cy="12" r="1.5" fill="%23FF3B30"/></svg>') 12 12, crosshair; }
+        #shape-preview { position: absolute; border: 2px dashed #FF3B30; background: rgba(255, 59, 48, 0.1); z-index: 61; pointer-events: none; box-sizing: border-box; }
         #shape-preview.circle { border-radius: 50%; }
-
-        #brush-cursor {
-            position: absolute;
-            border: 1px solid rgba(0,0,0,0.8);
-            border-radius: 50%;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            z-index: 62;
-            box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
-            box-sizing: border-box;
-            background: rgba(255,255,255,0.2);
-        }
+        #brush-cursor { position: absolute; border: 1px solid rgba(0,0,0,0.8); border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); z-index: 62; box-shadow: 0 0 0 1px rgba(255,255,255,0.8); box-sizing: border-box; background: rgba(255,255,255,0.2); }
         
         .eyedropper-cursor { cursor: crosshair !important; }
         .brush-cursor-mode { cursor: none !important; }
 
         .sponsor-btn {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            color: var(--text-main);
-            padding: 10px 18px;
-            border-radius: 30px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.85rem;
-            z-index: 200;
-            transition: all 0.3s ease;
-            border: 1px solid rgba(0,0,0,0.05);
+            position: absolute; bottom: 20px; right: 20px; background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: var(--text-main);
+            padding: 10px 18px; border-radius: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); display: flex;
+            align-items: center; gap: 8px; text-decoration: none; font-weight: 600; font-size: 0.85rem; z-index: 200;
+            transition: all 0.3s ease; border: 1px solid rgba(0,0,0,0.05);
         }
-        .sponsor-btn:hover {
-            background: white;
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
-            color: var(--primary);
-            border-color: var(--primary);
-        }
-
+        .sponsor-btn:hover { background: white; transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); color: var(--primary); border-color: var(--primary); }
     </style>
 </head>
 <body>
@@ -332,238 +259,142 @@
                 <i class="fa-solid fa-wand-magic-sparkles"></i>
                 <div>
                     <h1>簡單的圖片工具</h1>
-                    <p>裁切・去背・網格對齊・單格獨立圓角</p>
+                    <p>多圖層・去背・裁切・收納介面</p>
                 </div>
             </div>
             <div class="header-actions">
-                <button id="btn-undo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Z 或 Cmd+Z"><i class="fa-solid fa-rotate-left"></i> 上一步</button>
-                <button id="btn-redo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Y 或 Cmd+Y"><i class="fa-solid fa-rotate-right"></i> 下一步</button>
-                <button id="btn-capture-header" class="btn btn-outline btn-sm" style="display:none"><i class="fa-solid fa-desktop"></i> 截取螢幕</button>
+                <button id="btn-toggle-left" class="btn btn-outline btn-sm" title="隱藏/顯示左欄，最大化編輯區"><i class="fa-solid fa-left-right"></i> 左欄</button>
+                <button id="btn-undo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Z"><i class="fa-solid fa-rotate-left"></i> 上一步</button>
+                <button id="btn-redo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Y"><i class="fa-solid fa-rotate-right"></i> 下一步</button>
+                <button id="btn-capture-header" class="btn btn-outline btn-sm" style="display:none"><i class="fa-solid fa-desktop"></i> 截圖</button>
                 <button id="btn-new" class="btn btn-primary btn-sm" style="display:none"><i class="fa-solid fa-plus"></i> 新圖片</button>
+                <button id="btn-toggle-right" class="btn btn-outline btn-sm" title="隱藏/顯示右欄，最大化編輯區">右欄 <i class="fa-solid fa-left-right"></i></button>
             </div>
         </header>
 
         <main class="workspace">
-            <aside class="sidebar">
+            <!-- 左側工具列 (編輯類) -->
+            <aside class="sidebar" id="sidebar-left">
                 
                 <!-- 1. 智慧去背/填色 -->
-                <div class="sticky-section">
-                    <h3><i class="fa-solid fa-fill-drip"></i> 1. 智慧去背 / 填色</h3>
-                    <button id="btn-wand-toggle" class="btn btn-outline w-100" disabled>
-                        <i class="fa-solid fa-hand-pointer"></i> 啟動選區處理工具
-                    </button>
-                    
-                    <div id="wand-settings" class="control-box hidden mt-2">
-                        <div class="d-flex gap-2 mb-2">
-                            <button id="btn-action-erase" class="btn btn-primary btn-sm w-100"><i class="fa-solid fa-eraser"></i> 去背</button>
-                            <button id="btn-action-fill" class="btn btn-outline btn-sm w-100"><i class="fa-solid fa-fill"></i> 填色</button>
-                        </div>
-                        
-                        <div id="fill-color-row" class="form-row hidden mb-2 pb-2" style="border-bottom: 1px solid rgba(0,0,0,0.06);">
-                            <label>填色顏色</label>
-                            <div class="d-flex gap-2 align-center">
-                                <button id="btn-eyedropper" class="btn btn-outline btn-sm" title="滴管取色"><i class="fa-solid fa-eye-dropper"></i></button>
-                                <input type="color" id="fill-color" class="color-picker" value="#FF3B30">
-                            </div>
-                        </div>
-
-                        <div class="preset-grid mb-2">
-                            <button id="btn-erase-wand" class="btn btn-outline btn-sm w-100" title="點擊相近顏色"><i class="fa-solid fa-wand-magic"></i> 魔術棒</button>
-                            <button id="btn-erase-brush" class="btn btn-outline btn-sm w-100" title="自由塗抹"><i class="fa-solid fa-paint-brush"></i> 畫筆</button>
-                            <button id="btn-erase-rect" class="btn btn-outline btn-sm w-100" title="拉方框"><i class="fa-solid fa-vector-square"></i> 方框</button>
-                            <button id="btn-erase-circle" class="btn btn-outline btn-sm w-100" title="拉圓形"><i class="fa-regular fa-circle"></i> 圓形</button>
-                        </div>
-                        
-                        <div class="form-row wand-only">
-                            <label>容差：<span id="tol-val">20</span></label>
-                            <input type="range" id="tolerance" min="0" max="150" value="20">
-                        </div>
-                        <div class="form-row align-center wand-only">
-                            <label>只限相鄰區域</label>
-                            <label class="switch">
-                                <input type="checkbox" id="contiguous" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        
-                        <div class="form-row brush-only" style="display:none;">
-                            <label>筆刷粗細：<span id="brush-size-val">20</span>px</label>
-                            <input type="range" id="brush-size" min="1" max="150" value="20">
-                        </div>
-
-                        <div class="form-row align-center">
-                            <label>限裁切範圍內</label>
-                            <label class="switch">
-                                <input type="checkbox" id="limit-to-crop" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 2. 畫布規格 -->
-                <div class="section">
-                    <h3><i class="fa-solid fa-crop-simple"></i> 2. 畫布規格</h3>
-                    <div class="preset-grid">
-                        <div class="preset-item active" data-w="370" data-h="320">LINE 貼圖<br><span class="size-label">370 × 320</span></div>
-                        <div class="preset-item" data-w="240" data-h="240">LINE 主要<br><span class="size-label">240 × 240</span></div>
-                        <div class="preset-item" data-w="180" data-h="180">表情貼<br><span class="size-label">180 × 180</span></div>
-                        <div class="preset-item" data-w="96" data-h="74">LINE 標籤<br><span class="size-label">96 × 74</span></div>
-                        <div class="preset-item" data-w="1920" data-h="1080">16:9 橫式<br><span class="size-label">1920 × 1080</span></div>
-                        <div class="preset-item" data-w="custom">✏️ 自訂尺寸<br><span class="size-label">自由比例</span></div>
-                    </div>
-                    
-                    <div id="custom-size-box" class="custom-size-box hidden">
-                        <label>直接輸入像素尺寸 或 自由拖曳</label>
-                        <div class="custom-size-row">
-                            <input type="number" id="custom-w" placeholder="寬 px" value="370" min="1" max="9999">
-                            <span>×</span>
-                            <input type="number" id="custom-h" placeholder="高 px" value="320" min="1" max="9999">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 3. 圖片圓角 -->
-                <div class="section">
-                    <h3><i class="fa-solid fa-vector-square"></i> 3. 圖片圓角</h3>
-                    <div class="control-box">
-                        <div class="form-row">
-                            <label>圓角比例：<span id="radius-val">0</span>%</label>
-                            <input type="range" id="border-radius" min="0" max="50" value="0">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4. 網格與對齊 -->
-                <div class="section">
-                    <h3><i class="fa-solid fa-magnet"></i> 4. 網格與對齊</h3>
-                    <div class="control-box">
-                        <div class="form-row align-center mb-2">
-                            <label>顯示參考網格與十字線</label>
-                            <label class="switch">
-                                <input type="checkbox" id="show-grid" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div class="form-row align-center mb-2">
-                            <label>啟用磁吸 (位置與角度)</label>
-                            <label class="switch">
-                                <input type="checkbox" id="snap-grid" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div class="form-row mt-2">
-                            <label>網格間距：<span id="grid-size-val">20</span>px</label>
-                            <input type="range" id="grid-size" min="10" max="100" step="10" value="20">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 5. 圖形標註 -->
-                <div class="section">
-                    <h3><i class="fa-solid fa-pen-nib"></i> 5. 圖形標註</h3>
-                    <div class="d-flex gap-2 mb-2">
-                        <button id="btn-add-arrow" class="btn btn-outline btn-sm w-100"><i class="fa-solid fa-arrow-left"></i> 新增箭頭</button>
-                        <button id="btn-add-text" class="btn btn-outline btn-sm w-100"><i class="fa-solid fa-font"></i> 新增文字</button>
-                    </div>
-                    <div id="annotation-list" class="annotation-list"></div>
-                    <div id="anno-settings" class="control-box hidden">
-                        <div id="arrow-props">
-                            <div class="form-row">
-                                <label>顏色</label>
-                                <input type="color" id="arrow-color" class="color-picker" value="#FF3B30">
-                            </div>
-                            <div class="form-row">
-                                <label>大小：<span id="arrow-size-val">100</span>%</label>
-                                <input type="range" id="arrow-size" min="10" max="500" value="100" style="width:90px;flex:none">
-                            </div>
-                        </div>
-                        <div id="text-props" class="hidden">
-                            <input type="text" id="text-content" class="btn btn-outline w-100 mb-2 btn-sm" placeholder="輸入文字..." value="標註文字">
-                            <div class="form-row">
-                                <label>字型</label>
-                                <select id="text-font" class="btn btn-outline btn-sm form-select" style="padding:2px 8px; flex:1; max-width: 140px; text-overflow: ellipsis;">
-                                    <option value="'Noto Sans TC', 'Inter', sans-serif">預設 (黑體)</option>
-                                    <option value="'Microsoft JhengHei', '微軟正黑體', sans-serif">微軟正黑體 (Windows)</option>
-                                    <option value="'PingFang TC', '蘋方-繁', sans-serif">蘋方體 (Mac)</option>
-                                    <option value="'BiauKai', 'DFKai-SB', '標楷體', serif">標楷體</option>
-                                    <option value="'PMingLiU', '新細明體', serif">新細明體</option>
-                                    <option value="Arial, sans-serif">Arial</option>
-                                    <option value="'Times New Roman', serif">Times New Roman</option>
-                                </select>
-                            </div>
-                            <div class="form-row">
-                                <label>大小：<span id="font-size-val">30</span>px</label>
-                                <input type="range" id="font-size" min="10" max="200" value="30" style="width:90px;flex:none">
-                            </div>
-                            <div class="form-row">
-                                <label>水平斜角：<span id="text-skew-x-val">0</span>°</label>
-                                <input type="range" id="text-skew-x" min="-60" max="60" value="0" style="width:90px;flex:none">
-                            </div>
-                            <div class="form-row">
-                                <label>垂直斜角：<span id="text-skew-y-val">0</span>°</label>
-                                <input type="range" id="text-skew-y" min="-60" max="60" value="0" style="width:90px;flex:none">
-                            </div>
-                            <div class="form-row">
-                                <label>顏色</label>
-                                <input type="color" id="text-color" class="color-picker" value="#000000">
-                            </div>
-                        </div>
-                        
-                        <div class="section-divider"></div>
-                        
-                        <div class="form-row align-center mt-2 mb-2">
-                            <label>顯示立體陰影</label>
-                            <label class="switch">
-                                <input type="checkbox" id="anno-shadow" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        
-                        <div class="form-row" style="margin-top:8px"><label>整體旋轉</label></div>
-                        <div class="angle-wheel">
-                            <input type="range" id="anno-angle" min="0" max="360" value="0" step="15">
-                            <div class="angle-display"><span id="anno-angle-val">0</span>°</div>
-                        </div>
-                        <button id="btn-delete-anno" class="btn btn-outline btn-sm w-100" style="margin-top:10px;color:#FF3B30;border-color:#FF3B30">
-                            <i class="fa-solid fa-trash"></i> 刪除此標註
+                <details class="section" open>
+                    <summary>
+                        <h3><i class="fa-solid fa-fill-drip"></i> 1. 智慧去背 / 填色</h3>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </summary>
+                    <div class="section-content">
+                        <button id="btn-wand-toggle" class="btn btn-outline w-100" disabled>
+                            <i class="fa-solid fa-hand-pointer"></i> 啟動選區處理工具
                         </button>
-                    </div>
-                </div>
+                        
+                        <div id="wand-settings" class="control-box hidden mt-2">
+                            <div class="d-flex gap-2 mb-2">
+                                <button id="btn-action-erase" class="btn btn-primary btn-sm w-100"><i class="fa-solid fa-eraser"></i> 去背</button>
+                                <button id="btn-action-fill" class="btn btn-outline btn-sm w-100"><i class="fa-solid fa-fill"></i> 填色</button>
+                            </div>
+                            
+                            <div id="fill-color-row" class="form-row hidden mb-2 pb-2" style="border-bottom: 1px solid rgba(0,0,0,0.06);">
+                                <label>填色顏色</label>
+                                <div class="d-flex gap-2 align-center">
+                                    <button id="btn-eyedropper" class="btn btn-outline btn-sm" title="滴管取色"><i class="fa-solid fa-eye-dropper"></i></button>
+                                    <input type="color" id="fill-color" class="color-picker" value="#FF3B30">
+                                </div>
+                            </div>
 
-                <!-- 6. 完成匯出 -->
-                <div class="section mt-auto">
-                    <h3><i class="fa-solid fa-cloud-arrow-down"></i> 6. 完成匯出</h3>
-                    
-                    <div class="form-row mb-2 mt-2">
-                        <label>存檔格式</label>
-                        <select id="export-format" class="btn btn-outline btn-sm form-select" style="padding:2px 8px; width:140px;">
-                            <option value="image/png">PNG (保留透明底)</option>
-                            <option value="image/jpeg">JPEG (無透明底)</option>
-                            <option value="image/gif">GIF (單格靜態圖)</option>
-                            <option value="image/webp">WEBP (高壓縮比)</option>
-                        </select>
+                            <div class="preset-grid mb-2">
+                                <button id="btn-erase-wand" class="btn btn-outline btn-sm w-100" title="點擊相近顏色"><i class="fa-solid fa-wand-magic"></i> 魔術棒</button>
+                                <button id="btn-erase-brush" class="btn btn-outline btn-sm w-100" title="自由塗抹"><i class="fa-solid fa-paint-brush"></i> 畫筆</button>
+                                <button id="btn-erase-rect" class="btn btn-outline btn-sm w-100" title="拉方框"><i class="fa-solid fa-vector-square"></i> 方框</button>
+                                <button id="btn-erase-circle" class="btn btn-outline btn-sm w-100" title="拉圓形"><i class="fa-regular fa-circle"></i> 圓形</button>
+                            </div>
+                            
+                            <div class="form-row wand-only">
+                                <label>容差：<span id="tol-val">20</span></label>
+                                <input type="range" id="tolerance" min="0" max="150" value="20">
+                            </div>
+                            <div class="form-row align-center wand-only">
+                                <label>只限相鄰區域</label>
+                                <label class="switch"><input type="checkbox" id="contiguous" checked><span class="slider"></span></label>
+                            </div>
+                            
+                            <div class="form-row brush-only" style="display:none;">
+                                <label>筆刷粗細：<span id="brush-size-val">20</span>px</label>
+                                <input type="range" id="brush-size" min="1" max="150" value="20">
+                            </div>
+                            <div class="form-row align-center">
+                                <label>限裁切範圍內</label>
+                                <label class="switch"><input type="checkbox" id="limit-to-crop" checked><span class="slider"></span></label>
+                            </div>
+                        </div>
                     </div>
+                </details>
 
-                    <div class="form-row align-center mb-2">
-                        <label>網格切割匯出</label>
-                        <select id="export-slice" class="btn btn-outline btn-sm form-select" style="padding:2px 8px; width:130px;">
-                            <option value="none">不切割</option>
-                            <option value="3x3">九宮格 (3x3)</option>
-                            <option value="4x4">16宮格 (4x4)</option>
-                        </select>
+                <!-- 2. 圖層管理 -->
+                <details class="section" open>
+                    <summary>
+                        <h3><i class="fa-solid fa-layer-group"></i> 2. 圖層管理</h3>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </summary>
+                    <div class="section-content control-box">
+                        <button id="btn-add-layer" class="btn btn-outline btn-sm w-100"><i class="fa-solid fa-plus"></i> 新增繪圖層</button>
+                        <div id="layers-list" class="layer-list-container">
+                            <!-- 圖層清單 -->
+                        </div>
+                        <div class="form-row mt-2" style="border-top:1px solid rgba(0,0,0,0.05); padding-top:8px;">
+                            <label>圖層不透明度</label>
+                            <input type="range" id="layer-opacity" min="0" max="1" step="0.05" value="1">
+                        </div>
                     </div>
-                    
-                    <div class="export-info mb-2">
-                        <div>輸出總尺寸：<b id="stat-size">370 × 320 px</b></div>
-                        <div>防殘留邊界：<b>內縮 1 px (圓角獨立)</b></div>
+                </details>
+
+                <!-- 3. 圖形標註 -->
+                <details class="section">
+                    <summary>
+                        <h3><i class="fa-solid fa-pen-nib"></i> 3. 圖形標註</h3>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </summary>
+                    <div class="section-content">
+                        <div class="d-flex gap-2 mb-2">
+                            <button id="btn-add-arrow" class="btn btn-outline btn-sm w-100"><i class="fa-solid fa-arrow-left"></i> 新增箭頭</button>
+                            <button id="btn-add-text" class="btn btn-outline btn-sm w-100"><i class="fa-solid fa-font"></i> 新增文字</button>
+                        </div>
+                        <div id="annotation-list" class="annotation-list"></div>
+                        <div id="anno-settings" class="control-box hidden mt-2">
+                            <div id="arrow-props">
+                                <div class="form-row"><label>顏色</label><input type="color" id="arrow-color" class="color-picker" value="#FF3B30"></div>
+                                <div class="form-row"><label>大小：<span id="arrow-size-val">100</span>%</label><input type="range" id="arrow-size" min="10" max="500" value="100" style="width:90px;flex:none"></div>
+                            </div>
+                            <div id="text-props" class="hidden">
+                                <input type="text" id="text-content" class="btn btn-outline w-100 mb-2 btn-sm" placeholder="輸入文字..." value="標註文字">
+                                <div class="form-row"><label>字型</label>
+                                    <select id="text-font" class="btn btn-outline btn-sm form-select" style="padding:2px 8px; flex:1; max-width: 140px; text-overflow: ellipsis;">
+                                        <option value="'Noto Sans TC', 'Inter', sans-serif">預設 (黑體)</option>
+                                        <option value="'Microsoft JhengHei', '微軟正黑體', sans-serif">微軟正黑體</option>
+                                        <option value="'PingFang TC', '蘋方-繁', sans-serif">蘋方體</option>
+                                        <option value="'BiauKai', 'DFKai-SB', '標楷體', serif">標楷體</option>
+                                    </select>
+                                </div>
+                                <div class="form-row"><label>大小：<span id="font-size-val">30</span>px</label><input type="range" id="font-size" min="10" max="200" value="30" style="width:90px;flex:none"></div>
+                                <div class="form-row"><label>水平斜角：<span id="text-skew-x-val">0</span>°</label><input type="range" id="text-skew-x" min="-60" max="60" value="0" style="width:90px;flex:none"></div>
+                                <div class="form-row"><label>垂直斜角：<span id="text-skew-y-val">0</span>°</label><input type="range" id="text-skew-y" min="-60" max="60" value="0" style="width:90px;flex:none"></div>
+                                <div class="form-row"><label>顏色</label><input type="color" id="text-color" class="color-picker" value="#000000"></div>
+                            </div>
+                            <div class="section-divider"></div>
+                            <div class="form-row align-center mt-2 mb-2"><label>顯示立體陰影</label><label class="switch"><input type="checkbox" id="anno-shadow" checked><span class="slider"></span></label></div>
+                            <div class="form-row" style="margin-top:8px"><label>整體旋轉</label></div>
+                            <div class="angle-wheel">
+                                <input type="range" id="anno-angle" min="0" max="360" value="0" step="15">
+                                <div class="angle-display"><span id="anno-angle-val">0</span>°</div>
+                            </div>
+                            <button id="btn-delete-anno" class="btn btn-outline btn-sm w-100" style="margin-top:10px;color:#FF3B30;border-color:#FF3B30">
+                                <i class="fa-solid fa-trash"></i> 刪除此標註
+                            </button>
+                        </div>
                     </div>
-                    <button id="btn-export" class="btn btn-primary w-100" style="transition: background-color 0.3s;" disabled>
-                        <i class="fa-solid fa-download"></i> 下載圖片
-                    </button>
-                </div>
+                </details>
             </aside>
 
+            <!-- 編輯主畫布區 -->
             <section class="editor-area" id="editor-area">
                 <div class="upload-box" id="drop-zone">
                     <input type="file" id="file-input" accept="image/*" hidden>
@@ -571,11 +402,7 @@
                         <i class="fa-solid fa-images main-icon"></i>
                         <h2>放入圖片開始編輯</h2>
                         <p>支援 JPG、PNG、WEBP、GIF｜可直接拖放</p>
-                        
-                        <div class="paste-hint">
-                            <i class="fa-solid fa-keyboard"></i> 支援直接 Ctrl+V 貼上截圖
-                        </div>
-                        
+                        <div class="paste-hint"><i class="fa-solid fa-keyboard"></i> 支援直接 Ctrl+V 貼上截圖</div>
                         <div class="upload-actions">
                             <button id="btn-browse-zone" class="btn btn-primary"><i class="fa-regular fa-folder-open"></i> 瀏覽本機檔案</button>
                             <button id="btn-capture-zone" class="btn btn-outline"><i class="fa-solid fa-desktop"></i> 截取目前螢幕</button>
@@ -584,61 +411,135 @@
                 </div>
 
                 <div class="canvas-wrapper hidden" id="canvas-wrapper">
-                    <!-- 去背操作防護力場 -->
                     <div id="eraser-overlay" class="hidden"></div>
                     <div id="shape-preview" class="hidden"></div>
                     <div id="brush-cursor" class="hidden"></div>
-                    
                     <div class="mode-badge" id="mode-badge">📷 移動圖片模式</div>
+                    
                     <img id="main-image" src="" alt="Editor" style="max-width:100%">
                     <div class="anno-overlay" id="anno-overlay"></div>
+                    
                     <div class="tool-panel">
                         <span class="mode-label">操作模式</span>
-                        <button class="btn btn-outline btn-sm active" id="btn-mode-move" title="拖曳移動圖片本身">
-                            <i class="fa-solid fa-arrows-up-down-left-right"></i> 移動圖片
-                        </button>
-                        <button class="btn btn-outline btn-sm" id="btn-mode-crop" title="拖曳調整裁切框">
-                            <i class="fa-solid fa-crop-simple"></i> 調整選區
-                        </button>
+                        <button class="btn btn-outline btn-sm active" id="btn-mode-move" title="拖曳移動圖片本身"><i class="fa-solid fa-arrows-up-down-left-right"></i> 移動圖片</button>
+                        <button class="btn btn-outline btn-sm" id="btn-mode-crop" title="拖曳調整裁切框"><i class="fa-solid fa-crop-simple"></i> 調整選區</button>
                     </div>
                 </div>
 
-                <!-- 贊助連結按鈕 -->
-                <a href="https://store.line.me/stickershop/author/61922/zh-Hant" target="_blank" class="sponsor-btn" title="喜歡這個工具嗎？來看看我的原創貼圖吧！">
-                    <i class="fa-solid fa-mug-hot" style="color: #FF9500;"></i>
-                    <span>贊助開發者 (逛貼圖)</span>
+                <a href="https://store.line.me/stickershop/author/61922/zh-Hant" target="_blank" class="sponsor-btn" title="來看看我的原創貼圖吧！">
+                    <i class="fa-solid fa-mug-hot" style="color: #FF9500;"></i> <span>贊助開發者</span>
                 </a>
             </section>
 
-            <aside class="sidebar" style="width:280px">
-                <div class="section">
-                    <h3><i class="fa-solid fa-magnifying-glass"></i> 即時預覽</h3>
-                    <div class="preview-box" id="preview-box">
-                        <div id="preview-container" class="preview-container"></div>
+            <!-- 右側屬性列 (設定與匯出類) -->
+            <aside class="sidebar" id="sidebar-right" style="width:300px;">
+                <!-- 4. 畫布規格 -->
+                <details class="section" open>
+                    <summary>
+                        <h3><i class="fa-solid fa-crop-simple"></i> 4. 畫布規格</h3>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </summary>
+                    <div class="section-content">
+                        <div class="preset-grid">
+                            <div class="preset-item active" data-w="370" data-h="320">LINE 貼圖<br><span class="size-label">370 × 320</span></div>
+                            <div class="preset-item" data-w="240" data-h="240">LINE 主要<br><span class="size-label">240 × 240</span></div>
+                            <div class="preset-item" data-w="180" data-h="180">表情貼<br><span class="size-label">180 × 180</span></div>
+                            <div class="preset-item" data-w="96" data-h="74">LINE 標籤<br><span class="size-label">96 × 74</span></div>
+                            <div class="preset-item" data-w="1920" data-h="1080">16:9 橫式<br><span class="size-label">1920 × 1080</span></div>
+                            <div class="preset-item" data-w="custom">✏️ 自訂尺寸<br><span class="size-label">自由比例</span></div>
+                        </div>
+                        <div id="custom-size-box" class="custom-size-box hidden">
+                            <label>直接輸入像素尺寸 或 自由拖曳</label>
+                            <div class="custom-size-row">
+                                <input type="number" id="custom-w" placeholder="寬" value="370" min="1"><span>×</span>
+                                <input type="number" id="custom-h" placeholder="高" value="320" min="1">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-row" style="margin-top:8px">
-                        <label>背景</label>
-                        <select id="preview-bg" class="btn btn-outline btn-sm form-select" style="padding:2px 8px">
-                            <option value="transparent">網格（透明）</option>
-                            <option value="white">白色</option>
-                            <option value="black">黑色</option>
-                            <option value="#81c14b">綠色（去背用）</option>
-                        </select>
+                </details>
+
+                <!-- 5. 網格與對齊 -->
+                <details class="section">
+                    <summary>
+                        <h3><i class="fa-solid fa-magnet"></i> 5. 網格與對齊</h3>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </summary>
+                    <div class="section-content control-box">
+                        <div class="form-row align-center mb-2"><label>顯示參考網格</label><label class="switch"><input type="checkbox" id="show-grid" checked><span class="slider"></span></label></div>
+                        <div class="form-row align-center mb-2"><label>啟用磁吸</label><label class="switch"><input type="checkbox" id="snap-grid" checked><span class="slider"></span></label></div>
+                        <div class="form-row mt-2"><label>網格間距：<span id="grid-size-val">20</span>px</label><input type="range" id="grid-size" min="10" max="100" step="10" value="20"></div>
                     </div>
-                </div>
-                <div class="section">
-                    <h3><i class="fa-solid fa-circle-info"></i> 使用說明</h3>
-                    <div class="export-info" style="line-height:1.75">
-                        <b>載入圖片</b>：隨時按下 <kbd>Ctrl+V</kbd> 貼上截圖！<br><br>
-                        <b>移動圖片</b>：拖曳圖片本身，裁切框完美跟隨。<br>
-                        <b>調整選區</b>：切換模式後拖曳邊框，圖片不動。<br><br>
-                        <b>標註與磁吸</b>：拖曳藍點移動位置。開啟「磁吸」時，會自動吸附網格與中心點，角度以 15 度為單位。<br>
-                        <b>立體與變形</b>：文字可獨立調整傾斜角度，支援動態陰影效果。<br>
-                        <b>去背/填色</b>：切換模式。魔術棒可點擊透明處填色，新增「畫筆工具」可自由塗抹。<br>
-                        <b>分割匯出</b>：選擇九宮格或16宮格，單張完美獨立圓角且邊緣向內微縮防漏光！<br>
-                        <b>全域復原</b>：<kbd>Ctrl+Z</kbd> / <b>全域重做</b>：<kbd>Ctrl+Y</kbd>
+                </details>
+
+                <!-- 6. 圖片圓角 -->
+                <details class="section">
+                    <summary>
+                        <h3><i class="fa-solid fa-vector-square"></i> 6. 圖片圓角</h3>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </summary>
+                    <div class="section-content control-box">
+                        <div class="form-row">
+                            <label>圓角比例：<span id="radius-val">0</span>%</label>
+                            <input type="range" id="border-radius" min="0" max="50" value="0">
+                        </div>
                     </div>
-                </div>
+                </details>
+
+                <!-- 7. 完成匯出 -->
+                <details class="section" open>
+                    <summary>
+                        <h3><i class="fa-solid fa-cloud-arrow-down"></i> 7. 完成匯出</h3>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </summary>
+                    <div class="section-content">
+                        <div class="form-row mb-2">
+                            <label>存檔格式</label>
+                            <select id="export-format" class="btn btn-outline btn-sm form-select" style="padding:2px 8px; width:140px;">
+                                <option value="image/png">PNG (保留透明底)</option>
+                                <option value="image/jpeg">JPEG (無透明底)</option>
+                                <option value="image/webp">WEBP (高壓縮比)</option>
+                            </select>
+                        </div>
+                        <div class="form-row align-center mb-2">
+                            <label>網格切割匯出</label>
+                            <select id="export-slice" class="btn btn-outline btn-sm form-select" style="padding:2px 8px; width:130px;">
+                                <option value="none">不切割</option>
+                                <option value="3x3">九宮格 (3x3)</option>
+                                <option value="4x4">16宮格 (4x4)</option>
+                            </select>
+                        </div>
+                        <div class="export-info mb-2">
+                            <div>輸出總尺寸：<b id="stat-size">370 × 320 px</b></div>
+                            <div>防殘留邊界：<b>內縮 1 px (圓角獨立)</b></div>
+                        </div>
+                        <button id="btn-export" class="btn btn-primary w-100" style="transition: background-color 0.3s;" disabled>
+                            <i class="fa-solid fa-download"></i> 下載圖片
+                        </button>
+                    </div>
+                </details>
+
+                <!-- 即時預覽 -->
+                <details class="section" open>
+                    <summary>
+                        <h3><i class="fa-solid fa-magnifying-glass"></i> 即時預覽</h3>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </summary>
+                    <div class="section-content">
+                        <div class="preview-box" id="preview-box">
+                            <div id="preview-container" class="preview-container"></div>
+                        </div>
+                        <div class="form-row" style="margin-top:8px">
+                            <label>背景</label>
+                            <select id="preview-bg" class="btn btn-outline btn-sm form-select" style="padding:2px 8px">
+                                <option value="transparent">網格（透明）</option>
+                                <option value="white">白色</option>
+                                <option value="black">黑色</option>
+                                <option value="#81c14b">綠色（去背用）</option>
+                            </select>
+                        </div>
+                    </div>
+                </details>
+
             </aside>
         </main>
     </div>
@@ -666,6 +567,12 @@
 
         let annotations = [];
         let selectedAnnoId = null;
+
+        // 圖層系統 (全新加入)
+        let layers = [];
+        let activeLayerId = null;
+        let layerCounter = 0;
+        let wandCanvas, wandCtx; // 動態指向當前選取的圖層
         
         // 去背與填色工具狀態
         let currentProcessAction = 'erase'; 
@@ -678,21 +585,11 @@
         let lastBrushPt = {x: 0, y: 0};     
         let savedWandImageData = null; 
 
-        // 核心渲染畫布
-        let wandCanvas = document.createElement('canvas');
-        let wandCtx = wandCanvas.getContext('2d', { willReadFrequently: true });
-
         /* ══ 輔助工具：色碼轉換 ══ */
-        function rgbToHex(r, g, b) {
-            return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase();
-        }
+        function rgbToHex(r, g, b) { return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase(); }
         function hexToRgb(hex) {
             const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? {
-                r: parseInt(result[1], 16),
-                g: parseInt(result[2], 16),
-                b: parseInt(result[3], 16)
-            } : { r: 255, g: 0, b: 0 };
+            return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : { r: 255, g: 0, b: 0 };
         }
 
         /* ══ DOM 快取 ══ */
@@ -707,14 +604,13 @@
             btnExport:        $('btn-export'),
             presetItems:      document.querySelectorAll('.preset-item'),
             statSize:         $('stat-size'),
-            previewContainer: $('preview-container'),
-            previewBg:        $('preview-bg'),        previewBox:       $('preview-box'),
-            customSizeBox:    $('custom-size-box'),   customW:          $('custom-w'), customH: $('custom-h'),
+            previewContainer: $('preview-container'), previewBg:        $('preview-bg'),        previewBox:       $('preview-box'),
+            customSizeBox:    $('custom-size-box'),   customW:          $('custom-w'),          customH:          $('custom-h'),
             
             btnWandToggle:    $('btn-wand-toggle'),   wandSettings:     $('wand-settings'),
             btnActionErase:   $('btn-action-erase'),  btnActionFill:    $('btn-action-fill'),
-            fillColorRow:     $('fill-color-row'),    btnEyedropper:    $('btn-eyedropper'), fillColor: $('fill-color'),
-            btnEraseWand:     $('btn-erase-wand'),    btnEraseRect:     $('btn-erase-rect'), btnEraseCircle: $('btn-erase-circle'),
+            fillColorRow:     $('fill-color-row'),    btnEyedropper:    $('btn-eyedropper'),    fillColor:        $('fill-color'),
+            btnEraseWand:     $('btn-erase-wand'),    btnEraseRect:     $('btn-erase-rect'),    btnEraseCircle:   $('btn-erase-circle'),
             btnEraseBrush:    $('btn-erase-brush'),   
             brushSize:        $('brush-size'),        brushSizeVal:     $('brush-size-val'), 
             brushCursor:      $('brush-cursor'),      
@@ -732,20 +628,29 @@
             btnAddArrow:      $('btn-add-arrow'),     btnAddText:       $('btn-add-text'),
             annotationList:   $('annotation-list'),   annoSettings:     $('anno-settings'),
             arrowProps:       $('arrow-props'),       textProps:        $('text-props'),
-            arrowColor:       $('arrow-color'),
-            arrowSize:        $('arrow-size'),        arrowSizeVal:     $('arrow-size-val'),
+            arrowColor:       $('arrow-color'),       arrowSize:        $('arrow-size'),        arrowSizeVal:     $('arrow-size-val'),
             textContent:      $('text-content'),      textFont:         $('text-font'),
             fontSize:         $('font-size'),         fontSizeVal:      $('font-size-val'),
             textSkewX:        $('text-skew-x'),       textSkewXVal:     $('text-skew-x-val'),
             textSkewY:        $('text-skew-y'),       textSkewYVal:     $('text-skew-y-val'),
-            annoShadow:       $('anno-shadow'),
-            textColor:        $('text-color'),
+            annoShadow:       $('anno-shadow'),       textColor:        $('text-color'),
             annoAngle:        $('anno-angle'),        annoAngleVal:     $('anno-angle-val'),
             btnDeleteAnno:    $('btn-delete-anno'),
 
-            exportFormat:     $('export-format'),
-            exportSlice:      $('export-slice'),
+            exportFormat:     $('export-format'),     exportSlice:      $('export-slice'),
+            
+            // Layout toggles
+            btnToggleLeft:    $('btn-toggle-left'),   btnToggleRight:   $('btn-toggle-right'),
+            sidebarLeft:      $('sidebar-left'),      sidebarRight:     $('sidebar-right'),
+            
+            // Layers
+            btnAddLayer:      $('btn-add-layer'),     layersList:       $('layers-list'),
+            layerOpacity:     $('layer-opacity')
         };
+
+        // UI Panel Toggles
+        DOM.btnToggleLeft.onclick = () => { DOM.sidebarLeft.classList.toggle('collapsed'); setTimeout(()=> { if(cropper) window.dispatchEvent(new Event('resize')); }, 350); };
+        DOM.btnToggleRight.onclick = () => { DOM.sidebarRight.classList.toggle('collapsed'); setTimeout(()=> { if(cropper) window.dispatchEvent(new Event('resize')); }, 350); };
 
         function updateStatSize() {
             let splits = 1;
@@ -767,18 +672,13 @@
                             else if (`${i.dataset.w}x${i.dataset.h}` === settings.presetSize) i.classList.add('active');
                         });
                         if (settings.presetSize === 'custom') {
-                            isCustomSize = true;
-                            DOM.customSizeBox.classList.remove('hidden');
-                            targetWidth = parseInt(settings.customW) || 370;
-                            targetHeight = parseInt(settings.customH) || 320;
-                            DOM.customW.value = targetWidth;
-                            DOM.customH.value = targetHeight;
+                            isCustomSize = true; DOM.customSizeBox.classList.remove('hidden');
+                            targetWidth = parseInt(settings.customW) || 370; targetHeight = parseInt(settings.customH) || 320;
+                            DOM.customW.value = targetWidth; DOM.customH.value = targetHeight;
                         } else {
-                            isCustomSize = false;
-                            DOM.customSizeBox.classList.add('hidden');
+                            isCustomSize = false; DOM.customSizeBox.classList.add('hidden');
                             const [w, h] = settings.presetSize.split('x').map(Number);
-                            targetWidth = w || 370;
-                            targetHeight = h || 320;
+                            targetWidth = w || 370; targetHeight = h || 320;
                         }
                     }
                     if (settings.tolerance) { DOM.tolerance.value = settings.tolerance; DOM.tolVal.textContent = settings.tolerance; }
@@ -802,10 +702,7 @@
         function saveSettings() {
             let activePreset = '370x320';
             if (isCustomSize) activePreset = 'custom';
-            else {
-                const activeEl = document.querySelector('.preset-item.active');
-                if (activeEl) activePreset = activeEl.dataset.w === 'custom' ? 'custom' : `${activeEl.dataset.w}x${activeEl.dataset.h}`;
-            }
+            else { const activeEl = document.querySelector('.preset-item.active'); if (activeEl) activePreset = activeEl.dataset.w === 'custom' ? 'custom' : `${activeEl.dataset.w}x${activeEl.dataset.h}`; }
             const settings = {
                 presetSize: activePreset, customW: DOM.customW.value, customH: DOM.customH.value,
                 tolerance: DOM.tolerance.value, contiguous: DOM.contiguous.checked, limitToCrop: DOM.limitToCrop.checked,
@@ -817,33 +714,107 @@
         }
 
         loadSettings();
-        
         DOM.exportSlice.addEventListener('change', () => { saveSettings(); updateStatSize(); updatePreview(); rebuildAnnoOverlay(); });
         DOM.exportFormat.addEventListener('change', () => { saveSettings(); updatePreview(); });
+
+        /* ══ 圖層核心管理 (Layers) ══ */
+        function createLayer(name) {
+            const c = document.createElement('canvas');
+            return {
+                id: `layer_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                name: name,
+                canvas: c,
+                ctx: c.getContext('2d', { willReadFrequently: true }),
+                visible: true,
+                opacity: 1
+            };
+        }
+
+        function renderLayersUI() {
+            DOM.layersList.innerHTML = '';
+            [...layers].reverse().forEach(l => {
+                const item = document.createElement('div');
+                item.className = `layer-item ${l.id === activeLayerId ? 'active' : ''}`;
+                item.innerHTML = `
+                    <span style="flex:1" class="layer-name" data-id="${l.id}">${l.name}</span>
+                    <div>
+                        <i class="fa-solid ${l.visible ? 'fa-eye' : 'fa-eye-slash'} layer-vis" style="cursor:pointer; margin-right:8px" data-id="${l.id}"></i>
+                        <i class="fa-solid fa-trash layer-del" style="color:#FF3B30;cursor:pointer" data-id="${l.id}"></i>
+                    </div>
+                `;
+                item.onclick = (e) => {
+                    if(e.target.classList.contains('layer-vis')) {
+                        l.visible = !l.visible; updateCompositeImage(); renderLayersUI(); saveState(); updatePreview();
+                    } else if (e.target.classList.contains('layer-del')) {
+                        if(layers.length <= 1) { alert('至少保留一個圖層！'); return; }
+                        layers = layers.filter(layer => layer.id !== l.id);
+                        if(activeLayerId === l.id) selectLayer(layers[0].id);
+                        updateCompositeImage(); renderLayersUI(); saveState(); updatePreview();
+                    } else { selectLayer(l.id); }
+                };
+                DOM.layersList.appendChild(item);
+            });
+            const activeL = layers.find(l => l.id === activeLayerId);
+            if(activeL) DOM.layerOpacity.value = activeL.opacity;
+        }
+
+        function selectLayer(id) {
+            activeLayerId = id;
+            const l = layers.find(l => l.id === id);
+            if(l) { wandCanvas = l.canvas; wandCtx = l.ctx; }
+            renderLayersUI();
+        }
+
+        DOM.btnAddLayer.onclick = () => {
+            if(!layers.length) return;
+            const w = layers[0].canvas.width; const h = layers[0].canvas.height;
+            const newL = createLayer(`圖層 ${++layerCounter}`);
+            newL.canvas.width = w; newL.canvas.height = h;
+            layers.push(newL);
+            selectLayer(newL.id);
+            saveState();
+        };
+
+        DOM.layerOpacity.oninput = (e) => {
+            const l = layers.find(layer => layer.id === activeLayerId);
+            if(l) { l.opacity = e.target.value; updateCompositeImage(); updatePreview(); }
+        };
+        DOM.layerOpacity.onchange = () => saveState();
+
+        function updateCompositeImage() {
+            if(!layers.length) return;
+            const compCanvas = document.createElement('canvas');
+            compCanvas.width = layers[0].canvas.width; compCanvas.height = layers[0].canvas.height;
+            const compCtx = compCanvas.getContext('2d');
+            layers.forEach(l => {
+                if (l.visible) {
+                    compCtx.globalAlpha = l.opacity;
+                    compCtx.drawImage(l.canvas, 0, 0);
+                }
+            });
+            originalImageSrc = compCanvas.toDataURL('image/png');
+            updateCropperImagesFast(originalImageSrc);
+        }
 
         /* ══ 歷史紀錄全域封裝引擎 (Undo / Redo) ══ */
         function saveState() {
             if (!cropper) return;
             const state = {
-                src: wandCanvas.toDataURL('image/png'),
+                layers: layers.map(l => ({
+                    id: l.id, name: l.name, visible: l.visible, opacity: l.opacity,
+                    imgData: l.ctx.getImageData(0, 0, l.canvas.width, l.canvas.height)
+                })),
+                activeLayerId: activeLayerId,
                 annotations: JSON.parse(JSON.stringify(annotations)), 
                 cropData: cropper.getData(),
-                targetWidth: targetWidth,
-                targetHeight: targetHeight,
+                targetWidth: targetWidth, targetHeight: targetHeight,
                 isCustomSize: isCustomSize,
                 presetSize: document.querySelector('.preset-item.active')?.dataset.w === 'custom' ? 'custom' : `${targetWidth}x${targetHeight}`
             };
             
-            if (currentIndex < history.length - 1) {
-                history = history.slice(0, currentIndex + 1);
-            }
+            if (currentIndex < history.length - 1) history = history.slice(0, currentIndex + 1);
             history.push(state);
-            
-            if (history.length > 20) {
-                history.shift();
-            } else {
-                currentIndex++;
-            }
+            if (history.length > 20) history.shift(); else currentIndex++;
             updateUndoRedo();
         }
 
@@ -859,9 +830,7 @@
             annotations = JSON.parse(JSON.stringify(state.annotations));
             selectedAnnoId = null; 
             
-            targetWidth = state.targetWidth;
-            targetHeight = state.targetHeight;
-            isCustomSize = state.isCustomSize;
+            targetWidth = state.targetWidth; targetHeight = state.targetHeight; isCustomSize = state.isCustomSize;
             updateStatSize();
             
             DOM.presetItems.forEach(i => {
@@ -871,38 +840,39 @@
             });
             if (isCustomSize) {
                 DOM.customSizeBox.classList.remove('hidden');
-                DOM.customW.value = targetWidth;
-                DOM.customH.value = targetHeight;
+                DOM.customW.value = targetWidth; DOM.customH.value = targetHeight;
+            } else { DOM.customSizeBox.classList.add('hidden'); }
+            
+            // 復原圖層
+            layers = state.layers.map(ls => {
+                const l = createLayer(ls.name);
+                l.id = ls.id; l.visible = ls.visible; l.opacity = ls.opacity;
+                l.canvas.width = ls.imgData.width; l.canvas.height = ls.imgData.height;
+                l.ctx.putImageData(ls.imgData, 0, 0);
+                return l;
+            });
+            
+            if(layers.find(l => l.id === state.activeLayerId)) {
+                selectLayer(state.activeLayerId);
             } else {
-                DOM.customSizeBox.classList.add('hidden');
+                selectLayer(layers[layers.length-1].id);
             }
             
-            const img = new Image(); 
-            img.onload = () => {
-                wandCanvas.width = img.width; wandCanvas.height = img.height;
-                wandCtx.clearRect(0, 0, wandCanvas.width, wandCanvas.height);
-                wandCtx.drawImage(img, 0, 0);
-                
-                originalImageSrc = state.src;
-                updateCropperImagesFast(state.src);
-                
-                if (cropper && state.cropData) {
-                    isUserInteractingWithCropBox = true;
-                    if (!isCustomSize) cropper.setAspectRatio(targetWidth / targetHeight);
-                    else cropper.setAspectRatio(NaN);
-                    
-                    cropper.setData(state.cropData);
-                    lockedCropData = state.cropData;
-                    isUserInteractingWithCropBox = false;
-                }
-                
-                renderAnnotationList();
-                DOM.annoSettings.classList.add('hidden'); 
-                updateUndoRedo(); 
-                updatePreview();
-                rebuildAnnoOverlay();
-            };
-            img.src = state.src;
+            updateCompositeImage();
+            
+            if (cropper && state.cropData) {
+                isUserInteractingWithCropBox = true;
+                if (!isCustomSize) cropper.setAspectRatio(targetWidth / targetHeight); else cropper.setAspectRatio(NaN);
+                cropper.setData(state.cropData);
+                lockedCropData = state.cropData;
+                isUserInteractingWithCropBox = false;
+            }
+            
+            renderAnnotationList();
+            DOM.annoSettings.classList.add('hidden'); 
+            updateUndoRedo(); 
+            updatePreview();
+            rebuildAnnoOverlay();
         }
 
         DOM.btnUndo.onclick = () => { if (currentIndex > 0) restore(currentIndex - 1); };
@@ -911,10 +881,7 @@
         /* ══ 檔案與截圖處理 ══ */
         DOM.dropZone.ondragover  = e => { e.preventDefault(); DOM.dropZone.classList.add('dragover'); };
         DOM.dropZone.ondragleave = () => DOM.dropZone.classList.remove('dragover');
-        DOM.dropZone.ondrop = e => {
-            e.preventDefault(); DOM.dropZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-        };
+        DOM.dropZone.ondrop = e => { e.preventDefault(); DOM.dropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); };
         
         DOM.btnNew.onclick = () => DOM.fileInput.click();
         DOM.btnBrowseZone.onclick = (e) => { e.stopPropagation(); DOM.fileInput.click(); };
@@ -928,8 +895,7 @@
                 if (items[i].type.indexOf('image') !== -1) {
                     const blob = items[i].getAsFile();
                     const file = new File([blob], "pasted_image.png", { type: "image/png" });
-                    handleFile(file);
-                    break;
+                    handleFile(file); break;
                 }
             }
         });
@@ -937,20 +903,16 @@
         async function captureScreen() {
             try {
                 const stream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: false });
-                const video = document.createElement('video');
-                video.srcObject = stream;
+                const video = document.createElement('video'); video.srcObject = stream;
                 video.onloadedmetadata = () => {
                     video.play();
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     stream.getTracks().forEach(track => track.stop());
                     canvas.toBlob((blob) => { handleFile(new File([blob], "screen_capture.png", { type: "image/png" })); }, 'image/png');
                 };
             } catch (err) { console.error("螢幕擷取失敗或被取消:", err); }
         }
-        
         DOM.btnCaptureZone.onclick = (e) => { e.stopPropagation(); captureScreen(); };
         DOM.btnCaptureHeader.onclick = captureScreen;
 
@@ -958,38 +920,43 @@
             if (!file.type.startsWith('image/')) { alert('請上傳有效的圖片檔案。'); return; }
             currentFilename = file.name.replace(/\.[^/.]+$/, "");
             const reader = new FileReader();
-            reader.onload = e => {
-                originalImageSrc = e.target.result;
-                initEditor(originalImageSrc);
-            };
+            reader.onload = e => { originalImageSrc = e.target.result; initEditor(originalImageSrc); };
             reader.readAsDataURL(file);
         }
 
         function initEditor(src) {
             DOM.dropZone.classList.add('hidden');
             DOM.canvasWrapper.classList.remove('hidden');
-            DOM.btnNew.style.display = 'flex';
-            DOM.btnCaptureHeader.style.display = 'flex';
-            DOM.btnExport.disabled = false;
-            DOM.btnWandToggle.disabled = false;
+            DOM.btnNew.style.display = 'flex'; DOM.btnCaptureHeader.style.display = 'flex';
+            DOM.btnExport.disabled = false; DOM.btnWandToggle.disabled = false;
 
-            DOM.mainImage.src = src;
-            currentMode = 'move';
+            DOM.mainImage.src = src; currentMode = 'move';
             if (cropper) { cropper.destroy(); cropper = null; }
             
             DOM.mainImage.onload = () => {
                 DOM.mainImage.onload = null;
-                wandCanvas.width = DOM.mainImage.naturalWidth;
-                wandCanvas.height = DOM.mainImage.naturalHeight;
-                wandCtx.clearRect(0, 0, wandCanvas.width, wandCanvas.height);
-                wandCtx.drawImage(DOM.mainImage, 0, 0);
+                const w = DOM.mainImage.naturalWidth; const h = DOM.mainImage.naturalHeight;
+                
+                layers = []; layerCounter = 0;
+                // 初始化底圖層
+                const bgLayer = createLayer('原圖背景');
+                bgLayer.canvas.width = w; bgLayer.canvas.height = h;
+                bgLayer.ctx.drawImage(DOM.mainImage, 0, 0);
+                layers.push(bgLayer);
+                
+                // 初始化繪圖層
+                const drawLayer = createLayer('編輯圖層 1');
+                drawLayer.canvas.width = w; drawLayer.canvas.height = h;
+                layers.push(drawLayer);
+                
+                selectLayer(drawLayer.id);
+                updateCompositeImage();
 
                 cropper = _createCropper('move');
                 updateModeUI();
                 
                 history = []; currentIndex = -1; annotations = [];
-                renderAnnotationList();
-                saveState();
+                renderAnnotationList(); saveState();
             };
             if(DOM.btnWandToggle.classList.contains('btn-primary')) toggleWandMenu(); 
         }
@@ -1001,8 +968,7 @@
                 if (cropper) {
                     const container = DOM.mainImage.nextElementSibling;
                     if (container && container.classList.contains('cropper-container')) {
-                        const imgs = container.querySelectorAll('img');
-                        imgs.forEach(img => img.src = newSrc);
+                        const imgs = container.querySelectorAll('img'); imgs.forEach(img => img.src = newSrc);
                     }
                 }
             };
@@ -1016,14 +982,12 @@
                 viewMode: 0, dragMode: isMoveMode ? 'move' : 'crop',
                 aspectRatio: isCustomSize ? NaN : (targetWidth / targetHeight),
                 autoCropArea: 0.9, background: false, movable: isMoveMode, zoomable: true,
-                guides: false, // 關閉原生 3x3 虛線，交給我們的自訂網格
-                cropBoxMovable: !isMoveMode, cropBoxResizable: !isMoveMode, restore: false,
+                guides: false, cropBoxMovable: !isMoveMode, cropBoxResizable: !isMoveMode, restore: false,
                 
                 cropstart: (e) => {
                     const action = e.detail.action;
                     if (['crop', 'e', 'w', 's', 'n', 'se', 'sw', 'ne', 'nw', 'all'].includes(action)) {
-                        isUserInteractingWithCropBox = true;
-                        if (cropper) previousCropData = cropper.getData(); 
+                        isUserInteractingWithCropBox = true; if (cropper) previousCropData = cropper.getData(); 
                     }
                 },
                 cropend: () => {
@@ -1032,24 +996,18 @@
                         const newData = cropper.getData();
                         if (!lockedCropData || Math.abs(newData.x - lockedCropData.x) > 0.1 || Math.abs(newData.y - lockedCropData.y) > 0.1 ||
                             Math.abs(newData.width - lockedCropData.width) > 0.1 || Math.abs(newData.height - lockedCropData.height) > 0.1) {
-                            lockedCropData = newData;
-                            saveState(); 
+                            lockedCropData = newData; saveState(); 
                         }
                     }
                 },
                 ready() {
                     if (savedData) {
                         try { this.cropper.setCanvasData(savedData.canvas); } catch(e){}
-                        try { 
-                            isUserInteractingWithCropBox = true;
-                            this.cropper.setData(savedData.crop); 
-                            isUserInteractingWithCropBox = false;
-                        } catch(e){}
+                        try { isUserInteractingWithCropBox = true; this.cropper.setData(savedData.crop); isUserInteractingWithCropBox = false; } catch(e){}
                     }
                     lockedCropData = this.cropper.getData(); 
                     updatePreview(); rebuildAnnoOverlay();
-                    const overlay = DOM.editorArea.querySelector('.switching-overlay');
-                    if (overlay) overlay.remove();
+                    const overlay = DOM.editorArea.querySelector('.switching-overlay'); if (overlay) overlay.remove();
                     isSwitching = false;
                 },
                 crop: () => {
@@ -1058,8 +1016,7 @@
                         lockedCropData = cropper.getData();
                         if (isCustomSize && !isUpdatingFromInput) {
                             const cropData = cropper.getData(true);
-                            targetWidth = Math.max(1, Math.round(cropData.width));
-                            targetHeight = Math.max(1, Math.round(cropData.height));
+                            targetWidth = Math.max(1, Math.round(cropData.width)); targetHeight = Math.max(1, Math.round(cropData.height));
                             if (document.activeElement !== DOM.customW) DOM.customW.value = targetWidth;
                             if (document.activeElement !== DOM.customH) DOM.customH.value = targetHeight;
                             updateStatSize();
@@ -1083,12 +1040,9 @@
             if (mode === currentMode || !cropper || isSwitching) return;
             isSwitching = true; currentMode = mode; setEraserTool(null); 
             const savedData = { canvas: cropper.getCanvasData(), crop: cropper.getData() };
-            const overlay = document.createElement('div');
-            overlay.className = 'switching-overlay';
-            DOM.editorArea.appendChild(overlay);
+            const overlay = document.createElement('div'); overlay.className = 'switching-overlay'; DOM.editorArea.appendChild(overlay);
             cropper.destroy(); cropper = null;
-            cropper = _createCropper(mode, savedData);
-            updateModeUI();
+            cropper = _createCropper(mode, savedData); updateModeUI();
         }
 
         function updateModeUI() {
@@ -1100,8 +1054,7 @@
         /* ══ 畫布規格按鈕處理 ══ */
         DOM.presetItems.forEach(item => {
             item.onclick = () => {
-                DOM.presetItems.forEach(i => i.classList.remove('active'));
-                item.classList.add('active');
+                DOM.presetItems.forEach(i => i.classList.remove('active')); item.classList.add('active');
                 const wData = item.dataset.w;
                 if (wData === 'custom') {
                     isCustomSize = true; DOM.customSizeBox.classList.remove('hidden');
@@ -1109,49 +1062,34 @@
                         isUserInteractingWithCropBox = true; cropper.setAspectRatio(NaN); 
                         const cropData = cropper.getData(true);
                         targetWidth = Math.max(1, Math.round(cropData.width)); targetHeight = Math.max(1, Math.round(cropData.height));
-                        DOM.customW.value = targetWidth; DOM.customH.value = targetHeight;
-                        updateStatSize(); lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false;
-                        updatePreview(); rebuildAnnoOverlay();
+                        DOM.customW.value = targetWidth; DOM.customH.value = targetHeight; updateStatSize();
+                        lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false; updatePreview(); rebuildAnnoOverlay();
                     }
                 } else {
                     isCustomSize = false; DOM.customSizeBox.classList.add('hidden');
                     targetWidth = parseInt(wData); targetHeight = parseInt(item.dataset.h);
-                    if (cropper) {
-                        isUserInteractingWithCropBox = true; cropper.setAspectRatio(targetWidth / targetHeight);
-                        lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false;
-                    }
+                    if (cropper) { isUserInteractingWithCropBox = true; cropper.setAspectRatio(targetWidth / targetHeight); lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false; }
                     updateStatSize(); updatePreview(); rebuildAnnoOverlay();
                 }
                 saveSettings(); saveState(); 
             };
         });
 
-        DOM.customW.onchange = () => saveState();
-        DOM.customH.onchange = () => saveState();
-        
+        DOM.customW.onchange = () => saveState(); DOM.customH.onchange = () => saveState();
         DOM.customW.oninput = () => {
             isUpdatingFromInput = true; targetWidth = Math.max(1, parseInt(DOM.customW.value) || 1); updateStatSize();
-            if (cropper) {
-                isUserInteractingWithCropBox = true; const cropData = cropper.getData(true);
-                cropper.setData({ width: targetWidth, height: cropData.height }); lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false;
-            }
+            if (cropper) { isUserInteractingWithCropBox = true; const cropData = cropper.getData(true); cropper.setData({ width: targetWidth, height: cropData.height }); lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false; }
             rebuildAnnoOverlay(); updatePreview(); isUpdatingFromInput = false; saveSettings();
         };
-
         DOM.customH.oninput = () => {
             isUpdatingFromInput = true; targetHeight = Math.max(1, parseInt(DOM.customH.value) || 1); updateStatSize();
-            if (cropper) {
-                isUserInteractingWithCropBox = true; const cropData = cropper.getData(true);
-                cropper.setData({ width: cropData.width, height: targetHeight }); lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false;
-            }
+            if (cropper) { isUserInteractingWithCropBox = true; const cropData = cropper.getData(true); cropper.setData({ width: cropData.width, height: targetHeight }); lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false; }
             rebuildAnnoOverlay(); updatePreview(); isUpdatingFromInput = false; saveSettings();
         };
 
-        /* ══ 圖片圓角 ══ */
+        /* ══ 圖片圓角與網格系統 ══ */
         DOM.borderRadius.onchange = () => saveState();
         DOM.borderRadius.oninput = () => { DOM.radiusVal.textContent = DOM.borderRadius.value; updatePreview(); saveSettings(); };
-
-        /* ══ 網格與磁吸系統 ══ */
         DOM.showGrid.onchange = () => { rebuildAnnoOverlay(); saveSettings(); };
         DOM.snapGrid.onchange = () => { DOM.annoAngle.step = DOM.snapGrid.checked ? 15 : 1; saveSettings(); };
         DOM.gridSize.oninput = () => { DOM.gridSizeVal.textContent = DOM.gridSize.value; rebuildAnnoOverlay(); saveSettings(); };
@@ -1169,7 +1107,6 @@
 
         DOM.btnActionErase.onclick = () => setProcessAction('erase');
         DOM.btnActionFill.onclick  = () => setProcessAction('fill');
-
         function setProcessAction(action) {
             currentProcessAction = action;
             DOM.btnActionErase.classList.toggle('btn-primary', action === 'erase'); DOM.btnActionErase.classList.toggle('btn-outline', action !== 'erase');
@@ -1178,11 +1115,8 @@
         }
 
         function updateShapePreviewColor() {
-            if (currentProcessAction === 'fill') {
-                DOM.shapePreview.style.borderColor = DOM.fillColor.value; DOM.shapePreview.style.background = DOM.fillColor.value + '40';
-            } else {
-                DOM.shapePreview.style.borderColor = '#FF3B30'; DOM.shapePreview.style.background = 'rgba(255, 59, 48, 0.1)';
-            }
+            if (currentProcessAction === 'fill') { DOM.shapePreview.style.borderColor = DOM.fillColor.value; DOM.shapePreview.style.background = DOM.fillColor.value + '40'; } 
+            else { DOM.shapePreview.style.borderColor = '#FF3B30'; DOM.shapePreview.style.background = 'rgba(255, 59, 48, 0.1)'; }
         }
         DOM.fillColor.oninput = updateShapePreviewColor;
 
@@ -1279,7 +1213,8 @@
                 if (!isRenderingErase) {
                     isRenderingErase = true;
                     requestAnimationFrame(() => {
-                        updatePreview(); const tempSrc = wandCanvas.toDataURL('image/png'); updateCropperImagesFast(tempSrc); isRenderingErase = false;
+                        updateCompositeImage(); // 繪製時即時更新合成圖
+                        updatePreview(); isRenderingErase = false;
                     });
                 } return;
             }
@@ -1295,7 +1230,8 @@
                         if (!isDrawingEraseShape) { isRenderingErase = false; return; }
                         wandCtx.putImageData(savedWandImageData, 0, 0);
                         const pt1 = screenToImage(eraseStartX, eraseStartY); const pt2 = screenToImage(currentX, currentY);
-                        applyProcessShapeToCanvas(pt1, pt2, activeEraserTool); updatePreview(); isRenderingErase = false;
+                        applyProcessShapeToCanvas(pt1, pt2, activeEraserTool); 
+                        updateCompositeImage(); updatePreview(); isRenderingErase = false;
                     });
                 }
             }
@@ -1303,22 +1239,18 @@
 
         document.addEventListener('mouseup', e => {
             if (isDrawingBrush) {
-                isDrawingBrush = false; originalImageSrc = wandCanvas.toDataURL('image/png'); updateCropperImagesFast(originalImageSrc); 
-                saveState(); 
-                updatePreview(); return;
+                isDrawingBrush = false; updateCompositeImage(); saveState(); updatePreview(); return;
             }
             if (!isDrawingEraseShape) return;
             isDrawingEraseShape = false; DOM.shapePreview.classList.add('hidden');
             const rect = DOM.eraserOverlay.getBoundingClientRect();
             const currentX = Math.max(rect.left, Math.min(e.clientX, rect.right)); const currentY = Math.max(rect.top, Math.min(e.clientY, rect.bottom));
             
-            if (Math.abs(currentX - eraseStartX) < 5 && Math.abs(currentY - eraseStartY) < 5) { wandCtx.putImageData(savedWandImageData, 0, 0); updatePreview(); return; }
+            if (Math.abs(currentX - eraseStartX) < 5 && Math.abs(currentY - eraseStartY) < 5) { wandCtx.putImageData(savedWandImageData, 0, 0); updateCompositeImage(); updatePreview(); return; }
             
             const pt1 = screenToImage(eraseStartX, eraseStartY); const pt2 = screenToImage(currentX, currentY);
             wandCtx.putImageData(savedWandImageData, 0, 0); applyProcessShapeToCanvas(pt1, pt2, activeEraserTool);
-            originalImageSrc = wandCanvas.toDataURL('image/png'); updateCropperImagesFast(originalImageSrc); 
-            saveState(); 
-            updatePreview();
+            updateCompositeImage(); saveState(); updatePreview();
         });
 
         function applyBrushStepToCanvas(pt1, pt2) {
@@ -1383,25 +1315,21 @@
                     }
                 }
             }
-            wandCtx.putImageData(imgData, 0, 0); originalImageSrc = wandCanvas.toDataURL('image/png');
-            updatePreview(); updateCropperImagesFast(originalImageSrc); 
-            saveState(); 
+            wandCtx.putImageData(imgData, 0, 0); updateCompositeImage(); updatePreview(); saveState(); 
         }
 
         /* ══ 標註系統 ══ */
         DOM.btnAddArrow.onclick = () => {
             const id = Date.now();
             annotations.push({ id, type:'arrow', x:targetWidth/2, y:targetHeight/2, angle:0, color:'#FF3B30', size:100, skewX:0, skewY:0, hasShadow:true });
-            renderAnnotationList(); selectAnnotation(id); updatePreview(); rebuildAnnoOverlay();
-            saveState(); 
+            renderAnnotationList(); selectAnnotation(id); updatePreview(); rebuildAnnoOverlay(); saveState(); 
         };
         
         DOM.btnAddText.onclick = () => {
             const id = Date.now();
             const defaultFont = "'Noto Sans TC', 'Inter', sans-serif";
             annotations.push({ id, type:'text', x:targetWidth/2, y:targetHeight/2, angle:0, color:'#000000', fontSize:40, fontFamily: defaultFont, content:'新文字', skewX:0, skewY:0, hasShadow:true });
-            renderAnnotationList(); selectAnnotation(id); updatePreview(); rebuildAnnoOverlay();
-            saveState(); 
+            renderAnnotationList(); selectAnnotation(id); updatePreview(); rebuildAnnoOverlay(); saveState(); 
             setTimeout(() => { DOM.textContent.focus(); DOM.textContent.select(); }, 50);
         };
 
@@ -1442,8 +1370,7 @@
         function deleteAnnotation(id) {
             annotations = annotations.filter(a => a.id !== id);
             if (selectedAnnoId === id) selectedAnnoId = null;
-            renderAnnotationList(); selectAnnotation(null); updatePreview(); rebuildAnnoOverlay();
-            saveState(); 
+            renderAnnotationList(); selectAnnotation(null); updatePreview(); rebuildAnnoOverlay(); saveState(); 
         }
 
         DOM.btnDeleteAnno.onclick = () => { if (selectedAnnoId) deleteAnnotation(selectedAnnoId); };
@@ -1503,7 +1430,6 @@
                 return { x: canvasData.left + imgX * scaleX, y: canvasData.top + imgY * scaleY };
             }
 
-            // 原本的絕對像素網格
             if (DOM.showGrid.checked) {
                 const tl = toWrapperPx(0, 0); const br = toWrapperPx(targetWidth, targetHeight);
                 const gridDiv = document.createElement('div');
@@ -1520,7 +1446,6 @@
                 DOM.annoOverlay.appendChild(gridDiv);
             }
 
-            // 主編輯區即時顯示九宮格/16宮格切割輔助線
             const sliceMode = DOM.exportSlice.value;
             if (sliceMode !== 'none') {
                 const tl = toWrapperPx(0, 0); const br = toWrapperPx(targetWidth, targetHeight);
@@ -1572,17 +1497,12 @@
             _dragAnno.x = nextX; _dragAnno.y = nextY; updatePreview(); rebuildAnnoOverlay();
         });
         
-        document.addEventListener('mouseup', () => { 
-            if (_dragAnno) {
-                _dragAnno = null; 
-                saveState(); 
-            }
-        });
+        document.addEventListener('mouseup', () => { if (_dragAnno) { _dragAnno = null; saveState(); } });
 
         /* ══ 預覽背景 ══ */
         DOM.previewBg.onchange = () => { const v = DOM.previewBg.value; DOM.previewBox.style.background = v === 'transparent' ? '' : v; saveSettings(); };
 
-        /* ══ 預覽 & Canvas 合成 (超解析度引擎支援) ══ */
+        /* ══ 預覽 & Canvas 合成 ══ */
         function updatePreview() {
             if (!cropper) return;
             const canvas = getFinalCanvas(1);
@@ -1609,100 +1529,74 @@
             DOM.previewContainer.appendChild(imgWrapper);
         }
 
-        // 核心渲染引擎：支援單張獨立圓角、內縮邊界，並確保標註完美切斷
         function getFinalCanvas(exportScale = 1) {
-            if (!cropper) return null;
+            if (!cropper || !layers.length) return null;
             const cropData = cropper.getData(true);
             if (!cropData || cropData.width <= 0 || cropData.height <= 0) return null;
             
+            // 將所有可見圖層合併至臨時畫布
+            const compCanvas = document.createElement('canvas');
+            compCanvas.width = layers[0].canvas.width; compCanvas.height = layers[0].canvas.height;
+            const compCtx = compCanvas.getContext('2d');
+            layers.forEach(l => {
+                if(l.visible) { compCtx.globalAlpha = l.opacity; compCtx.drawImage(l.canvas, 0, 0); }
+            });
+
             const sliceMode = DOM.exportSlice.value;
             let splits = 1;
-            if (sliceMode === '3x3') splits = 3;
-            else if (sliceMode === '4x4') splits = 4;
+            if (sliceMode === '3x3') splits = 3; else if (sliceMode === '4x4') splits = 4;
 
-            const finalWidth = targetWidth * exportScale;
-            const finalHeight = targetHeight * exportScale;
-            const final = document.createElement('canvas');
-            final.width = finalWidth;
-            final.height = finalHeight;
+            const finalWidth = targetWidth * exportScale; const finalHeight = targetHeight * exportScale;
+            const final = document.createElement('canvas'); final.width = finalWidth; final.height = finalHeight;
             const ctx = final.getContext('2d');
             
             const format = DOM.exportFormat.value;
-            if (format === 'image/jpeg') {
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillRect(0, 0, final.width, final.height);
-            }
+            if (format === 'image/jpeg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, final.width, final.height); }
 
             ctx.scale(exportScale, exportScale);
             
             const radiusPercent = parseInt(DOM.borderRadius.value) || 0;
-            // 如果是分割模式，預設上下左右往內縮 1 像素 (以 final 輸出的解析度為準)
             const inset = splits > 1 ? (1 / exportScale) : 0;
             
-            ctx.save();
-            ctx.beginPath();
-            
-            const pieceW = targetWidth / splits;
-            const pieceH = targetHeight / splits;
-            const maxRadius = Math.min(pieceW, pieceH) / 2;
-            const radiusPx = (radiusPercent / 50) * maxRadius;
+            ctx.save(); ctx.beginPath();
+            const pieceW = targetWidth / splits; const pieceH = targetHeight / splits;
+            const maxRadius = Math.min(pieceW, pieceH) / 2; const radiusPx = (radiusPercent / 50) * maxRadius;
 
-            // 為每一小格繪製獨立的裁切路徑 (支援圓角與內縮)
             for (let r = 0; r < splits; r++) {
                 for (let c = 0; c < splits; c++) {
-                    const px = c * pieceW + inset;
-                    const py = r * pieceH + inset;
-                    const pw = pieceW - inset * 2;
-                    const ph = pieceH - inset * 2;
+                    const px = c * pieceW + inset; const py = r * pieceH + inset;
+                    const pw = pieceW - inset * 2; const ph = pieceH - inset * 2;
 
                     if (pw > 0 && ph > 0) {
                         if (radiusPx > 0) {
-                            if (ctx.roundRect) {
-                                ctx.roundRect(px, py, pw, ph, radiusPx);
-                            } else {
-                                ctx.moveTo(px + radiusPx, py);
-                                ctx.lineTo(px + pw - radiusPx, py);
-                                ctx.quadraticCurveTo(px + pw, py, px + pw, py + radiusPx);
-                                ctx.lineTo(px + pw, py + ph - radiusPx);
-                                ctx.quadraticCurveTo(px + pw, py + ph, px + pw - radiusPx, py + ph);
-                                ctx.lineTo(px + radiusPx, py + ph);
-                                ctx.quadraticCurveTo(px, py + ph, px, py + ph - radiusPx);
-                                ctx.lineTo(px, py + radiusPx);
-                                ctx.quadraticCurveTo(px, py, px + radiusPx, py);
+                            if (ctx.roundRect) { ctx.roundRect(px, py, pw, ph, radiusPx); } else {
+                                ctx.moveTo(px + radiusPx, py); ctx.lineTo(px + pw - radiusPx, py); ctx.quadraticCurveTo(px + pw, py, px + pw, py + radiusPx);
+                                ctx.lineTo(px + pw, py + ph - radiusPx); ctx.quadraticCurveTo(px + pw, py + ph, px + pw - radiusPx, py + ph);
+                                ctx.lineTo(px + radiusPx, py + ph); ctx.quadraticCurveTo(px, py + ph, px, py + ph - radiusPx);
+                                ctx.lineTo(px, py + radiusPx); ctx.quadraticCurveTo(px, py, px + radiusPx, py);
                             }
-                        } else {
-                            ctx.rect(px, py, pw, ph);
-                        }
+                        } else { ctx.rect(px, py, pw, ph); }
                     }
                 }
             }
-            ctx.closePath();
-            ctx.clip(); 
+            ctx.closePath(); ctx.clip(); 
             
-            // 繪製原圖
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(wandCanvas, cropData.x, cropData.y, cropData.width, cropData.height, 0, 0, targetWidth, targetHeight);
+            ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+            // 繪製多圖層合成的畫面
+            ctx.drawImage(compCanvas, cropData.x, cropData.y, cropData.width, cropData.height, 0, 0, targetWidth, targetHeight);
             
-            // 繪製標註 (在裁切範圍內繪製，確保跨界的標註被乾淨切斷)
             annotations.forEach(anno => {
                 ctx.save();
                 if (anno.hasShadow !== false) {
                     const scale = Math.max(targetWidth, targetHeight) / 500;
-                    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-                    ctx.shadowBlur = 8 * scale * exportScale;
-                    ctx.shadowOffsetX = 2 * scale * exportScale;
-                    ctx.shadowOffsetY = 2 * scale * exportScale;
-                } else {
-                    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-                }
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'; ctx.shadowBlur = 8 * scale * exportScale;
+                    ctx.shadowOffsetX = 2 * scale * exportScale; ctx.shadowOffsetY = 2 * scale * exportScale;
+                } else { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; }
 
-                ctx.translate(anno.x, anno.y);
-                ctx.rotate(anno.angle * Math.PI / 180);
+                ctx.translate(anno.x, anno.y); ctx.rotate(anno.angle * Math.PI / 180);
                 
                 if (anno.type === 'text' && (anno.skewX !== 0 || anno.skewY !== 0)) {
-                    const skewXRad = (anno.skewX || 0) * Math.PI / 180;
-                    const skewYRad = (anno.skewY || 0) * Math.PI / 180;
+                    const skewXRad = (anno.skewX || 0) * Math.PI / 180; const skewYRad = (anno.skewY || 0) * Math.PI / 180;
                     ctx.transform(1, Math.tan(skewYRad), Math.tan(skewXRad), 1, 0, 0);
                 }
                 
@@ -1719,7 +1613,6 @@
                 ctx.restore();
             });
             ctx.restore();
-            
             return final;
         }
 
@@ -1753,17 +1646,9 @@
                             const pieceCanvas = document.createElement('canvas'); pieceCanvas.width = w; pieceCanvas.height = h;
                             const pCtx = pieceCanvas.getContext('2d'); 
                             
-                            if (format === 'image/jpeg') {
-                                pCtx.fillStyle = '#FFFFFF';
-                                pCtx.fillRect(0, 0, w, h);
-                            }
+                            if (format === 'image/jpeg') { pCtx.fillStyle = '#FFFFFF'; pCtx.fillRect(0, 0, w, h); }
                             
-                            // 直接從已完美裁切與內縮的大畫布中，取出對應的區塊
-                            pCtx.drawImage(
-                                canvas, 
-                                c * pieceW, r * pieceH, w, h, 
-                                0, 0, w, h
-                            );
+                            pCtx.drawImage( canvas,  c * pieceW, r * pieceH, w, h,  0, 0, w, h );
                             
                             const promise = new Promise((resolve) => {
                                 pieceCanvas.toBlob((blob) => { zip.file(`${currentFilename}_part${idx}.${ext}`, blob); resolve(); }, format, format === 'image/jpeg' ? 0.92 : 1);
