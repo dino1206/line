@@ -224,7 +224,6 @@
 
         <!-- 頂部下拉選單列 -->
         <div class="top-menus" id="top-menus">
-            
             <!-- 畫布規格 -->
             <div class="dropdown">
                 <button class="dropdown-toggle"><i class="fa-solid fa-crop-simple"></i> 畫布設定</button>
@@ -296,7 +295,6 @@
                     <div class="form-row" style="border-top:1px solid rgba(0,0,0,0.05); padding-top:8px;"><label>間距：<span id="grid-size-val">20</span>px</label><input type="range" id="grid-size" min="10" max="100" step="10" value="20" style="width:90px"></div>
                 </div>
             </div>
-
         </div>
 
         <!-- 匯出控制列 -->
@@ -900,7 +898,7 @@
                 compCtx.globalAlpha = 1;
                 compCtx.save();
                 compCtx.beginPath();
-                compCtx.strokeStyle = '#007AFF'; compCtx.lineWidth = 2;
+                compCtx.strokeStyle = '#007AFF'; compCtx.lineWidth = 1.5;
                 compCtx.moveTo(penPath[0].x, penPath[0].y);
                 
                 for(let i=1; i<penPath.length; i++) {
@@ -925,12 +923,13 @@
                         if (p.cp2x !== p.x || p.cp2y !== p.y) { compCtx.moveTo(p.x, p.y); compCtx.lineTo(p.cp2x, p.cp2y); }
                         compCtx.stroke();
 
-                        compCtx.fillStyle = '#FFFFFF'; compCtx.strokeStyle = '#007AFF'; compCtx.lineWidth = 1.5;
-                        if (p.cp1x !== p.x || p.cp1y !== p.y) { compCtx.beginPath(); compCtx.arc(p.cp1x, p.cp1y, 3, 0, Math.PI*2); compCtx.fill(); compCtx.stroke(); }
-                        if (p.cp2x !== p.x || p.cp2y !== p.y) { compCtx.beginPath(); compCtx.arc(p.cp2x, p.cp2y, 3, 0, Math.PI*2); compCtx.fill(); compCtx.stroke(); }
+                        // 修改圓點大小以符合 Photoshop 專業精準度
+                        compCtx.fillStyle = '#FFFFFF'; compCtx.strokeStyle = '#007AFF'; compCtx.lineWidth = 1;
+                        if (p.cp1x !== p.x || p.cp1y !== p.y) { compCtx.beginPath(); compCtx.arc(p.cp1x, p.cp1y, 1.5, 0, Math.PI*2); compCtx.fill(); compCtx.stroke(); }
+                        if (p.cp2x !== p.x || p.cp2y !== p.y) { compCtx.beginPath(); compCtx.arc(p.cp2x, p.cp2y, 1.5, 0, Math.PI*2); compCtx.fill(); compCtx.stroke(); }
                         
                         compCtx.fillStyle = '#007AFF';
-                        compCtx.beginPath(); compCtx.arc(p.x, p.y, 4, 0, Math.PI*2); compCtx.fill(); compCtx.stroke(); 
+                        compCtx.beginPath(); compCtx.arc(p.x, p.y, 2, 0, Math.PI*2); compCtx.fill(); compCtx.stroke(); 
                     });
                 }
                 compCtx.restore();
@@ -1313,7 +1312,6 @@
             applyProcessShapeToCanvas(null, null, action); 
         };
 
-        // 全新的防呆螢幕座標轉換系統
         function screenToImage(clientX, clientY) {
             if(!DOM.eraserOverlay || !cropper) return {x:0, y:0};
             const canvasData = cropper.getCanvasData(); 
@@ -1351,8 +1349,8 @@
                         for (let i = 0; i < penPath.length; i++) {
                             const node = penPath[i];
                             const dx = pt.x - node.x; const dy = pt.y - node.y;
-                            // 判斷點擊半徑
-                            if (dx*dx + dy*dy < 400) { 
+                            // 判斷點擊半徑，調小至 144 (12px) 避免干擾
+                            if (dx*dx + dy*dy < 144) { 
                                 node.cp2x = node.x; node.cp2y = node.y; updateCompositeImage(); saveState(); return;
                             }
                         }
@@ -1360,7 +1358,7 @@
 
                     if (penPath.length > 1 && !penClosed) {
                         const dx = pt.x - penPath[0].x; const dy = pt.y - penPath[0].y;
-                        if (dx*dx + dy*dy < 400) { penClosed = true; updateCompositeImage(); saveState(); return; }
+                        if (dx*dx + dy*dy < 144) { penClosed = true; updateCompositeImage(); saveState(); return; }
                     }
                     
                     if (!penClosed) {
@@ -1801,7 +1799,7 @@
                 visual.style.position = 'absolute';
                 visual.style.left = pos.x + 'px';
                 visual.style.top = pos.y + 'px';
-                visual.style.pointerEvents = 'none'; 
+                visual.style.pointerEvents = 'none'; // 讓滑鼠穿透到把手
                 visual.style.zIndex = '49';
                 
                 let transformStr = `translate(-50%, -50%) rotate(${anno.angle}deg)`;
