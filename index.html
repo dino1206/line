@@ -52,15 +52,24 @@
             background: var(--surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--surface-border); border-radius: var(--border-radius);
             padding: 12px 24px; display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 16px; flex-shrink: 0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 16px; flex-shrink: 0; gap: 16px;
         }
 
-        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo { display: flex; align-items: center; gap: 12px; flex: 1; }
         .logo i { font-size: 1.8rem; color: var(--primary); }
-        .logo h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.5px; }
-        .logo p { font-size: 0.8rem; color: var(--text-muted); }
+        .logo h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.5px; white-space: nowrap; }
+        .logo p { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
         
-        .header-actions { display: flex; gap: 8px; }
+        .header-export {
+            display: flex; align-items: center; gap: 8px;
+            background: #f9f9fb; padding: 6px 12px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05);
+            flex-shrink: 0;
+        }
+        .header-export select { border: none; background: transparent; font-weight: 600; color: var(--text-main); cursor: pointer; outline: none; }
+        .header-export .divider { width: 1px; height: 18px; background: rgba(0,0,0,0.1); margin: 0 4px; }
+        .header-export #stat-size { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); min-width: 70px; text-align: center; font-family: monospace; }
+
+        .header-actions { display: flex; gap: 8px; flex: 1; justify-content: flex-end; flex-wrap: wrap; }
 
         .workspace { display: flex; gap: 16px; flex-grow: 1; min-height: 0; }
         
@@ -197,11 +206,6 @@
         .preset-item.active { border-color: var(--primary); background: rgba(0,122,255,0.1); font-weight: 700; color: var(--primary); }
         .preset-item[data-w="custom"] { grid-column: 1 / -1; }
 
-        .export-info { background: #f5f5f7; border-radius: 12px; padding: 12px; font-size: 0.8rem; border: 1px solid rgba(0,0,0,0.03); }
-        .export-info div { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .export-info div:last-child { margin-bottom: 0; }
-        .export-info b { color: var(--text-main); }
-
         .custom-size-box { background: rgba(0,122,255,0.05); border: 1px dashed var(--primary); border-radius: 10px; padding: 10px; margin-top: 4px; }
         .custom-size-box label { font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 6px; text-align: center; }
         .custom-size-row { display: flex; align-items: center; gap: 8px; }
@@ -257,17 +261,38 @@
         <header class="glass-header">
             <div class="logo">
                 <i class="fa-solid fa-wand-magic-sparkles"></i>
-                <div>
+                <div style="overflow: hidden;">
                     <h1>簡單的圖片工具</h1>
-                    <p>多圖層・去背・裁切・收納介面</p>
+                    <p style="text-overflow: ellipsis; overflow: hidden;">多圖層・去背・裁切・收納介面</p>
                 </div>
             </div>
+
+            <!-- 新增：中央獨立的匯出控制列 -->
+            <div class="header-export">
+                <select id="export-format" title="存檔格式">
+                    <option value="image/png">PNG 透明底</option>
+                    <option value="image/jpeg">JPEG 無透明</option>
+                    <option value="image/webp">WEBP 壓縮</option>
+                </select>
+                <div class="divider"></div>
+                <select id="export-slice" title="網格切割選項">
+                    <option value="none">單張不切</option>
+                    <option value="3x3">九宮格</option>
+                    <option value="4x4">16宮格</option>
+                </select>
+                <div class="divider"></div>
+                <span id="stat-size" title="當前輸出總尺寸">370x320</span>
+                <button id="btn-export" class="btn btn-primary btn-sm" disabled style="padding: 6px 16px; margin-left: 4px;" title="防殘留邊界：網格模式自動內縮 1px">
+                    <i class="fa-solid fa-download"></i> 匯出
+                </button>
+            </div>
+
             <div class="header-actions">
                 <button id="btn-toggle-left" class="btn btn-outline btn-sm" title="隱藏/顯示左欄，最大化編輯區"><i class="fa-solid fa-left-right"></i> 左欄</button>
-                <button id="btn-undo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Z"><i class="fa-solid fa-rotate-left"></i> 上一步</button>
-                <button id="btn-redo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Y"><i class="fa-solid fa-rotate-right"></i> 下一步</button>
+                <button id="btn-undo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Z"><i class="fa-solid fa-rotate-left"></i> 復原</button>
+                <button id="btn-redo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Y"><i class="fa-solid fa-rotate-right"></i> 重做</button>
                 <button id="btn-capture-header" class="btn btn-outline btn-sm" style="display:none"><i class="fa-solid fa-desktop"></i> 截圖</button>
-                <button id="btn-new" class="btn btn-primary btn-sm" style="display:none"><i class="fa-solid fa-plus"></i> 新圖片</button>
+                <button id="btn-new" class="btn btn-primary btn-sm" style="display:none"><i class="fa-solid fa-plus"></i> 新圖</button>
                 <button id="btn-toggle-right" class="btn btn-outline btn-sm" title="隱藏/顯示右欄，最大化編輯區">右欄 <i class="fa-solid fa-left-right"></i></button>
             </div>
         </header>
@@ -485,43 +510,10 @@
                     </div>
                 </details>
 
-                <!-- 7. 完成匯出 -->
+                <!-- 7. 即時預覽 -->
                 <details class="section" open>
                     <summary>
-                        <h3><i class="fa-solid fa-cloud-arrow-down"></i> 7. 完成匯出</h3>
-                        <i class="fa-solid fa-chevron-down"></i>
-                    </summary>
-                    <div class="section-content">
-                        <div class="form-row mb-2">
-                            <label>存檔格式</label>
-                            <select id="export-format" class="btn btn-outline btn-sm form-select" style="padding:2px 8px; width:140px;">
-                                <option value="image/png">PNG (保留透明底)</option>
-                                <option value="image/jpeg">JPEG (無透明底)</option>
-                                <option value="image/webp">WEBP (高壓縮比)</option>
-                            </select>
-                        </div>
-                        <div class="form-row align-center mb-2">
-                            <label>網格切割匯出</label>
-                            <select id="export-slice" class="btn btn-outline btn-sm form-select" style="padding:2px 8px; width:130px;">
-                                <option value="none">不切割</option>
-                                <option value="3x3">九宮格 (3x3)</option>
-                                <option value="4x4">16宮格 (4x4)</option>
-                            </select>
-                        </div>
-                        <div class="export-info mb-2">
-                            <div>輸出總尺寸：<b id="stat-size">370 × 320 px</b></div>
-                            <div>防殘留邊界：<b>內縮 1 px (圓角獨立)</b></div>
-                        </div>
-                        <button id="btn-export" class="btn btn-primary w-100" style="transition: background-color 0.3s;" disabled>
-                            <i class="fa-solid fa-download"></i> 下載圖片
-                        </button>
-                    </div>
-                </details>
-
-                <!-- 即時預覽 -->
-                <details class="section" open>
-                    <summary>
-                        <h3><i class="fa-solid fa-magnifying-glass"></i> 即時預覽</h3>
+                        <h3><i class="fa-solid fa-magnifying-glass"></i> 7. 即時預覽</h3>
                         <i class="fa-solid fa-chevron-down"></i>
                     </summary>
                     <div class="section-content">
@@ -568,11 +560,11 @@
         let annotations = [];
         let selectedAnnoId = null;
 
-        // 圖層系統 (全新加入)
+        // 圖層系統
         let layers = [];
         let activeLayerId = null;
         let layerCounter = 0;
-        let wandCanvas, wandCtx; // 動態指向當前選取的圖層
+        let wandCanvas, wandCtx; 
         
         // 去背與填色工具狀態
         let currentProcessAction = 'erase'; 
@@ -639,11 +631,9 @@
 
             exportFormat:     $('export-format'),     exportSlice:      $('export-slice'),
             
-            // Layout toggles
             btnToggleLeft:    $('btn-toggle-left'),   btnToggleRight:   $('btn-toggle-right'),
             sidebarLeft:      $('sidebar-left'),      sidebarRight:     $('sidebar-right'),
             
-            // Layers
             btnAddLayer:      $('btn-add-layer'),     layersList:       $('layers-list'),
             layerOpacity:     $('layer-opacity')
         };
@@ -656,7 +646,7 @@
             let splits = 1;
             if (DOM.exportSlice.value === '3x3') splits = 3;
             else if (DOM.exportSlice.value === '4x4') splits = 4;
-            DOM.statSize.textContent = `${targetWidth * splits} × ${targetHeight * splits} px`;
+            DOM.statSize.textContent = `${targetWidth * splits}x${targetHeight * splits}`;
         }
 
         /* ══ 本地儲存設定 ══ */
@@ -722,11 +712,7 @@
             const c = document.createElement('canvas');
             return {
                 id: `layer_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                name: name,
-                canvas: c,
-                ctx: c.getContext('2d', { willReadFrequently: true }),
-                visible: true,
-                opacity: 1
+                name: name, canvas: c, ctx: c.getContext('2d', { willReadFrequently: true }), visible: true, opacity: 1
             };
         }
 
@@ -759,8 +745,7 @@
         }
 
         function selectLayer(id) {
-            activeLayerId = id;
-            const l = layers.find(l => l.id === id);
+            activeLayerId = id; const l = layers.find(l => l.id === id);
             if(l) { wandCanvas = l.canvas; wandCtx = l.ctx; }
             renderLayersUI();
         }
@@ -768,11 +753,8 @@
         DOM.btnAddLayer.onclick = () => {
             if(!layers.length) return;
             const w = layers[0].canvas.width; const h = layers[0].canvas.height;
-            const newL = createLayer(`圖層 ${++layerCounter}`);
-            newL.canvas.width = w; newL.canvas.height = h;
-            layers.push(newL);
-            selectLayer(newL.id);
-            saveState();
+            const newL = createLayer(`圖層 ${++layerCounter}`); newL.canvas.width = w; newL.canvas.height = h;
+            layers.push(newL); selectLayer(newL.id); saveState();
         };
 
         DOM.layerOpacity.oninput = (e) => {
@@ -786,12 +768,7 @@
             const compCanvas = document.createElement('canvas');
             compCanvas.width = layers[0].canvas.width; compCanvas.height = layers[0].canvas.height;
             const compCtx = compCanvas.getContext('2d');
-            layers.forEach(l => {
-                if (l.visible) {
-                    compCtx.globalAlpha = l.opacity;
-                    compCtx.drawImage(l.canvas, 0, 0);
-                }
-            });
+            layers.forEach(l => { if (l.visible) { compCtx.globalAlpha = l.opacity; compCtx.drawImage(l.canvas, 0, 0); } });
             originalImageSrc = compCanvas.toDataURL('image/png');
             updateCropperImagesFast(originalImageSrc);
         }
@@ -800,15 +777,9 @@
         function saveState() {
             if (!cropper) return;
             const state = {
-                layers: layers.map(l => ({
-                    id: l.id, name: l.name, visible: l.visible, opacity: l.opacity,
-                    imgData: l.ctx.getImageData(0, 0, l.canvas.width, l.canvas.height)
-                })),
-                activeLayerId: activeLayerId,
-                annotations: JSON.parse(JSON.stringify(annotations)), 
-                cropData: cropper.getData(),
-                targetWidth: targetWidth, targetHeight: targetHeight,
-                isCustomSize: isCustomSize,
+                layers: layers.map(l => ({ id: l.id, name: l.name, visible: l.visible, opacity: l.opacity, imgData: l.ctx.getImageData(0, 0, l.canvas.width, l.canvas.height) })),
+                activeLayerId: activeLayerId, annotations: JSON.parse(JSON.stringify(annotations)), cropData: cropper.getData(),
+                targetWidth: targetWidth, targetHeight: targetHeight, isCustomSize: isCustomSize,
                 presetSize: document.querySelector('.preset-item.active')?.dataset.w === 'custom' ? 'custom' : `${targetWidth}x${targetHeight}`
             };
             
@@ -824,55 +795,35 @@
         }
 
         function restore(idx) {
-            currentIndex = idx; 
-            const state = history[idx];
-            
-            annotations = JSON.parse(JSON.stringify(state.annotations));
-            selectedAnnoId = null; 
-            
-            targetWidth = state.targetWidth; targetHeight = state.targetHeight; isCustomSize = state.isCustomSize;
-            updateStatSize();
+            currentIndex = idx; const state = history[idx];
+            annotations = JSON.parse(JSON.stringify(state.annotations)); selectedAnnoId = null; 
+            targetWidth = state.targetWidth; targetHeight = state.targetHeight; isCustomSize = state.isCustomSize; updateStatSize();
             
             DOM.presetItems.forEach(i => {
                 i.classList.remove('active');
                 if (state.presetSize === 'custom' && i.dataset.w === 'custom') i.classList.add('active');
                 else if (`${i.dataset.w}x${i.dataset.h}` === state.presetSize) i.classList.add('active');
             });
-            if (isCustomSize) {
-                DOM.customSizeBox.classList.remove('hidden');
-                DOM.customW.value = targetWidth; DOM.customH.value = targetHeight;
-            } else { DOM.customSizeBox.classList.add('hidden'); }
+            if (isCustomSize) { DOM.customSizeBox.classList.remove('hidden'); DOM.customW.value = targetWidth; DOM.customH.value = targetHeight; } 
+            else { DOM.customSizeBox.classList.add('hidden'); }
             
-            // 復原圖層
             layers = state.layers.map(ls => {
-                const l = createLayer(ls.name);
-                l.id = ls.id; l.visible = ls.visible; l.opacity = ls.opacity;
-                l.canvas.width = ls.imgData.width; l.canvas.height = ls.imgData.height;
-                l.ctx.putImageData(ls.imgData, 0, 0);
-                return l;
+                const l = createLayer(ls.name); l.id = ls.id; l.visible = ls.visible; l.opacity = ls.opacity;
+                l.canvas.width = ls.imgData.width; l.canvas.height = ls.imgData.height; l.ctx.putImageData(ls.imgData, 0, 0); return l;
             });
             
-            if(layers.find(l => l.id === state.activeLayerId)) {
-                selectLayer(state.activeLayerId);
-            } else {
-                selectLayer(layers[layers.length-1].id);
-            }
+            if(layers.find(l => l.id === state.activeLayerId)) selectLayer(state.activeLayerId);
+            else selectLayer(layers[layers.length-1].id);
             
             updateCompositeImage();
             
             if (cropper && state.cropData) {
                 isUserInteractingWithCropBox = true;
                 if (!isCustomSize) cropper.setAspectRatio(targetWidth / targetHeight); else cropper.setAspectRatio(NaN);
-                cropper.setData(state.cropData);
-                lockedCropData = state.cropData;
-                isUserInteractingWithCropBox = false;
+                cropper.setData(state.cropData); lockedCropData = state.cropData; isUserInteractingWithCropBox = false;
             }
             
-            renderAnnotationList();
-            DOM.annoSettings.classList.add('hidden'); 
-            updateUndoRedo(); 
-            updatePreview();
-            rebuildAnnoOverlay();
+            renderAnnotationList(); DOM.annoSettings.classList.add('hidden'); updateUndoRedo(); updatePreview(); rebuildAnnoOverlay();
         }
 
         DOM.btnUndo.onclick = () => { if (currentIndex > 0) restore(currentIndex - 1); };
@@ -925,8 +876,7 @@
         }
 
         function initEditor(src) {
-            DOM.dropZone.classList.add('hidden');
-            DOM.canvasWrapper.classList.remove('hidden');
+            DOM.dropZone.classList.add('hidden'); DOM.canvasWrapper.classList.remove('hidden');
             DOM.btnNew.style.display = 'flex'; DOM.btnCaptureHeader.style.display = 'flex';
             DOM.btnExport.disabled = false; DOM.btnWandToggle.disabled = false;
 
@@ -938,22 +888,11 @@
                 const w = DOM.mainImage.naturalWidth; const h = DOM.mainImage.naturalHeight;
                 
                 layers = []; layerCounter = 0;
-                // 初始化底圖層
-                const bgLayer = createLayer('原圖背景');
-                bgLayer.canvas.width = w; bgLayer.canvas.height = h;
-                bgLayer.ctx.drawImage(DOM.mainImage, 0, 0);
-                layers.push(bgLayer);
+                const bgLayer = createLayer('原圖背景'); bgLayer.canvas.width = w; bgLayer.canvas.height = h; bgLayer.ctx.drawImage(DOM.mainImage, 0, 0); layers.push(bgLayer);
+                const drawLayer = createLayer('編輯圖層 1'); drawLayer.canvas.width = w; drawLayer.canvas.height = h; layers.push(drawLayer);
                 
-                // 初始化繪圖層
-                const drawLayer = createLayer('編輯圖層 1');
-                drawLayer.canvas.width = w; drawLayer.canvas.height = h;
-                layers.push(drawLayer);
-                
-                selectLayer(drawLayer.id);
-                updateCompositeImage();
-
-                cropper = _createCropper('move');
-                updateModeUI();
+                selectLayer(drawLayer.id); updateCompositeImage();
+                cropper = _createCropper('move'); updateModeUI();
                 
                 history = []; currentIndex = -1; annotations = [];
                 renderAnnotationList(); saveState();
