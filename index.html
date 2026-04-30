@@ -53,7 +53,7 @@
             padding: 10px 24px; display: flex; justify-content: space-between; align-items: center;
             flex-shrink: 0; z-index: 200; gap: 16px;
         }
-        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo { display: flex; align-items: center; gap: 12px; flex: 1; }
         .logo i { font-size: 1.5rem; color: var(--primary); }
         .logo h1 { font-size: 1.1rem; font-weight: 700; margin: 0; white-space: nowrap; }
         
@@ -132,7 +132,7 @@
         .sidebar-right.collapsed { margin-right: -320px; }
 
         details.section { background: rgba(255, 255, 255, 0.8); border: 1px solid var(--surface-border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
-        details.section summary { padding: 10px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: #f9f9fb; color: var(--primary); user-select: none; }
+        details.section summary { padding: 10px 14px; cursor: default; display: flex; align-items: center; justify-content: space-between; background: #f9f9fb; color: var(--primary); user-select: none; }
         details.section summary::-webkit-details-marker { display: none; }
         details.section summary h3 { margin: 0; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-main); }
         .section-content { padding: 12px; border-top: 1px solid rgba(0,0,0,0.05); font-size: 0.85rem; }
@@ -165,14 +165,18 @@
         .layer-list-container, .annotation-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; margin-top: 8px;}
         .layer-item, .annotation-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: white; border: 1px solid #d2d2d7; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
         .layer-item.active, .annotation-item.active { border-color: var(--primary); background: rgba(0,122,255,0.08); font-weight: 600; box-shadow: 0 0 0 2px rgba(0,122,255,0.1); }
-        .layer-item .layer-vis, .layer-item .layer-del, .annotation-item .delete-btn { opacity: 0.6; transition: opacity 0.2s; font-size: 0.9rem; color: var(--text-main); }
-        .layer-item .layer-vis:hover, .layer-item .layer-del:hover, .annotation-item .delete-btn:hover { opacity: 1; }
+        
+        .layer-icon { opacity: 0.5; transition: opacity 0.2s; font-size: 0.9rem; color: var(--text-main); cursor: pointer; }
+        .layer-icon:hover { opacity: 1; color: var(--primary); }
         .layer-del:hover, .delete-btn:hover { color: #FF3B30 !important; }
+        
+        .annotation-item .delete-btn { color: #FF3B30; cursor: pointer; padding: 2px 4px; opacity: 0.6; }
+        .annotation-item .delete-btn:hover { opacity: 1; }
 
         .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
         .preset-item { padding: 8px 6px; border: 1px solid #d2d2d7; border-radius: 6px; cursor: pointer; text-align: center; font-size: 0.8rem; font-weight: 500; background: white; line-height: 1.3; transition: all 0.2s;}
         .preset-item .size-label { font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: 400;}
-        .preset-item:hover { border-color: var(--primary); background: rgba(0,122,255,0.05); }
+        .preset-item:hover { border-color: var(--primary); }
         .preset-item.active { border-color: var(--primary); background: rgba(0,122,255,0.1); font-weight: 700; color: var(--primary); }
         .preset-item[data-w="custom"] { grid-column: 1 / -1; }
 
@@ -191,7 +195,7 @@
         .canvas-wrapper { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
         .hidden { display: none !important; }
 
-        .anno-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; pointer-events: none; }
+        .anno-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; pointer-events: none; overflow: hidden;}
         .anno-handle { position: absolute; width: 24px; height: 24px; background: rgba(0,122,255,0.85); border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); cursor: grab; pointer-events: all; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); transition: background 0.15s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); user-select: none;}
         .anno-handle:hover { background: var(--primary-hover); transform: translate(-50%, -50%) scale(1.1); }
         .anno-handle.selected { background: #FF3B30; transform: translate(-50%, -50%) scale(1.15); box-shadow: 0 4px 10px rgba(255,59,48,0.4); }
@@ -213,7 +217,7 @@
     <header class="glass-header">
         <div class="logo">
             <i class="fa-solid fa-wand-magic-sparkles"></i>
-            <div>
+            <div style="overflow: hidden;">
                 <h1>簡單圖片工具 Pro</h1>
             </div>
         </div>
@@ -278,7 +282,6 @@
                         <div style="height:1px; background:rgba(0,0,0,0.05); margin:8px 0;"></div>
                         <div class="form-row mb-2"><label>立體陰影</label><label class="switch"><input type="checkbox" id="anno-shadow" checked><span class="slider"></span></label></div>
                         <div class="form-row mb-2"><label>整體旋轉：<span id="anno-angle-val">0</span>°</label><input type="range" id="anno-angle" min="0" max="360" value="0" step="15" style="width:100px"></div>
-                        <button id="btn-delete-anno" class="btn btn-outline btn-sm w-100" style="color:#FF3B30;border-color:rgba(255,59,48,0.3)"><i class="fa-solid fa-trash"></i> 刪除此標註</button>
                     </div>
                 </div>
             </div>
@@ -317,12 +320,12 @@
         </div>
 
         <div class="header-actions">
-            <button id="btn-undo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Z"><i class="fa-solid fa-rotate-left"></i></button>
-            <button id="btn-redo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Y"><i class="fa-solid fa-rotate-right"></i></button>
-            <button id="btn-capture-header" class="btn btn-outline btn-sm" style="display:none"><i class="fa-solid fa-desktop"></i></button>
-            <button id="btn-new" class="btn btn-primary btn-sm" style="display:none"><i class="fa-solid fa-plus"></i></button>
-            <button id="btn-toggle-left" class="btn btn-outline btn-sm" title="隱藏/顯示左欄"><i class="fa-solid fa-bars"></i></button>
-            <button id="btn-toggle-right" class="btn btn-outline btn-sm" title="隱藏/顯示右側面板"><i class="fa-solid fa-layer-group"></i></button>
+            <button id="btn-undo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Z"><i class="fa-solid fa-rotate-left"></i> 復原</button>
+            <button id="btn-redo" class="btn btn-outline btn-sm" style="display:none" title="快捷鍵: Ctrl+Y"><i class="fa-solid fa-rotate-right"></i> 重做</button>
+            <button id="btn-capture-header" class="btn btn-outline btn-sm" style="display:none"><i class="fa-solid fa-desktop"></i> 截圖</button>
+            <button id="btn-new" class="btn btn-primary btn-sm" style="display:none"><i class="fa-solid fa-plus"></i> 新圖</button>
+            <button id="btn-toggle-left" class="btn btn-outline btn-sm" title="隱藏/顯示左側工具列"><i class="fa-solid fa-bars"></i></button>
+            <button id="btn-toggle-right" class="btn btn-outline btn-sm" title="隱藏/顯示右側面板">面板 <i class="fa-solid fa-caret-right"></i></button>
         </div>
     </header>
 
@@ -370,7 +373,7 @@
         <!-- 鋼筆專屬動作 -->
         <div class="opt-group opt-group-pen" id="opt-group-pen" style="display:none; gap:6px;">
             <div style="color:#007AFF; font-size: 0.8rem; background: rgba(0,122,255,0.08); padding: 4px 10px; border-radius: 6px; margin-right: 8px;">
-                <i class="fa-solid fa-info-circle"></i> Alt+點擊重置把手。路徑會跨工具自動保留！
+                <i class="fa-solid fa-info-circle"></i> Alt+點擊重置把手。路徑自動保留！
             </div>
             <button id="btn-pen-close" class="btn btn-outline btn-sm" title="將起點與終點閉合"><i class="fa-solid fa-link"></i> 閉合路徑</button>
             <button id="btn-pen-apply" class="btn btn-primary btn-sm" title="依據左方的 [描邊/填色/去背] 模式執行畫布更新"><i class="fa-solid fa-check"></i> 套用路徑</button>
@@ -627,11 +630,12 @@
                             else if (`${i.dataset.w}x${i.dataset.h}` === settings.presetSize) i.classList.add('active');
                         });
                         if (settings.presetSize === 'custom') {
-                            isCustomSize = true; DOM.customSizeBox.classList.remove('hidden');
+                            isCustomSize = true; if(DOM.customSizeBox) DOM.customSizeBox.classList.remove('hidden');
                             targetWidth = parseInt(settings.customW) || 370; targetHeight = parseInt(settings.customH) || 320;
-                            DOM.customW.value = targetWidth; DOM.customH.value = targetHeight;
+                            if(DOM.customW) DOM.customW.value = targetWidth; 
+                            if(DOM.customH) DOM.customH.value = targetHeight;
                         } else {
-                            isCustomSize = false; DOM.customSizeBox.classList.add('hidden');
+                            isCustomSize = false; if(DOM.customSizeBox) DOM.customSizeBox.classList.add('hidden');
                             const [w, h] = settings.presetSize.split('x').map(Number);
                             targetWidth = w || 370; targetHeight = h || 320;
                         }
@@ -642,7 +646,7 @@
                     if (settings.brushSize && DOM.brushSize) { DOM.brushSize.value = settings.brushSize; DOM.brushSizeVal.textContent = settings.brushSize; }
                     if (settings.borderRadius && DOM.borderRadius) { DOM.borderRadius.value = settings.borderRadius; DOM.radiusVal.textContent = settings.borderRadius; }
                     if (settings.showGrid !== undefined && DOM.showGrid) DOM.showGrid.checked = settings.showGrid;
-                    if (settings.snapGrid !== undefined && DOM.snapGrid) { DOM.snapGrid.checked = settings.snapGrid; DOM.annoAngle.step = settings.snapGrid ? 15 : 1; }
+                    if (settings.snapGrid !== undefined && DOM.snapGrid) { DOM.snapGrid.checked = settings.snapGrid; if(DOM.annoAngle) DOM.annoAngle.step = settings.snapGrid ? 15 : 1; }
                     if (settings.gridSize && DOM.gridSize) { DOM.gridSize.value = settings.gridSize; DOM.gridSizeVal.textContent = settings.gridSize; }
                     if (settings.exportFormat && DOM.exportFormat) DOM.exportFormat.value = settings.exportFormat;
                     if (settings.exportSlice && DOM.exportSlice) DOM.exportSlice.value = settings.exportSlice;
@@ -659,11 +663,11 @@
             if (isCustomSize) activePreset = 'custom';
             else { const activeEl = document.querySelector('.preset-item.active'); if (activeEl) activePreset = activeEl.dataset.w === 'custom' ? 'custom' : `${activeEl.dataset.w}x${activeEl.dataset.h}`; }
             const settings = {
-                presetSize: activePreset, customW: DOM.customW.value, customH: DOM.customH.value,
-                tolerance: DOM.tolerance.value, contiguous: DOM.contiguous.checked, limitToCrop: DOM.limitToCrop.checked,
-                brushSize: DOM.brushSize.value, borderRadius: DOM.borderRadius.value,
-                showGrid: DOM.showGrid.checked, snapGrid: DOM.snapGrid.checked, gridSize: DOM.gridSize.value,
-                exportFormat: DOM.exportFormat.value, exportSlice: DOM.exportSlice.value, previewBg: DOM.previewBg.value
+                presetSize: activePreset, customW: DOM.customW ? DOM.customW.value : 370, customH: DOM.customH ? DOM.customH.value : 320,
+                tolerance: DOM.tolerance ? DOM.tolerance.value : 20, contiguous: DOM.contiguous ? DOM.contiguous.checked : true, limitToCrop: DOM.limitToCrop ? DOM.limitToCrop.checked : true,
+                brushSize: DOM.brushSize ? DOM.brushSize.value : 20, borderRadius: DOM.borderRadius ? DOM.borderRadius.value : 0,
+                showGrid: DOM.showGrid ? DOM.showGrid.checked : true, snapGrid: DOM.snapGrid ? DOM.snapGrid.checked : true, gridSize: DOM.gridSize ? DOM.gridSize.value : 20,
+                exportFormat: DOM.exportFormat ? DOM.exportFormat.value : 'image/png', exportSlice: DOM.exportSlice ? DOM.exportSlice.value : 'none', previewBg: DOM.previewBg ? DOM.previewBg.value : 'transparent'
             };
             localStorage.setItem('simpleImgEditorSettings', JSON.stringify(settings));
         }
@@ -690,16 +694,71 @@
             });
         });
 
+        // 統一整合所有鍵盤快捷鍵，避免事件遺漏或覆蓋
         document.addEventListener('keydown', e => {
-            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+            const isInputActive = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+            if (isInputActive) return;
+
             const key = e.key.toLowerCase();
+
+            // 1. 復原 / 重做 (Undo / Redo)
+            if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                if (currentIndex > 0) restore(currentIndex - 1);
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && (key === 'y' || (e.shiftKey && key === 'z'))) {
+                e.preventDefault();
+                if (currentIndex < history.length - 1) restore(currentIndex + 1);
+                return;
+            }
+
+            // 2. 標註刪除
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnnoId) {
+                e.preventDefault();
+                deleteAnnotation(selectedAnnoId);
+                return;
+            }
+
+            // 3. 調整筆刷/鋼筆粗細
+            if (activeEraserTool === 'brush' || activeEraserTool === 'pen') {
+                if (e.key === '[' || e.key === ']') {
+                    e.preventDefault();
+                    if(DOM.brushSize) {
+                        let currentSize = parseInt(DOM.brushSize.value); 
+                        currentSize += (e.key === '[') ? -5 : 5;
+                        currentSize = Math.max(1, Math.min(150, currentSize)); 
+                        DOM.brushSize.value = currentSize; 
+                        if(DOM.brushSizeVal) DOM.brushSizeVal.textContent = currentSize; 
+                        saveSettings();
+                        if (DOM.eraserOverlay && !DOM.eraserOverlay.classList.contains('hidden') && cropper && activeEraserTool === 'brush') {
+                            const cd = cropper.getCanvasData(); 
+                            const zoomRatio = cd.width / wandCanvas.width; 
+                            const displaySize = currentSize * zoomRatio;
+                            if(DOM.brushCursor) {
+                                DOM.brushCursor.style.width = displaySize + 'px'; 
+                                DOM.brushCursor.style.height = displaySize + 'px';
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
+
+            // 4. 鋼筆工具特定快捷鍵
+            if (activeEraserTool === 'pen') {
+                if (e.key === 'Enter') { e.preventDefault(); if(DOM.btnPenClose) DOM.btnPenClose.click(); return; }
+                if (e.key === 'Escape') { e.preventDefault(); if(DOM.btnPenClear) DOM.btnPenClear.click(); return; }
+            }
+
+            // 5. 工具列切換快捷鍵
             if (key === 'v') activateTool('move');
-            if (key === 'c') activateTool('crop');
-            if (key === 'w') activateTool('wand');
-            if (key === 'b') activateTool('brush');
-            if (key === 'p') activateTool('pen');
-            if (key === 'u') activateTool('rect');
-            if (key === 'o') activateTool('circle');
+            else if (key === 'c') activateTool('crop');
+            else if (key === 'w') activateTool('wand');
+            else if (key === 'b') activateTool('brush');
+            else if (key === 'p') activateTool('pen');
+            else if (key === 'u') activateTool('rect');
+            else if (key === 'o') activateTool('circle');
         });
 
         function activateTool(tool) {
@@ -726,29 +785,31 @@
         function updateOptionsBar(tool) {
             if(!DOM.toolOptionsBar) return;
             
-            DOM.optGroupAction.style.display = 'none';
-            DOM.optGroupColor.style.display  = 'none';
-            DOM.optGroupLimit.style.display  = 'none';
-            DOM.optGroupSize.style.display = 'none';
-            DOM.optGroupWand.style.display = 'none';
-            DOM.optGroupPen.style.display  = 'none';
-            DOM.optGroupHint.style.display = 'none';
+            if(DOM.optGroupAction) DOM.optGroupAction.style.display = 'none';
+            if(DOM.optGroupColor) DOM.optGroupColor.style.display  = 'none';
+            if(DOM.optGroupLimit) DOM.optGroupLimit.style.display  = 'none';
+            if(DOM.optGroupSize) DOM.optGroupSize.style.display = 'none';
+            if(DOM.optGroupWand) DOM.optGroupWand.style.display = 'none';
+            if(DOM.optGroupPen) DOM.optGroupPen.style.display  = 'none';
+            if(DOM.optGroupHint) DOM.optGroupHint.style.display = 'none';
 
             if (tool === 'move' || tool === 'crop') {
-                DOM.optGroupHint.style.display = 'flex';
-                DOM.optGroupHint.innerHTML = tool === 'move' ? 
-                    '<i class="fa-solid fa-info-circle"></i> 在畫布拖曳即可移動圖片位置。滑鼠滾輪可縮放。' : 
-                    '<i class="fa-solid fa-info-circle"></i> 拖曳畫面上的裁切框邊界來調整輸出範圍。';
+                if(DOM.optGroupHint) {
+                    DOM.optGroupHint.style.display = 'flex';
+                    DOM.optGroupHint.innerHTML = tool === 'move' ? 
+                        '<i class="fa-solid fa-info-circle"></i> 在畫布拖曳即可移動圖片位置。滑鼠滾輪可縮放。' : 
+                        '<i class="fa-solid fa-info-circle"></i> 拖曳畫面上的裁切框邊界來調整輸出範圍。';
+                }
             } else {
-                DOM.optGroupAction.style.display = (tool === 'rect' || tool === 'circle' || tool === 'pen') ? 'flex' : 'none';
-                if(tool === 'brush' || tool === 'wand') DOM.optGroupAction.style.display = 'flex';
+                if(DOM.optGroupAction) DOM.optGroupAction.style.display = (tool === 'rect' || tool === 'circle' || tool === 'pen') ? 'flex' : 'none';
+                if(tool === 'brush' || tool === 'wand') { if(DOM.optGroupAction) DOM.optGroupAction.style.display = 'flex'; }
 
-                DOM.optGroupColor.style.display  = 'flex';
-                DOM.optGroupLimit.style.display  = 'flex';
+                if(DOM.optGroupColor) DOM.optGroupColor.style.display  = 'flex';
+                if(DOM.optGroupLimit) DOM.optGroupLimit.style.display  = 'flex';
                 
-                DOM.optGroupSize.style.display = (tool === 'brush' || tool === 'pen' || tool === 'rect' || tool === 'circle') ? 'flex' : 'none';
-                DOM.optGroupWand.style.display = (tool === 'wand') ? 'flex' : 'none';
-                DOM.optGroupPen.style.display  = (tool === 'pen') ? 'flex' : 'none';
+                if(DOM.optGroupSize) DOM.optGroupSize.style.display = (tool === 'brush' || tool === 'pen' || tool === 'rect' || tool === 'circle') ? 'flex' : 'none';
+                if(DOM.optGroupWand) DOM.optGroupWand.style.display = (tool === 'wand') ? 'flex' : 'none';
+                if(DOM.optGroupPen) DOM.optGroupPen.style.display  = (tool === 'pen') ? 'flex' : 'none';
 
                 updateShapePreviewColor();
             }
@@ -771,18 +832,31 @@
                 item.className = `layer-item ${l.id === activeLayerId ? 'active' : ''}`;
                 item.innerHTML = `
                     <span style="flex:1" class="layer-name" data-id="${l.id}">${l.name}</span>
-                    <div>
-                        <i class="fa-solid ${l.visible ? 'fa-eye' : 'fa-eye-slash'} layer-vis" style="cursor:pointer; margin-right:8px" data-id="${l.id}"></i>
-                        <i class="fa-solid fa-trash layer-del" style="cursor:pointer" data-id="${l.id}"></i>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <i class="fa-solid fa-chevron-up layer-icon layer-up" title="上移" data-id="${l.id}"></i>
+                        <i class="fa-solid fa-chevron-down layer-icon layer-down" title="下移" data-id="${l.id}"></i>
+                        <i class="fa-solid ${l.visible ? 'fa-eye' : 'fa-eye-slash'} layer-icon layer-vis" title="顯示/隱藏" data-id="${l.id}"></i>
+                        <i class="fa-solid fa-trash layer-icon layer-del" title="刪除圖層" data-id="${l.id}"></i>
                     </div>
                 `;
                 item.onclick = (e) => {
-                    if(e.target.classList.contains('layer-vis')) {
+                    const idx = layers.findIndex(layer => layer.id === l.id);
+                    if (e.target.classList.contains('layer-up')) {
+                        if (idx < layers.length - 1) { 
+                            const temp = layers[idx]; layers[idx] = layers[idx+1]; layers[idx+1] = temp;
+                            updateCompositeImage(); renderLayersUI(); saveState(); updatePreview();
+                        }
+                    } else if (e.target.classList.contains('layer-down')) {
+                        if (idx > 0) { 
+                            const temp = layers[idx]; layers[idx] = layers[idx-1]; layers[idx-1] = temp;
+                            updateCompositeImage(); renderLayersUI(); saveState(); updatePreview();
+                        }
+                    } else if(e.target.classList.contains('layer-vis')) {
                         l.visible = !l.visible; updateCompositeImage(); renderLayersUI(); saveState(); updatePreview();
                     } else if (e.target.classList.contains('layer-del')) {
                         if(layers.length <= 1) { alert('至少保留一個圖層！'); return; }
                         layers = layers.filter(layer => layer.id !== l.id);
-                        if(activeLayerId === l.id) selectLayer(layers[0].id);
+                        if(activeLayerId === l.id) selectLayer(layers[layers.length-1].id);
                         updateCompositeImage(); renderLayersUI(); saveState(); updatePreview();
                     } else { selectLayer(l.id); }
                 };
@@ -874,6 +948,7 @@
                 activeLayerId: activeLayerId, annotations: JSON.parse(JSON.stringify(annotations)), cropData: cropper.getData(),
                 targetWidth: targetWidth, targetHeight: targetHeight, isCustomSize: isCustomSize,
                 presetSize: document.querySelector('.preset-item.active')?.dataset.w === 'custom' ? 'custom' : `${targetWidth}x${targetHeight}`,
+                
                 penPath: JSON.parse(JSON.stringify(penPath || [])),
                 penClosed: penClosed || false,
                 activeEraserTool: activeEraserTool
@@ -891,6 +966,7 @@
         }
 
         function restore(idx) {
+            if(idx < 0 || idx >= history.length) return;
             currentIndex = idx; const state = history[idx];
             
             isDrawingBrush = false; isDrawingEraseShape = false;
@@ -995,7 +1071,7 @@
             if(DOM.btnCaptureHeader) DOM.btnCaptureHeader.style.display = 'flex';
             if(DOM.btnExport) DOM.btnExport.disabled = false;
             
-            DOM.toolOptionsBar.classList.remove('hidden-bar');
+            if(DOM.toolOptionsBar) DOM.toolOptionsBar.classList.remove('hidden-bar');
 
             DOM.mainImage.src = src; currentMode = 'move';
             if (cropper) { cropper.destroy(); cropper = null; }
@@ -1137,11 +1213,11 @@
         /* ══ 圖片圓角與網格系統 ══ */
         if(DOM.borderRadius) {
             DOM.borderRadius.onchange = () => saveState();
-            DOM.borderRadius.oninput = () => { DOM.radiusVal.textContent = DOM.borderRadius.value; updatePreview(); saveSettings(); };
+            DOM.borderRadius.oninput = () => { if(DOM.radiusVal) DOM.radiusVal.textContent = DOM.borderRadius.value; updatePreview(); saveSettings(); };
         }
         if(DOM.showGrid) DOM.showGrid.onchange = () => { rebuildAnnoOverlay(); saveSettings(); };
-        if(DOM.snapGrid) DOM.snapGrid.onchange = () => { DOM.annoAngle.step = DOM.snapGrid.checked ? 15 : 1; saveSettings(); };
-        if(DOM.gridSize) DOM.gridSize.oninput = () => { DOM.gridSizeVal.textContent = DOM.gridSize.value; rebuildAnnoOverlay(); saveSettings(); };
+        if(DOM.snapGrid) DOM.snapGrid.onchange = () => { if(DOM.annoAngle) DOM.annoAngle.step = DOM.snapGrid.checked ? 15 : 1; saveSettings(); };
+        if(DOM.gridSize) DOM.gridSize.oninput = () => { if(DOM.gridSizeVal) DOM.gridSizeVal.textContent = DOM.gridSize.value; rebuildAnnoOverlay(); saveSettings(); };
 
         /* ══ 智慧去背與填色系統 (支援描邊) ══ */
         if(DOM.btnActionStroke) DOM.btnActionStroke.onclick = () => setProcessAction('stroke');
@@ -1196,8 +1272,12 @@
             };
         }
 
-        if(DOM.tolerance) DOM.tolerance.oninput = () => { DOM.tolVal.textContent = DOM.tolerance.value; saveSettings(); };
-        if(DOM.brushSize) DOM.brushSize.oninput = () => { DOM.brushSizeVal.textContent = DOM.brushSize.value; saveSettings(); };
+        if(DOM.tolerance) {
+            DOM.tolerance.oninput = () => { if(DOM.tolVal) DOM.tolVal.textContent = DOM.tolerance.value; saveSettings(); };
+        }
+        if(DOM.brushSize) {
+            DOM.brushSize.oninput = () => { if(DOM.brushSizeVal) DOM.brushSizeVal.textContent = DOM.brushSize.value; saveSettings(); };
+        }
         if(DOM.contiguous) DOM.contiguous.addEventListener('change', saveSettings); 
         if(DOM.limitToCrop) DOM.limitToCrop.addEventListener('change', saveSettings);
 
@@ -1225,7 +1305,6 @@
             }
         }
 
-        // 鋼筆工具操作邏輯 
         if(DOM.btnPenClear) DOM.btnPenClear.onclick = () => { if(penPath.length>0) { penPath = []; penCurrentMouse = null; penClosed = false; updateCompositeImage(); saveState(); } };
         if(DOM.btnPenClose) DOM.btnPenClose.onclick = () => { if (penPath.length > 1 && !penClosed) { penClosed = true; updateCompositeImage(); saveState(); } };
         if(DOM.btnPenApply) DOM.btnPenApply.onclick = () => { 
@@ -1234,11 +1313,21 @@
             applyProcessShapeToCanvas(null, null, action); 
         };
 
+        // 全新的防呆螢幕座標轉換系統
         function screenToImage(clientX, clientY) {
             if(!DOM.eraserOverlay || !cropper) return {x:0, y:0};
-            const cd = cropper.getCanvasData(); const rect = DOM.eraserOverlay.getBoundingClientRect();
-            const x = Math.floor((clientX - rect.left - cd.left) * (wandCanvas.width  / cd.width));
-            const y = Math.floor((clientY - rect.top  - cd.top)  * (wandCanvas.height / cd.height));
+            const canvasData = cropper.getCanvasData(); 
+            const cropData = cropper.getData();
+            const nw = canvasData.naturalWidth || 1; 
+            const nh = canvasData.naturalHeight || 1;
+            const scaleX = canvasData.width / nw; 
+            const scaleY = canvasData.height / nh;
+
+            const rect = DOM.eraserOverlay.getBoundingClientRect();
+            
+            // 螢幕上的絕對像素轉換成實際影像(Image)的內部像素
+            const x = Math.floor((clientX - rect.left - canvasData.left) / scaleX);
+            const y = Math.floor((clientY - rect.top  - canvasData.top) / scaleY);
             return {x, y};
         }
 
@@ -1262,6 +1351,7 @@
                         for (let i = 0; i < penPath.length; i++) {
                             const node = penPath[i];
                             const dx = pt.x - node.x; const dy = pt.y - node.y;
+                            // 判斷點擊半徑
                             if (dx*dx + dy*dy < 400) { 
                                 node.cp2x = node.x; node.cp2y = node.y; updateCompositeImage(); saveState(); return;
                             }
@@ -1305,10 +1395,12 @@
             
             if (activeEraserTool === 'brush' && !DOM.eraserOverlay.classList.contains('hidden')) {
                 const cd = cropper.getCanvasData(); const zoomRatio = cd.width / wandCanvas.width; const displaySize = parseInt(DOM.brushSize.value) * zoomRatio;
-                DOM.brushCursor.style.width = displaySize + 'px'; DOM.brushCursor.style.height = displaySize + 'px';
-                DOM.brushCursor.style.left = (currentX - rect.left) + 'px'; DOM.brushCursor.style.top = (currentY - rect.top) + 'px';
-                if (currentProcessAction === 'stroke' || currentProcessAction === 'fill') { DOM.brushCursor.style.borderColor = DOM.fillColor.value; DOM.brushCursor.style.background = DOM.fillColor.value + '40'; } 
-                else { DOM.brushCursor.style.borderColor = 'rgba(0,0,0,0.8)'; DOM.brushCursor.style.background = 'rgba(255,255,255,0.2)'; }
+                if(DOM.brushCursor) {
+                    DOM.brushCursor.style.width = displaySize + 'px'; DOM.brushCursor.style.height = displaySize + 'px';
+                    DOM.brushCursor.style.left = (currentX - rect.left) + 'px'; DOM.brushCursor.style.top = (currentY - rect.top) + 'px';
+                    if (currentProcessAction === 'stroke' || currentProcessAction === 'fill') { DOM.brushCursor.style.borderColor = DOM.fillColor.value; DOM.brushCursor.style.background = DOM.fillColor.value + '40'; } 
+                    else { DOM.brushCursor.style.borderColor = 'rgba(0,0,0,0.8)'; DOM.brushCursor.style.background = 'rgba(255,255,255,0.2)'; }
+                }
             }
 
             if (activeEraserTool === 'pen') {
@@ -1611,31 +1703,57 @@
             }
         });
 
-        /* ══ 標註把手浮層 & 主視窗切割輔助線 ══ */
+        /* ══ 標註把手浮層 & 主視窗切割輔助線 (全新防呆絕對像素換算) ══ */
         function rebuildAnnoOverlay() {
             if(!DOM.annoOverlay) return;
             DOM.annoOverlay.innerHTML = '';
             if (!cropper) return;
-            const canvasData = cropper.getCanvasData(); const cropData = cropper.getData();
-            const nw = canvasData.naturalWidth || DOM.mainImage.naturalWidth || 1; const nh = canvasData.naturalHeight || DOM.mainImage.naturalHeight || 1;
-            const scaleX = canvasData.width / nw; const scaleY = canvasData.height / nh;
-            const cropScaleX = targetWidth / cropData.width; const cropScaleY = targetHeight / cropData.height;
             
+            const canvasData = cropper.getCanvasData(); 
+            const cropData = cropper.getData();
+            if (!cropData || cropData.width <= 0) return;
+
+            const nw = canvasData.naturalWidth || 1; 
+            const nh = canvasData.naturalHeight || 1;
+            const scaleX = canvasData.width / nw; 
+            const scaleY = canvasData.height / nh;
+
+            // 螢幕與裁切框(輸出畫布)之間的直接比例換算
+            const screenScaleX = (cropData.width * scaleX) / targetWidth;
+            const screenScaleY = (cropData.height * scaleY) / targetHeight;
+            const baseX = canvasData.left + cropData.x * scaleX;
+            const baseY = canvasData.top + cropData.y * scaleY;
+
             function toWrapperPx(ax, ay) {
-                const imgX = ax / cropScaleX + cropData.x; const imgY = ay / cropScaleY + cropData.y;
-                return { x: canvasData.left + imgX * scaleX, y: canvasData.top + imgY * scaleY };
+                return { 
+                    x: baseX + ax * screenScaleX, 
+                    y: baseY + ay * screenScaleY 
+                };
             }
 
             if (DOM.showGrid && DOM.showGrid.checked) {
-                const tl = toWrapperPx(0, 0); const br = toWrapperPx(targetWidth, targetHeight);
+                const tl = toWrapperPx(0, 0); 
+                const br = toWrapperPx(targetWidth, targetHeight);
                 const gridDiv = document.createElement('div');
-                gridDiv.style.position = 'absolute'; gridDiv.style.left = tl.x + 'px'; gridDiv.style.top = tl.y + 'px';
-                gridDiv.style.width = (br.x - tl.x) + 'px'; gridDiv.style.height = (br.y - tl.y) + 'px';
-                gridDiv.style.pointerEvents = 'none'; gridDiv.style.border = '1px solid rgba(0, 122, 255, 0.4)'; gridDiv.style.boxSizing = 'border-box'; gridDiv.style.zIndex = '40'; 
+                gridDiv.style.position = 'absolute'; 
+                gridDiv.style.left = tl.x + 'px'; 
+                gridDiv.style.top = tl.y + 'px';
+                gridDiv.style.width = (br.x - tl.x) + 'px'; 
+                gridDiv.style.height = (br.y - tl.y) + 'px';
+                gridDiv.style.pointerEvents = 'none'; 
+                gridDiv.style.border = '1px solid rgba(0, 122, 255, 0.4)'; 
+                gridDiv.style.boxSizing = 'border-box'; 
+                gridDiv.style.zIndex = '40'; 
 
-                const gridSize = parseInt(DOM.gridSize ? DOM.gridSize.value : 20) || 20; const bgSizeX = (gridSize / cropScaleX) * scaleX; const bgSizeY = (gridSize / cropScaleY) * scaleY;
-                gridDiv.style.backgroundImage = `linear-gradient(to right, rgba(0, 122, 255, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 122, 255, 0.2) 1px, transparent 1px)`;
-                gridDiv.style.backgroundSize = `${bgSizeX}px ${bgSizeY}px`; gridDiv.style.backgroundPosition = '0 0';
+                const gridSize = parseInt(DOM.gridSize ? DOM.gridSize.value : 20) || 20; 
+                const bgSizeX = gridSize * screenScaleX; 
+                const bgSizeY = gridSize * screenScaleY;
+                
+                if(bgSizeX > 0 && bgSizeY > 0) {
+                    gridDiv.style.backgroundImage = `linear-gradient(to right, rgba(0, 122, 255, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 122, 255, 0.2) 1px, transparent 1px)`;
+                    gridDiv.style.backgroundSize = `${bgSizeX}px ${bgSizeY}px`; 
+                    gridDiv.style.backgroundPosition = '0 0';
+                }
 
                 const centerDiv = document.createElement('div'); centerDiv.style.position = 'absolute'; centerDiv.style.left = '50%'; centerDiv.style.top = '0'; centerDiv.style.width = '1px'; centerDiv.style.height = '100%'; centerDiv.style.backgroundColor = 'rgba(255, 59, 48, 0.4)'; gridDiv.appendChild(centerDiv);
                 const centerDivH = document.createElement('div'); centerDivH.style.position = 'absolute'; centerDivH.style.left = '0'; centerDivH.style.top = '50%'; centerDivH.style.width = '100%'; centerDivH.style.height = '1px'; centerDivH.style.backgroundColor = 'rgba(255, 59, 48, 0.4)'; gridDiv.appendChild(centerDivH);
@@ -1644,33 +1762,46 @@
 
             const sliceMode = DOM.exportSlice ? DOM.exportSlice.value : 'none';
             if (sliceMode !== 'none') {
-                const tl = toWrapperPx(0, 0); const br = toWrapperPx(targetWidth, targetHeight);
-                const sliceDiv = document.createElement('div');
-                sliceDiv.style.position = 'absolute'; sliceDiv.style.left = tl.x + 'px'; sliceDiv.style.top = tl.y + 'px';
-                sliceDiv.style.width = (br.x - tl.x) + 'px'; sliceDiv.style.height = (br.y - tl.y) + 'px';
-                sliceDiv.style.pointerEvents = 'none'; sliceDiv.style.boxSizing = 'border-box';
-                sliceDiv.style.border = '2px solid rgba(255, 59, 48, 0.8)'; sliceDiv.style.zIndex = '45';
+                const splits = sliceMode === '3x3' ? 3 : 4;
+                const tl = toWrapperPx(0, 0); 
+                const br = toWrapperPx(targetWidth, targetHeight);
+                const w = Math.max(0, br.x - tl.x);
+                const h = Math.max(0, br.y - tl.y);
+                
+                if (w > 0 && h > 0) {
+                    const sliceDiv = document.createElement('div');
+                    sliceDiv.style.position = 'absolute';
+                    sliceDiv.style.left = tl.x + 'px';
+                    sliceDiv.style.top = tl.y + 'px';
+                    sliceDiv.style.width = w + 'px';
+                    sliceDiv.style.height = h + 'px';
+                    sliceDiv.style.pointerEvents = 'none';
+                    sliceDiv.style.boxSizing = 'border-box';
+                    sliceDiv.style.border = '2px solid rgba(255, 59, 48, 0.8)';
+                    sliceDiv.style.zIndex = '45';
 
-                let bgImage = '';
-                if (sliceMode === '3x3') {
-                    bgImage = `linear-gradient(to right, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px)), linear-gradient(to bottom, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px))`;
-                } else if (sliceMode === '4x4') {
-                    bgImage = `linear-gradient(to right, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px)), linear-gradient(to bottom, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px))`;
+                    // 改用 SVG 來繪製格線，確保畫面不被遮擋或渲染失敗
+                    let svgStr = `<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">`;
+                    for(let i=1; i<splits; i++) {
+                        const posStr = (i * 100 / splits).toFixed(2) + '%';
+                        svgStr += `<line x1="${posStr}" y1="0" x2="${posStr}" y2="100%" stroke="rgba(255,59,48,0.8)" stroke-width="2"/>`;
+                        svgStr += `<line x1="0" y1="${posStr}" x2="100%" y2="${posStr}" stroke="rgba(255,59,48,0.8)" stroke-width="2"/>`;
+                    }
+                    svgStr += `</svg>`;
+                    sliceDiv.innerHTML = svgStr;
+                    DOM.annoOverlay.appendChild(sliceDiv);
                 }
-                sliceDiv.style.backgroundImage = bgImage;
-                DOM.annoOverlay.appendChild(sliceDiv);
             }
 
             // 繪製標註 (實體 DOM 元素)
             annotations.forEach(anno => {
                 const pos = toWrapperPx(anno.x, anno.y);
                 
-                // 1. 建立視覺元素
                 const visual = document.createElement('div');
                 visual.style.position = 'absolute';
                 visual.style.left = pos.x + 'px';
                 visual.style.top = pos.y + 'px';
-                visual.style.pointerEvents = 'none'; // 讓滑鼠穿透到把手
+                visual.style.pointerEvents = 'none'; 
                 visual.style.zIndex = '49';
                 
                 let transformStr = `translate(-50%, -50%) rotate(${anno.angle}deg)`;
@@ -1680,12 +1811,12 @@
                 if (anno.hasShadow !== false) visual.style.filter = `drop-shadow(2px 2px 4px rgba(0,0,0,0.6))`;
                 
                 if (anno.type === 'arrow') {
-                    const sSize = anno.size * cropScaleX * scaleX;
+                    const sSize = Math.max(1, anno.size * screenScaleX);
                     visual.innerHTML = `<svg width="${sSize}" height="${sSize}" viewBox="-50 -50 100 100" style="overflow:visible;">
                         <polygon points="-50,0 -10,-40 -10,-20 50,-20 50,20 -10,20 -10,40" fill="${anno.color}" />
                     </svg>`;
                 } else {
-                    const fontSizePx = anno.fontSize * cropScaleX * scaleX;
+                    const fontSizePx = Math.max(1, anno.fontSize * screenScaleX);
                     visual.style.fontFamily = anno.fontFamily || "'Noto Sans TC', 'Inter', sans-serif";
                     visual.innerHTML = `
                         <div style="position:relative; display:inline-block;">
@@ -1695,7 +1826,6 @@
                 }
                 DOM.annoOverlay.appendChild(visual);
 
-                // 2. 建立拖曳把手
                 const handle = document.createElement('div');
                 handle.className = `anno-handle${selectedAnnoId === anno.id ? ' selected' : ''}`;
                 handle.style.left = pos.x + 'px'; 
@@ -1712,8 +1842,11 @@
         function startHandleDrag(e, anno) {
             _dragAnno = anno; _dragStartX = e.clientX; _dragStartY = e.clientY; _dragAnnoX0 = anno.x; _dragAnnoY0 = anno.y;
             const canvasData = cropper.getCanvasData(); const cropData = cropper.getData();
-            const nw = canvasData.naturalWidth || DOM.mainImage.naturalWidth || 1; const nh = canvasData.naturalHeight || DOM.mainImage.naturalHeight || 1;
-            _dragRX = (targetWidth / cropData.width) / (canvasData.width / nw); _dragRY = (targetHeight / cropData.height) / (canvasData.height / nh);
+            const nw = canvasData.naturalWidth || 1; const nh = canvasData.naturalHeight || 1;
+            const scaleX = canvasData.width / nw; const scaleY = canvasData.height / nh;
+            const screenScaleX = (cropData.width * scaleX) / targetWidth;
+            const screenScaleY = (cropData.height * scaleY) / targetHeight;
+            _dragRX = 1 / screenScaleX; _dragRY = 1 / screenScaleY;
         }
 
         document.addEventListener('mousemove', e => {
@@ -1750,13 +1883,17 @@
                 const gridOverlay = document.createElement('div');
                 gridOverlay.style.position = 'absolute'; gridOverlay.style.top = '0'; gridOverlay.style.left = '0'; gridOverlay.style.width = '100%'; gridOverlay.style.height = '100%';
                 gridOverlay.style.pointerEvents = 'none'; gridOverlay.style.boxSizing = 'border-box'; gridOverlay.style.border = '1px solid rgba(255, 59, 48, 0.8)';
-                let bgImage = '';
-                if (sliceMode === '3x3') {
-                    bgImage = `linear-gradient(to right, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px)), linear-gradient(to bottom, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px))`;
-                } else if (sliceMode === '4x4') {
-                    bgImage = `linear-gradient(to right, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px)), linear-gradient(to bottom, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px))`;
+                
+                const splits = sliceMode === '3x3' ? 3 : 4;
+                let svgStr = `<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">`;
+                for(let i=1; i<splits; i++) {
+                    const posStr = (i * 100 / splits).toFixed(2) + '%';
+                    svgStr += `<line x1="${posStr}" y1="0" x2="${posStr}" y2="100%" stroke="rgba(255,59,48,0.8)" stroke-width="2"/>`;
+                    svgStr += `<line x1="0" y1="${posStr}" x2="100%" y2="${posStr}" stroke="rgba(255,59,48,0.8)" stroke-width="2"/>`;
                 }
-                gridOverlay.style.backgroundImage = bgImage; imgWrapper.appendChild(gridOverlay);
+                svgStr += `</svg>`;
+                gridOverlay.innerHTML = svgStr;
+                imgWrapper.appendChild(gridOverlay);
             }
             DOM.previewContainer.appendChild(imgWrapper);
         }
