@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Web 行車記錄器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* 確保全螢幕且不滾動 */
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background-color: #000; }
+        /* 影片填滿畫面 */
+        #camera-preview { object-fit: cover; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        /* UI 覆蓋層 */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+        /* 讓按鈕可以被點擊 */
+        .interactive { pointer-events: auto; }
+        /* 閃爍動畫 */
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .recording-dot { animation: blink 1.5s infinite; color: red; }
+        /* 時鐘浮水印陰影效果，確保任何背景下清晰 */
+        .watermark-text { text-shadow: 2px 2px 4px rgba(0,0,0,0.9), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; }
+    </style>
+</head>
+<body class="text-white font-sans antialiased">
+
+    <!-- 攝影機預覽 -->
+    <video id="camera-preview" autoplay muted playsinline></video>
+
+    <!-- UI 覆蓋層 -->
+    <div id="ui-layer" class="p-4 sm:p-8 relative">
+        
+        <!-- 即時實際時間 (浮水印) 移動至畫面正上方 -->
+        <div id="real-time-clock" class="absolute top-4 left-0 w-full text-center text-white text-xl sm:text-2xl font-mono font-bold tracking-widest watermark-text pointer-events-none z-0">
+            載入時間中...
+        </div>
+
+        <!-- 頂部資訊 (為了不遮擋時間，稍微往下推 mt-8) -->
+        <div class="flex justify-between items-start interactive relative z-10 mt-8 sm:mt-10">
+            <div class="bg-black/60 backdrop-blur-md rounded-lg p-3 border border-white/20 shadow-lg">
+                <div id="status-text" class="text-lg font-bold flex items-center gap-2">
+                    <i class="fas fa-video"></i> 系統就緒
+                </div>
+                <!-- 該節錄影進度顯示 (放大並加強對比，錄影時才會出現) -->
+                <div id="timer-text" class="text-lg sm:text-xl text-yellow-400 mt-2 font-mono font-bold hidden tracking-wider">
+                    <i class="fas fa-stopwatch mr-1"></i><span id="time-elapsed">00:00</span> / 03:00
+                </div>
+                <div class="text-xs text-gray-300 mt-2">覆蓋槽位: <span id="current-index-display">1</span>/20</div>
+            </div>
+
+            <button onclick="openGallery()" class="bg-gray-800/80 hover:bg-gray-700 p-3 rounded-full shadow-lg transition duration-200 border border-gray-600">
+                <i class="fas fa-folder-open text-xl"></i>
+            </button>
+        </div>
+
+        <!-- 畫面下方控制項 -->
+        <div class="flex flex-col items-center justify-end h-full pb-6 interactive">
+            <!-- 錄影按鈕 -->
+            <button id="record-btn" onclick="toggleRecording()" class="flex flex-col items-center justify-center w-24 h-24 bg-red-600 hover:bg-red-500 rounded-full shadow-[0_0_20px_rgba(220,38,38,0.6)] border-4 border-white/20 transition duration-300 transform active:scale-95">
+                <i id="record-icon" class="fas fa-circle text-3xl mb-1"></i>
+                <span id="record-label" class="text-xs font-bold uppercase tracking-wider">開始錄影</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 檔案庫 Modal -->
+    <div id="gallery-modal" class="fixed inset-0 bg-black/95 z-50 hidden flex flex-col interactive">
+        <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900">
+            <h2 class="text-xl font-bold"><i class="fas fa-archive mr-2"></i> 內部儲存檔案庫 (上限20個)</h2>
+            <button onclick="closeGallery()" class="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        <div class="p-4 bg-yellow-900/30 text-yellow-200 text-sm border-b border-yellow-700/50 flex items-start gap-2">
+            <i class="fas fa-info-circle mt-0.5"></i> 
+            <div>提示：瀏覽此清單時，背景的錄影<b>會持續進行</b>。請點擊下載圖示將重要影片存入手機相簿。</div>
+        </div>
+        <div id="file-list" class="flex-1 overflow-y-auto p-4 space-y-3">
+            <div class="text-center text-gray-500 mt-10">載入中...</div>
+        </div>
+    </div>
+
+    <!-- 空間不足警告 Modal -->
+    <div id="storage-warning-modal" class="fixed inset-0 bg-black/95 z-[60] hidden flex flex-col justify-center items-center p-4 interactive">
+        <div class="bg-gray-900 border border-red-500 rounded-xl p-6 max-w-sm w-full text-center shadow-[0_0_30px_rgba(220,38,38,0.4)]">
+            <i class="fas fa-exclamation-triangle text-red-500 text-6xl mb-4"></i>
+            <h2 class="text-2xl font-bold text-white mb-3">儲存空間不足</h2>
+            <div class="bg-black/50 rounded p-3 mb-4 text-left border border-gray-800">
+                <p class="text-gray-300 text-sm mb-2">安全運作需求：<span class="text-green-400 font-mono">2.00 GB</span></p>
+                <p class="text-gray-300 text-sm">目前剩餘空間：<span id="available-gb-text" class="text-red-400 font-mono font-bold"></span></p>
+            </div>
+            <p class="text-gray-400 text-sm mb-6 text-left">
+                為了確保 20 個影片檔能順利循環儲存且不會中途當機，系統已自動攔截錄影。<br><br>
+                請清理手機儲存空間（或刪除部分歷史影片），然後再試一次。
+            </p>
+            <button onclick="closeStorageWarning()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition active:scale-95">
+                我知道了
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 核心變數設定 ---
+        const CYCLE_LIMIT = 20; 
+        const RECORD_DURATION_MS = 3 * 60 * 1000; 
+        const REQUIRED_SPACE_BYTES = 2 * 1024 * 1024 * 1024; 
+        
+        let stream = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recordTimer = null;
+        let displayTimer = null;
+        let startTime = 0;
+        
+        let currentIndex = parseInt(localStorage.getItem('dashcam_index')) || 1;
+        document.getElementById('current-index-display').innerText = currentIndex;
+
+        // --- 即時時鐘邏輯 (浮水印) ---
+        function updateRealTimeClock() {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const MM = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const HH = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('real-time-clock').innerText = `${yyyy}/${MM}/${dd} ${HH}:${mm}:${ss}`;
+        }
+        setInterval(updateRealTimeClock, 1000);
+        updateRealTimeClock(); 
+
+        // --- 儲存空間容量檢查機制 ---
+        async function checkStorageSpace() {
+            if (navigator.storage && navigator.storage.estimate) {
+                try {
+                    const estimate = await navigator.storage.estimate();
+                    const availableSpace = estimate.quota - estimate.usage;
+                    const availableGB = (availableSpace / (1024 * 1024 * 1024)).toFixed(2);
+                    
+                    if (availableSpace < REQUIRED_SPACE_BYTES) {
+                        return { hasSpace: false, availableGB: availableGB + " GB" };
+                    }
+                    return { hasSpace: true, availableGB: availableGB + " GB" };
+                } catch (e) {
+                    return { hasSpace: true, availableGB: "未知" }; 
+                }
+            }
+            return { hasSpace: true, availableGB: "瀏覽器不支援容量檢查" }; 
+        }
+
+        function showStorageWarning(availableGB) {
+            document.getElementById('available-gb-text').innerText = availableGB;
+            document.getElementById('storage-warning-modal').classList.remove('hidden');
+        }
+
+        function closeStorageWarning() {
+            document.getElementById('storage-warning-modal').classList.add('hidden');
+        }
+
+        // --- IndexedDB 儲存邏輯 ---
+        const dbName = "DashcamStorage";
+        const storeName = "videos";
+        let db;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(dbName, 1);
+                request.onerror = event => reject("資料庫開啟失敗");
+                request.onsuccess = event => { db = event.target.result; resolve(); };
+                request.onupgradeneeded = event => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(storeName)) {
+                        db.createObjectStore(storeName, { keyPath: "id" });
+                    }
+                };
+            });
+        }
+
+        async function saveVideoToDB(id, blob, timestamp) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([storeName], "readwrite");
+                const store = transaction.objectStore(storeName);
+                const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+                const filename = `行車紀錄_${String(id).padStart(2, '0')}.${ext}`;
+                
+                const data = {
+                    id: id,
+                    filename: filename,
+                    blob: blob,
+                    timestamp: timestamp,
+                    size: (blob.size / (1024 * 1024)).toFixed(2) + " MB"
+                };
+                
+                const request = store.put(data); 
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject("儲存失敗");
+            });
+        }
+
+        async function getAllVideosFromDB() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([storeName], "readonly");
+                const store = transaction.objectStore(storeName);
+                const request = store.getAll();
+                request.onsuccess = () => {
+                    let results = request.result;
+                    results.sort((a, b) => b.timestamp - a.timestamp);
+                    resolve(results);
+                };
+                request.onerror = () => reject("讀取失敗");
+            });
+        }
+
+        async function deleteVideoFromDB(id) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([storeName], "readwrite");
+                const store = transaction.objectStore(storeName);
+                const request = store.delete(id);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject("刪除失敗");
+            });
+        }
+
+        // --- 攝影機與錄影邏輯 ---
+        async function initCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: true
+                });
+                document.getElementById('camera-preview').srcObject = stream;
+            } catch (err) {
+                alert("無法存取相機，請確認是否給予權限。錯誤: " + err.message);
+            }
+        }
+
+        async function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+                return;
+            }
+
+            const spaceInfo = await checkStorageSpace();
+            if (spaceInfo.hasSpace === false) {
+                showStorageWarning(spaceInfo.availableGB);
+                return; 
+            }
+
+            if (!stream) await initCamera();
+            if (!stream) return;
+
+            startRecordingSession();
+        }
+
+        function startRecordingSession() {
+            isRecording = true;
+            updateUI();
+            startSingleCycle();
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            clearTimeout(recordTimer);
+            clearInterval(displayTimer);
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop(); 
+            }
+            updateUI();
+        }
+
+        function startSingleCycle() {
+            if (!isRecording) return;
+            recordedChunks = [];
+            
+            let options = { mimeType: 'video/webm' };
+            if (MediaRecorder.isTypeSupported('video/mp4')) {
+                options = { mimeType: 'video/mp4' };
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                mediaRecorder = new MediaRecorder(stream); 
+            }
+
+            mediaRecorder.ondataavailable = event => {
+                if (event.data && event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                if (recordedChunks.length > 0) {
+                    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
+                    const timestamp = new Date().getTime();
+                    
+                    try {
+                        await saveVideoToDB(currentIndex, blob, timestamp);
+                    } catch (err) {
+                        console.error(err);
+                    }
+
+                    currentIndex++;
+                    if (currentIndex > CYCLE_LIMIT) currentIndex = 1;
+                    localStorage.setItem('dashcam_index', currentIndex);
+                    document.getElementById('current-index-display').innerText = currentIndex;
+                }
+
+                if (isRecording) {
+                    startSingleCycle();
+                }
+            };
+
+            mediaRecorder.start();
+            startTime = Date.now();
+            
+            recordTimer = setTimeout(() => {
+                if (mediaRecorder.state === "recording") {
+                    mediaRecorder.stop(); 
+                }
+            }, RECORD_DURATION_MS);
+
+            clearInterval(displayTimer);
+            updateTimeDisplay(); 
+            displayTimer = setInterval(updateTimeDisplay, 1000);
+        }
+
+        // --- UI 更新邏輯 ---
+        function updateUI() {
+            const btn = document.getElementById('record-btn');
+            const icon = document.getElementById('record-icon');
+            const label = document.getElementById('record-label');
+            const statusText = document.getElementById('status-text');
+            const timerText = document.getElementById('timer-text');
+
+            if (isRecording) {
+                btn.classList.remove('bg-red-600', 'hover:bg-red-500');
+                btn.classList.add('bg-gray-800', 'hover:bg-gray-700', 'border-red-500');
+                icon.classList.remove('fa-circle');
+                icon.classList.add('fa-stop', 'text-red-500');
+                label.innerText = '停止錄影';
+                
+                statusText.innerHTML = '<i class="fas fa-circle recording-dot"></i> 錄影中';
+                // 錄影開始，顯示進度時間
+                timerText.classList.remove('hidden');
+            } else {
+                btn.classList.add('bg-red-600', 'hover:bg-red-500');
+                btn.classList.remove('bg-gray-800', 'hover:bg-gray-700', 'border-red-500');
+                icon.classList.add('fa-circle');
+                icon.classList.remove('fa-stop', 'text-red-500');
+                label.innerText = '開始錄影';
+
+                statusText.innerHTML = '<i class="fas fa-video"></i> 系統就緒';
+                // 錄影停止，隱藏進度時間
+                timerText.classList.add('hidden');
+                document.getElementById('time-elapsed').innerText = "00:00";
+            }
+        }
+
+        function updateTimeDisplay() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            document.getElementById('time-elapsed').innerText = `${m}:${s}`;
+        }
+
+        // --- 檔案庫(Gallery)邏輯 ---
+        async function openGallery() {
+            document.getElementById('gallery-modal').classList.remove('hidden');
+            await renderFileList();
+        }
+
+        function closeGallery() {
+            document.getElementById('gallery-modal').classList.add('hidden');
+        }
+
+        async function renderFileList() {
+            const listContainer = document.getElementById('file-list');
+            listContainer.innerHTML = '<div class="text-center text-gray-500 py-10"><i class="fas fa-spinner fa-spin text-3xl mb-3"></i><br>讀取檔案中...</div>';
+            
+            try {
+                const videos = await getAllVideosFromDB();
+                if (videos.length === 0) {
+                    listContainer.innerHTML = '<div class="text-center text-gray-500 py-10"><i class="fas fa-box-open text-4xl mb-3"></i><br>目前沒有錄影檔案</div>';
+                    return;
+                }
+
+                listContainer.innerHTML = '';
+                videos.forEach(v => {
+                    const date = new Date(v.timestamp).toLocaleString('zh-TW');
+                    const isLatest = (v.id === (currentIndex === 1 ? 20 : currentIndex - 1));
+                    
+                    const item = document.createElement('div');
+                    item.className = 'bg-gray-800 rounded-lg p-4 flex items-center justify-between shadow border border-gray-700';
+                    item.innerHTML = `
+                        <div class="flex-1 overflow-hidden">
+                            <div class="font-bold text-lg flex items-center gap-2">
+                                ${v.filename}
+                                ${isLatest ? '<span class="bg-blue-600 text-xs px-2 py-0.5 rounded text-white">最新</span>' : ''}
+                            </div>
+                            <div class="text-sm text-gray-400 mt-1"><i class="far fa-clock"></i> ${date}</div>
+                            <div class="text-xs text-gray-500 mt-1"><i class="fas fa-hdd"></i> 大小: ${v.size} (Slot: ${v.id})</div>
+                        </div>
+                        <div class="flex gap-2 ml-4">
+                            <button onclick="downloadVideo(${v.id})" class="w-10 h-10 bg-green-600 hover:bg-green-500 rounded-full flex justify-center items-center transition shadow">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button onclick="deleteVideoUI(${v.id})" class="w-10 h-10 bg-red-900/80 hover:bg-red-700 text-red-200 rounded-full flex justify-center items-center transition shadow">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    `;
+                    listContainer.appendChild(item);
+                });
+            } catch (e) {
+                listContainer.innerHTML = '<div class="text-center text-red-500 py-10">讀取資料庫發生錯誤</div>';
+            }
+        }
+
+        async function downloadVideo(id) {
+            try {
+                const videos = await getAllVideosFromDB();
+                const video = videos.find(v => v.id === id);
+                if (video) {
+                    const url = URL.createObjectURL(video.blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = video.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }, 100);
+                }
+            } catch (err) {
+                alert("下載失敗：" + err);
+            }
+        }
+
+        async function deleteVideoUI(id) {
+            if(confirm('確定要刪除這個檔案嗎？')) {
+                await deleteVideoFromDB(id);
+                renderFileList(); 
+            }
+        }
+
+        // --- 啟動初始化 ---
+        window.onload = async () => {
+            try {
+                await initDB();
+                await initCamera();
+            } catch (e) {
+                console.error("初始化錯誤:", e);
+            }
+        };
+    </script>
+</body>
+</html>
