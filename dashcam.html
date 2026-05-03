@@ -159,46 +159,7 @@
         let currentIndex = parseInt(localStorage.getItem('dashcam_index')) || 1;
         document.getElementById('current-index-display').innerText = currentIndex;
 
-        // --- 進入系統 (處理全螢幕與自動錄影) ---
-        async function enterDashcamMode() {
-            // 1. 嘗試請求全螢幕 (支援 Android Chrome，iOS Safari 必須靠加到主畫面)
-            try {
-                const docElm = document.documentElement;
-                if (docElm.requestFullscreen) {
-                    await docElm.requestFullscreen();
-                } else if (docElm.webkitRequestFullscreen) {
-                    await docElm.webkitRequestFullscreen();
-                }
-            } catch (e) {
-                console.warn("無法自動進入全螢幕", e);
-            }
-
-            // 2. 嘗試呼叫 API 強制鎖定橫向 (Android 支援)
-            try {
-                if (screen.orientation && screen.orientation.lock) {
-                    await screen.orientation.lock('landscape');
-                }
-            } catch (e) {
-                console.warn("無法強制鎖定橫向，已啟動 CSS 阻擋器");
-            }
-
-            document.getElementById('start-screen').classList.add('hidden');
-            
-            // 3. 初始化相機並等待準備完成，然後【自動開始錄影】
-            try {
-                await initDB();
-                await initCamera(); // 現在這個函數會等待畫布完全準備好才放行
-                
-                if (!isRecording) {
-                    await toggleRecording(); // 觸發錄影
-                }
-            } catch (e) {
-                console.error("初始化錯誤:", e);
-                alert("相機存取失敗，請確認是否給予權限。");
-            }
-        }
-
-        // --- 螢幕防休眠邏輯 ---
+        // --- 深度喚醒與防休眠邏輯 (解決切換APP後畫面凍結) ---
         async function requestWakeLock() {
             try {
                 if ('wakeLock' in navigator) {
@@ -220,11 +181,64 @@
             }
         }
 
+        // 強制恢復相機播放的共用函式
+        function forceResumeVideo() {
+            const video = document.getElementById('hidden-video');
+            if (video && video.paused && cameraStream) {
+                video.play().catch(e => console.warn("喚醒攝影機失敗", e));
+            }
+        }
+
+        // 監聽 1：網頁從背景回到前景 (切換App回來)
         document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible' && isRecording) {
-                await requestWakeLock();
+            if (document.visibilityState === 'visible') {
+                forceResumeVideo();
+                if (wakeLock !== null && isRecording) {
+                    await requestWakeLock();
+                }
             }
         });
+
+        // 監聽 2：確保系統彈窗 (如存檔下載) 關閉後，重新取得焦點時喚醒畫面
+        window.addEventListener('focus', () => {
+            forceResumeVideo();
+        });
+
+        // --- 進入系統 (處理全螢幕與自動錄影) ---
+        async function enterDashcamMode() {
+            try {
+                const docElm = document.documentElement;
+                if (docElm.requestFullscreen) {
+                    await docElm.requestFullscreen();
+                } else if (docElm.webkitRequestFullscreen) {
+                    await docElm.webkitRequestFullscreen();
+                }
+            } catch (e) {
+                console.warn("無法自動進入全螢幕", e);
+            }
+
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    await screen.orientation.lock('landscape');
+                }
+            } catch (e) {
+                console.warn("無法強制鎖定橫向，已啟動 CSS 阻擋器");
+            }
+
+            document.getElementById('start-screen').classList.add('hidden');
+            
+            try {
+                await initDB();
+                await initCamera(); 
+                
+                if (!isRecording) {
+                    await toggleRecording(); 
+                }
+            } catch (e) {
+                console.error("初始化錯誤:", e);
+                alert("相機存取失敗，請確認是否給予權限。");
+            }
+        }
 
         // --- 儲存空間容量檢查機制 ---
         async function checkStorageSpace() {
@@ -252,6 +266,7 @@
 
         function closeStorageWarning() {
             document.getElementById('storage-warning-modal').classList.add('hidden');
+            forceResumeVideo(); // 關閉警告也重新喚醒畫面
         }
 
         // --- IndexedDB 儲存邏輯 ---
@@ -318,7 +333,7 @@
             });
         }
 
-        // --- 攝影機與 Canvas 浮水印繪製邏輯 (包裝為 Promise 確保依序執行) ---
+        // --- 攝影機與 Canvas 浮水印繪製邏輯 ---
         async function initCamera() {
             return new Promise(async (resolve, reject) => {
                 try {
@@ -370,7 +385,6 @@
                             const ss = String(now.getSeconds()).padStart(2, '0');
                             const timeStr = `${yyyy}/${MM}/${dd}  ${HH}:${mm}:${ss}`;
 
-                            // 【字體縮小優化】調小比例 (除以 35)
                             const fontSize = Math.max(14, Math.floor(canvas.height / 35)); 
                             ctx.font = `bold ${fontSize}px monospace`;
                             ctx.textAlign = "center";
@@ -378,13 +392,12 @@
                             
                             ctx.shadowColor = "rgba(0,0,0,0.85)";
                             ctx.shadowBlur = 6;
-                            // 框線也同步變細
                             ctx.lineWidth = Math.max(1, Math.floor(fontSize / 20));
                             ctx.strokeStyle = "black";
                             ctx.fillStyle = "#FFD700"; 
 
                             const textX = canvas.width / 2;
-                            const textY = 10; // 稍微往上移一點
+                            const textY = 10; 
 
                             ctx.strokeText(timeStr, textX, textY);
                             ctx.fillText(timeStr, textX, textY);
@@ -443,6 +456,8 @@
             if (mediaRecorder.state === "recording") {
                 mediaRecorder.stop(); 
             }
+            // 點擊存檔後，強制喚醒一下畫面確保順暢
+            forceResumeVideo();
         }
 
         // --- 錄影核心 ---
@@ -582,6 +597,8 @@
 
         function closeGallery() {
             document.getElementById('gallery-modal').classList.add('hidden');
+            // 關閉 Modal 時也確保畫面恢復播放
+            forceResumeVideo();
         }
 
         async function renderFileList() {
@@ -642,6 +659,8 @@
                     setTimeout(() => {
                         document.body.removeChild(a);
                         URL.revokeObjectURL(url);
+                        // 下載完成後可能會有系統彈窗，確保返回時喚醒
+                        forceResumeVideo();
                     }, 100);
                 }
             } catch (err) {
