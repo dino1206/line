@@ -2,13 +2,13 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Web 行車記錄器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* 確保全螢幕且不滾動 */
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background-color: #000; }
+        /* 徹底鎖死畫面，防止任何滑動與彈性滾動 */
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background-color: #000; touch-action: none; overscroll-behavior: none; }
         /* Canvas 預覽畫面填滿 */
         #camera-preview { object-fit: cover; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
         /* UI 覆蓋層 */
@@ -22,54 +22,61 @@
 </head>
 <body class="text-white font-sans antialiased">
 
-    <!-- 原始攝影機影像 (使用透明度隱藏，避免被瀏覽器停止渲染) -->
+    <!-- 啟動與權限請求畫面 (解決手機全螢幕與轉向限制) -->
+    <div id="start-screen" class="fixed inset-0 bg-gray-900 z-[100] flex flex-col items-center justify-center interactive p-6">
+        <i class="fas fa-car-side text-6xl text-blue-500 mb-6"></i>
+        <h1 class="text-3xl font-bold mb-2">Web 行車記錄器</h1>
+        <p class="text-gray-400 text-center mb-8 max-w-sm">為了獲得最佳體驗，系統將進入全螢幕模式並建議以橫向放置手機。</p>
+        <button onclick="enterDashcamMode()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-full shadow-[0_0_20px_rgba(37,99,235,0.5)] text-lg transition transform active:scale-95 flex items-center gap-3">
+            <i class="fas fa-power-off"></i> 啟動系統
+        </button>
+    </div>
+
+    <!-- 原始攝影機影像 (隱藏層) -->
     <video id="hidden-video" autoplay muted playsinline style="position: absolute; opacity: 0.01; z-index: -1; pointer-events: none; width: 100%; height: 100%;"></video>
 
     <!-- 實際顯示與錄製用的 Canvas (包含燒錄的時間) -->
     <canvas id="camera-preview"></canvas>
 
     <!-- UI 覆蓋層 -->
-    <div id="ui-layer" class="p-4 sm:p-8 relative">
+    <div id="ui-layer" class="p-4 sm:p-6 relative">
         
         <!-- 頂部資訊 -->
         <div class="flex justify-between items-start interactive relative z-10">
             <!-- 左側：狀態面板 -->
             <div class="bg-black/60 backdrop-blur-md rounded-lg p-3 border border-white/20 shadow-lg">
-                <div id="status-text" class="text-lg font-bold flex items-center gap-2">
+                <div id="status-text" class="text-base sm:text-lg font-bold flex items-center gap-2">
                     <i class="fas fa-video"></i> 系統就緒
                 </div>
-                <!-- 防休眠狀態提示 -->
-                <div id="wake-lock-status" class="text-xs text-green-400 mt-1 hidden">
+                <div id="wake-lock-status" class="text-[10px] sm:text-xs text-green-400 mt-1 hidden">
                     <i class="fas fa-sun"></i> 螢幕長亮防休眠已啟動
                 </div>
                 <!-- 該節錄影進度顯示 -->
-                <div id="timer-text" class="text-lg sm:text-xl text-yellow-400 mt-2 font-mono font-bold hidden tracking-wider">
+                <div id="timer-text" class="text-base sm:text-xl text-yellow-400 mt-1 sm:mt-2 font-mono font-bold hidden tracking-wider">
                     <i class="fas fa-stopwatch mr-1"></i><span id="time-elapsed">00:00</span> / 03:00
                 </div>
-                <div class="text-xs text-gray-300 mt-2">背景循環槽位: <span id="current-index-display">1</span>/20</div>
+                <div class="text-[10px] sm:text-xs text-gray-300 mt-1 sm:mt-2">背景循環槽位: <span id="current-index-display">1</span>/20</div>
             </div>
 
             <!-- 右側：功能按鈕群 -->
-            <div class="flex flex-col items-end gap-3">
-                <!-- 直接存入相簿按鈕 (緊急備份) -->
-                <button onclick="saveCurrentToAlbum()" class="bg-blue-600/90 hover:bg-blue-500 px-4 py-2.5 rounded-full shadow-[0_0_15px_rgba(37,99,235,0.6)] transition duration-200 border border-blue-400 flex items-center gap-2 active:scale-95">
-                    <i class="fas fa-download text-lg"></i>
-                    <span class="font-bold tracking-wider text-sm">直接存入</span>
+            <div class="flex flex-col items-end gap-2 sm:gap-3">
+                <button onclick="saveCurrentToAlbum()" class="bg-blue-600/90 hover:bg-blue-500 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full shadow-[0_0_15px_rgba(37,99,235,0.6)] transition duration-200 border border-blue-400 flex items-center gap-2 active:scale-95">
+                    <i class="fas fa-download text-base sm:text-lg"></i>
+                    <span class="font-bold tracking-wider text-xs sm:text-sm">直接存入</span>
                 </button>
-                <!-- 歷史檔案庫按鈕 (找回20個循環檔) -->
-                <button onclick="openGallery()" class="bg-gray-800/80 hover:bg-gray-700 px-4 py-2.5 rounded-full shadow-lg transition duration-200 border border-gray-600 flex items-center gap-2 active:scale-95">
-                    <i class="fas fa-folder-open text-yellow-500 text-lg"></i>
-                    <span class="font-bold tracking-wider text-sm text-gray-200">歷史檔案</span>
+                <button onclick="openGallery()" class="bg-gray-800/80 hover:bg-gray-700 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full shadow-lg transition duration-200 border border-gray-600 flex items-center gap-2 active:scale-95">
+                    <i class="fas fa-folder-open text-yellow-500 text-base sm:text-lg"></i>
+                    <span class="font-bold tracking-wider text-xs sm:text-sm text-gray-200">歷史檔案</span>
                 </button>
             </div>
         </div>
 
         <!-- 畫面下方控制項 -->
-        <div class="flex flex-col items-center justify-end h-full pb-6 interactive">
+        <div class="flex flex-col items-center justify-end h-full pb-2 sm:pb-6 interactive">
             <!-- 錄影按鈕 -->
-            <button id="record-btn" onclick="toggleRecording()" class="flex flex-col items-center justify-center w-24 h-24 bg-red-600 hover:bg-red-500 rounded-full shadow-[0_0_20px_rgba(220,38,38,0.6)] border-4 border-white/20 transition duration-300 transform active:scale-95">
-                <i id="record-icon" class="fas fa-circle text-3xl mb-1"></i>
-                <span id="record-label" class="text-xs font-bold uppercase tracking-wider">開始錄影</span>
+            <button id="record-btn" onclick="toggleRecording()" class="flex flex-col items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-red-600 hover:bg-red-500 rounded-full shadow-[0_0_20px_rgba(220,38,38,0.6)] border-4 border-white/20 transition duration-300 transform active:scale-95">
+                <i id="record-icon" class="fas fa-circle text-2xl sm:text-3xl mb-1"></i>
+                <span id="record-label" class="text-[10px] sm:text-xs font-bold uppercase tracking-wider">開始錄影</span>
             </button>
         </div>
     </div>
@@ -125,12 +132,46 @@
         let displayTimer = null;
         let startTime = 0;
         let wakeLock = null; 
-        let isEmergencySave = false; // 標記是否為點擊「直接存入」
+        let isEmergencySave = false;
         
         let currentIndex = parseInt(localStorage.getItem('dashcam_index')) || 1;
         document.getElementById('current-index-display').innerText = currentIndex;
 
-        // --- 螢幕防休眠邏輯 (Screen Wake Lock API) ---
+        // --- 進入系統 (處理全螢幕與旋轉) ---
+        async function enterDashcamMode() {
+            // 請求全螢幕
+            try {
+                const docElm = document.documentElement;
+                if (docElm.requestFullscreen) {
+                    await docElm.requestFullscreen();
+                } else if (docElm.webkitRequestFullscreen) {
+                    await docElm.webkitRequestFullscreen();
+                }
+            } catch (e) {
+                console.warn("無法自動進入全螢幕", e);
+            }
+
+            // 請求鎖定橫向 (Landscape)
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    await screen.orientation.lock('landscape');
+                }
+            } catch (e) {
+                console.warn("無法強制鎖定橫向，請手動旋轉手機", e);
+            }
+
+            // 隱藏啟動畫面並初始化相機
+            document.getElementById('start-screen').classList.add('hidden');
+            try {
+                await initDB();
+                await initCamera();
+            } catch (e) {
+                console.error("初始化錯誤:", e);
+                alert("相機存取失敗，請確認是否給予權限。");
+            }
+        }
+
+        // --- 螢幕防休眠邏輯 ---
         async function requestWakeLock() {
             try {
                 if ('wakeLock' in navigator) {
@@ -186,7 +227,7 @@
             document.getElementById('storage-warning-modal').classList.add('hidden');
         }
 
-        // --- IndexedDB 儲存邏輯 (保留背景循環功能) ---
+        // --- IndexedDB 儲存邏輯 ---
         const dbName = "DashcamStorage";
         const storeName = "videos";
         let db;
@@ -253,8 +294,9 @@
         // --- 攝影機與 Canvas 浮水印繪製邏輯 ---
         async function initCamera() {
             try {
+                // 優先請求高畫質比例
                 cameraStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+                    video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
                     audio: true
                 });
                 
@@ -265,11 +307,11 @@
                 video.srcObject = cameraStream;
                 
                 video.addEventListener('loadedmetadata', () => {
-                    video.play(); // 確保影片開始播放
+                    video.play(); 
+                    // 初始化時先設定畫布尺寸
                     canvas.width = video.videoWidth || 1280;
                     canvas.height = video.videoHeight || 720;
                     
-                    // 從 Canvas 提取包含畫面的串流
                     canvasStream = canvas.captureStream(30);
                     
                     const audioTracks = cameraStream.getAudioTracks();
@@ -279,8 +321,13 @@
                 });
 
                 function drawCanvas() {
-                    // 確保影片已經準備好且有寬度
                     if (video.readyState >= 2 && video.videoWidth > 0) {
+                        // 【動態尺寸偵測】若手機旋轉導致串流比例改變，畫布自動跟隨調整，防止變窄
+                        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
+                        }
+
                         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                         const now = new Date();
@@ -292,19 +339,20 @@
                         const ss = String(now.getSeconds()).padStart(2, '0');
                         const timeStr = `${yyyy}/${MM}/${dd}  ${HH}:${mm}:${ss}`;
 
-                        const fontSize = Math.max(24, Math.floor(canvas.height / 15)); 
+                        // 【字體縮小優化】調小比例
+                        const fontSize = Math.max(16, Math.floor(canvas.height / 28)); 
                         ctx.font = `bold ${fontSize}px monospace`;
                         ctx.textAlign = "center";
                         ctx.textBaseline = "top";
                         
-                        ctx.shadowColor = "rgba(0,0,0,0.8)";
-                        ctx.shadowBlur = 8;
-                        ctx.lineWidth = Math.max(2, Math.floor(fontSize / 15));
+                        ctx.shadowColor = "rgba(0,0,0,0.85)";
+                        ctx.shadowBlur = 6;
+                        ctx.lineWidth = Math.max(1, Math.floor(fontSize / 15));
                         ctx.strokeStyle = "black";
                         ctx.fillStyle = "#FFD700"; 
 
                         const textX = canvas.width / 2;
-                        const textY = 20; 
+                        const textY = 15; 
 
                         ctx.strokeText(timeStr, textX, textY);
                         ctx.fillText(timeStr, textX, textY);
@@ -315,7 +363,8 @@
                 requestAnimationFrame(drawCanvas);
 
             } catch (err) {
-                alert("無法存取相機，請確認是否給予權限。錯誤: " + err.message);
+                // 將拋出錯誤交由呼叫處處理
+                throw err;
             }
         }
 
@@ -360,10 +409,9 @@
                 return;
             }
             
-            // 設定標記，並立即中斷當前錄影以觸發存檔
             isEmergencySave = true;
             if (mediaRecorder.state === "recording") {
-                mediaRecorder.stop(); // 停止會立刻觸發 onstop 進行下載
+                mediaRecorder.stop(); 
             }
         }
 
@@ -409,18 +457,15 @@
                     const blob = new Blob(recordedChunks, { type: finalMimeType });
                     const timestamp = new Date().getTime();
                     
-                    // 1. 保留背景寫入 DB (作為黑盒子備份)
                     try {
                         await saveVideoToDB(currentIndex, blob, timestamp, finalMimeType);
                     } catch (err) {
                         console.error(err);
                     }
 
-                    // 2. 如果是用戶點擊了「直接存入相簿」，觸發下載到手機
                     if (isEmergencySave) {
-                        isEmergencySave = false; // 復原標記
+                        isEmergencySave = false; 
                         const ext = finalMimeType.includes("mp4") ? "mp4" : "webm";
-                        // 讓檔名包含明確時間，方便在相簿尋找
                         const filename = `行車紀錄_手動存檔_${timestamp}.${ext}`;
                         
                         const url = URL.createObjectURL(blob);
@@ -443,7 +488,6 @@
                     document.getElementById('current-index-display').innerText = currentIndex;
                 }
 
-                // 若錄影狀態仍在進行中 (未按下停止鍵)，則無縫銜接下一次循環
                 if (isRecording) {
                     startSingleCycle();
                 }
@@ -581,16 +625,6 @@
                 renderFileList(); 
             }
         }
-
-        // --- 啟動初始化 ---
-        window.onload = async () => {
-            try {
-                await initDB();
-                await initCamera();
-            } catch (e) {
-                console.error("初始化錯誤:", e);
-            }
-        };
     </script>
 </body>
 </html>
