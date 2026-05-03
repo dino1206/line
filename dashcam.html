@@ -3,12 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- PWA 相關標籤：支援加入主畫面並隱藏網址列 (特別針對 iOS) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="display" content="standalone">
+
     <title>Web 行車記錄器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         /* 徹底鎖死畫面，防止任何滑動與彈性滾動 */
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background-color: #000; touch-action: none; overscroll-behavior: none; }
+        body, html { margin: 0; padding: 0; height: 100dvh; width: 100dvw; overflow: hidden; background-color: #000; touch-action: none; overscroll-behavior: none; }
         /* Canvas 預覽畫面填滿 */
         #camera-preview { object-fit: cover; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
         /* UI 覆蓋層 */
@@ -18,16 +25,31 @@
         /* 閃爍動畫 */
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
         .recording-dot { animation: blink 1.5s infinite; color: red; }
+        
+        /* 直向畫面攔截器 (當手機直拿時強制顯示) */
+        @media screen and (orientation: portrait) {
+            #portrait-blocker { display: flex !important; }
+        }
     </style>
 </head>
 <body class="text-white font-sans antialiased">
 
-    <!-- 啟動與權限請求畫面 (解決手機全螢幕與轉向限制) -->
+    <!-- 直向畫面攔截器 (保護錄影比例) -->
+    <div id="portrait-blocker" class="fixed inset-0 bg-black z-[200] flex-col items-center justify-center text-white hidden interactive">
+        <i class="fas fa-mobile-alt text-6xl mb-6 transform -rotate-90 animate-pulse text-blue-500"></i>
+        <h2 class="text-3xl font-bold mb-3 tracking-widest">請將手機轉為橫向</h2>
+        <p class="text-gray-400 text-center max-w-xs leading-relaxed">行車記錄器需要橫向畫面以獲得最佳視野，並確保影片格式正確。</p>
+    </div>
+
+    <!-- 啟動與權限請求畫面 -->
     <div id="start-screen" class="fixed inset-0 bg-gray-900 z-[100] flex flex-col items-center justify-center interactive p-6">
         <i class="fas fa-car-side text-6xl text-blue-500 mb-6"></i>
         <h1 class="text-3xl font-bold mb-2">Web 行車記錄器</h1>
-        <p class="text-gray-400 text-center mb-8 max-w-sm">為了獲得最佳體驗，系統將進入全螢幕模式並建議以橫向放置手機。</p>
-        <button onclick="enterDashcamMode()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-full shadow-[0_0_20px_rgba(37,99,235,0.5)] text-lg transition transform active:scale-95 flex items-center gap-3">
+        <div class="bg-gray-800/80 p-4 rounded-lg mb-8 max-w-sm text-sm text-gray-300 space-y-2 border border-gray-700 shadow-lg">
+            <p><i class="fas fa-check text-green-500 mr-2"></i> 點擊後將<b>自動開始錄影</b></p>
+            <p><i class="fab fa-apple text-gray-400 mr-2"></i> <b>iPhone 隱藏網址列秘訣：</b>請點擊 Safari 底部「分享」>「加入主畫面」，由桌面圖示開啟即可全螢幕。</p>
+        </div>
+        <button onclick="enterDashcamMode()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-10 rounded-full shadow-[0_0_20px_rgba(37,99,235,0.5)] text-lg transition transform active:scale-95 flex items-center gap-3">
             <i class="fas fa-power-off"></i> 啟動系統
         </button>
     </div>
@@ -35,7 +57,7 @@
     <!-- 原始攝影機影像 (隱藏層) -->
     <video id="hidden-video" autoplay muted playsinline style="position: absolute; opacity: 0.01; z-index: -1; pointer-events: none; width: 100%; height: 100%;"></video>
 
-    <!-- 實際顯示與錄製用的 Canvas (包含燒錄的時間) -->
+    <!-- 實際顯示與錄製用的 Canvas -->
     <canvas id="camera-preview"></canvas>
 
     <!-- UI 覆蓋層 -->
@@ -137,9 +159,9 @@
         let currentIndex = parseInt(localStorage.getItem('dashcam_index')) || 1;
         document.getElementById('current-index-display').innerText = currentIndex;
 
-        // --- 進入系統 (處理全螢幕與旋轉) ---
+        // --- 進入系統 (處理全螢幕與自動錄影) ---
         async function enterDashcamMode() {
-            // 請求全螢幕
+            // 1. 嘗試請求全螢幕 (支援 Android Chrome，iOS Safari 必須靠加到主畫面)
             try {
                 const docElm = document.documentElement;
                 if (docElm.requestFullscreen) {
@@ -151,20 +173,25 @@
                 console.warn("無法自動進入全螢幕", e);
             }
 
-            // 請求鎖定橫向 (Landscape)
+            // 2. 嘗試呼叫 API 強制鎖定橫向 (Android 支援)
             try {
                 if (screen.orientation && screen.orientation.lock) {
                     await screen.orientation.lock('landscape');
                 }
             } catch (e) {
-                console.warn("無法強制鎖定橫向，請手動旋轉手機", e);
+                console.warn("無法強制鎖定橫向，已啟動 CSS 阻擋器");
             }
 
-            // 隱藏啟動畫面並初始化相機
             document.getElementById('start-screen').classList.add('hidden');
+            
+            // 3. 初始化相機並等待準備完成，然後【自動開始錄影】
             try {
                 await initDB();
-                await initCamera();
+                await initCamera(); // 現在這個函數會等待畫布完全準備好才放行
+                
+                if (!isRecording) {
+                    await toggleRecording(); // 觸發錄影
+                }
             } catch (e) {
                 console.error("初始化錯誤:", e);
                 alert("相機存取失敗，請確認是否給予權限。");
@@ -291,81 +318,84 @@
             });
         }
 
-        // --- 攝影機與 Canvas 浮水印繪製邏輯 ---
+        // --- 攝影機與 Canvas 浮水印繪製邏輯 (包裝為 Promise 確保依序執行) ---
         async function initCamera() {
-            try {
-                // 優先請求高畫質比例
-                cameraStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
-                    audio: true
-                });
-                
-                const video = document.getElementById('hidden-video');
-                const canvas = document.getElementById('camera-preview');
-                const ctx = canvas.getContext('2d');
-                
-                video.srcObject = cameraStream;
-                
-                video.addEventListener('loadedmetadata', () => {
-                    video.play(); 
-                    // 初始化時先設定畫布尺寸
-                    canvas.width = video.videoWidth || 1280;
-                    canvas.height = video.videoHeight || 720;
+            return new Promise(async (resolve, reject) => {
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+                        audio: true
+                    });
                     
-                    canvasStream = canvas.captureStream(30);
+                    const video = document.getElementById('hidden-video');
+                    const canvas = document.getElementById('camera-preview');
+                    const ctx = canvas.getContext('2d');
                     
-                    const audioTracks = cameraStream.getAudioTracks();
-                    if (audioTracks.length > 0) {
-                        canvasStream.addTrack(audioTracks[0]);
-                    }
-                });
-
-                function drawCanvas() {
-                    if (video.readyState >= 2 && video.videoWidth > 0) {
-                        // 【動態尺寸偵測】若手機旋轉導致串流比例改變，畫布自動跟隨調整，防止變窄
-                        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-                            canvas.width = video.videoWidth;
-                            canvas.height = video.videoHeight;
+                    video.srcObject = cameraStream;
+                    
+                    video.addEventListener('loadedmetadata', () => {
+                        video.play(); 
+                        canvas.width = video.videoWidth || 1280;
+                        canvas.height = video.videoHeight || 720;
+                        
+                        canvasStream = canvas.captureStream(30);
+                        
+                        const audioTracks = cameraStream.getAudioTracks();
+                        if (audioTracks.length > 0) {
+                            canvasStream.addTrack(audioTracks[0]);
                         }
 
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                        const now = new Date();
-                        const yyyy = now.getFullYear();
-                        const MM = String(now.getMonth() + 1).padStart(2, '0');
-                        const dd = String(now.getDate()).padStart(2, '0');
-                        const HH = String(now.getHours()).padStart(2, '0');
-                        const mm = String(now.getMinutes()).padStart(2, '0');
-                        const ss = String(now.getSeconds()).padStart(2, '0');
-                        const timeStr = `${yyyy}/${MM}/${dd}  ${HH}:${mm}:${ss}`;
-
-                        // 【字體縮小優化】調小比例
-                        const fontSize = Math.max(16, Math.floor(canvas.height / 28)); 
-                        ctx.font = `bold ${fontSize}px monospace`;
-                        ctx.textAlign = "center";
-                        ctx.textBaseline = "top";
+                        // 啟動畫布渲染迴圈
+                        requestAnimationFrame(drawCanvas);
                         
-                        ctx.shadowColor = "rgba(0,0,0,0.85)";
-                        ctx.shadowBlur = 6;
-                        ctx.lineWidth = Math.max(1, Math.floor(fontSize / 15));
-                        ctx.strokeStyle = "black";
-                        ctx.fillStyle = "#FFD700"; 
+                        // 畫布準備完畢，放行
+                        resolve();
+                    });
 
-                        const textX = canvas.width / 2;
-                        const textY = 15; 
+                    function drawCanvas() {
+                        if (video.readyState >= 2 && video.videoWidth > 0) {
+                            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                                canvas.width = video.videoWidth;
+                                canvas.height = video.videoHeight;
+                            }
 
-                        ctx.strokeText(timeStr, textX, textY);
-                        ctx.fillText(timeStr, textX, textY);
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                            const now = new Date();
+                            const yyyy = now.getFullYear();
+                            const MM = String(now.getMonth() + 1).padStart(2, '0');
+                            const dd = String(now.getDate()).padStart(2, '0');
+                            const HH = String(now.getHours()).padStart(2, '0');
+                            const mm = String(now.getMinutes()).padStart(2, '0');
+                            const ss = String(now.getSeconds()).padStart(2, '0');
+                            const timeStr = `${yyyy}/${MM}/${dd}  ${HH}:${mm}:${ss}`;
+
+                            // 【字體縮小優化】調小比例 (除以 35)
+                            const fontSize = Math.max(14, Math.floor(canvas.height / 35)); 
+                            ctx.font = `bold ${fontSize}px monospace`;
+                            ctx.textAlign = "center";
+                            ctx.textBaseline = "top";
+                            
+                            ctx.shadowColor = "rgba(0,0,0,0.85)";
+                            ctx.shadowBlur = 6;
+                            // 框線也同步變細
+                            ctx.lineWidth = Math.max(1, Math.floor(fontSize / 20));
+                            ctx.strokeStyle = "black";
+                            ctx.fillStyle = "#FFD700"; 
+
+                            const textX = canvas.width / 2;
+                            const textY = 10; // 稍微往上移一點
+
+                            ctx.strokeText(timeStr, textX, textY);
+                            ctx.fillText(timeStr, textX, textY);
+                        }
+                        requestAnimationFrame(drawCanvas);
                     }
-                    requestAnimationFrame(drawCanvas);
-                }
-                
-                requestAnimationFrame(drawCanvas);
 
-            } catch (err) {
-                // 將拋出錯誤交由呼叫處處理
-                throw err;
-            }
+                } catch (err) {
+                    reject(err);
+                }
+            });
         }
 
         async function toggleRecording() {
