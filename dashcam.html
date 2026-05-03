@@ -35,13 +35,17 @@
             載入時間中...
         </div>
 
-        <!-- 頂部資訊 (為了不遮擋時間，稍微往下推 mt-8) -->
+        <!-- 頂部資訊 -->
         <div class="flex justify-between items-start interactive relative z-10 mt-8 sm:mt-10">
             <div class="bg-black/60 backdrop-blur-md rounded-lg p-3 border border-white/20 shadow-lg">
                 <div id="status-text" class="text-lg font-bold flex items-center gap-2">
                     <i class="fas fa-video"></i> 系統就緒
                 </div>
-                <!-- 該節錄影進度顯示 (放大並加強對比，錄影時才會出現) -->
+                <!-- 防休眠狀態提示 -->
+                <div id="wake-lock-status" class="text-xs text-green-400 mt-1 hidden">
+                    <i class="fas fa-sun"></i> 螢幕長亮防休眠已啟動
+                </div>
+                <!-- 該節錄影進度顯示 -->
                 <div id="timer-text" class="text-lg sm:text-xl text-yellow-400 mt-2 font-mono font-bold hidden tracking-wider">
                     <i class="fas fa-stopwatch mr-1"></i><span id="time-elapsed">00:00</span> / 03:00
                 </div>
@@ -112,9 +116,46 @@
         let recordTimer = null;
         let displayTimer = null;
         let startTime = 0;
+        let wakeLock = null; // 喚醒鎖物件
         
         let currentIndex = parseInt(localStorage.getItem('dashcam_index')) || 1;
         document.getElementById('current-index-display').innerText = currentIndex;
+
+        // --- 螢幕防休眠邏輯 (Screen Wake Lock API) ---
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    document.getElementById('wake-lock-status').classList.remove('hidden');
+                    console.log('Screen Wake Lock 啟動：螢幕將保持長亮');
+                    
+                    // 當鎖定被釋放時的事件
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Screen Wake Lock 釋放');
+                    });
+                }
+            } catch (err) {
+                console.warn(`無法請求螢幕喚醒鎖: ${err.name}, ${err.message}`);
+                // 某些舊版瀏覽器或非 https 環境可能不支援，隱藏提示
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release()
+                .then(() => {
+                    wakeLock = null;
+                    document.getElementById('wake-lock-status').classList.add('hidden');
+                });
+            }
+        }
+
+        // 處理網頁可見度改變（例如縮小網頁再回來，需重新請求喚醒鎖）
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible' && isRecording) {
+                await requestWakeLock();
+            }
+        });
 
         // --- 即時時鐘邏輯 (浮水印) ---
         function updateRealTimeClock() {
@@ -253,14 +294,16 @@
             startRecordingSession();
         }
 
-        function startRecordingSession() {
+        async function startRecordingSession() {
             isRecording = true;
+            await requestWakeLock(); // 啟動錄影時請求螢幕常亮
             updateUI();
             startSingleCycle();
         }
 
         function stopRecording() {
             isRecording = false;
+            releaseWakeLock(); // 停止錄影時釋放螢幕常亮
             clearTimeout(recordTimer);
             clearInterval(displayTimer);
             if (mediaRecorder && mediaRecorder.state === "recording") {
