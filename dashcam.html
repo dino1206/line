@@ -159,7 +159,29 @@
         let currentIndex = parseInt(localStorage.getItem('dashcam_index')) || 1;
         document.getElementById('current-index-display').innerText = currentIndex;
 
-        // --- 深度喚醒與防休眠邏輯 (解決切換APP後畫面凍結) ---
+        // --- 強制恢復相機播放的共用函式 ---
+        function forceResumeVideo() {
+            const video = document.getElementById('hidden-video');
+            if (video && video.paused && cameraStream) {
+                video.play().catch(e => console.warn("喚醒攝影機失敗", e));
+            }
+        }
+
+        // 保留原生事件監聽，確保主動性
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                forceResumeVideo();
+                if (wakeLock !== null && isRecording) {
+                    await requestWakeLock();
+                }
+            }
+        });
+
+        window.addEventListener('focus', () => {
+            forceResumeVideo();
+        });
+
+        // --- 螢幕防休眠邏輯 ---
         async function requestWakeLock() {
             try {
                 if ('wakeLock' in navigator) {
@@ -180,29 +202,6 @@
                 });
             }
         }
-
-        // 強制恢復相機播放的共用函式
-        function forceResumeVideo() {
-            const video = document.getElementById('hidden-video');
-            if (video && video.paused && cameraStream) {
-                video.play().catch(e => console.warn("喚醒攝影機失敗", e));
-            }
-        }
-
-        // 監聽 1：網頁從背景回到前景 (切換App回來)
-        document.addEventListener('visibilitychange', async () => {
-            if (document.visibilityState === 'visible') {
-                forceResumeVideo();
-                if (wakeLock !== null && isRecording) {
-                    await requestWakeLock();
-                }
-            }
-        });
-
-        // 監聽 2：確保系統彈窗 (如存檔下載) 關閉後，重新取得焦點時喚醒畫面
-        window.addEventListener('focus', () => {
-            forceResumeVideo();
-        });
 
         // --- 進入系統 (處理全螢幕與自動錄影) ---
         async function enterDashcamMode() {
@@ -266,7 +265,7 @@
 
         function closeStorageWarning() {
             document.getElementById('storage-warning-modal').classList.add('hidden');
-            forceResumeVideo(); // 關閉警告也重新喚醒畫面
+            forceResumeVideo();
         }
 
         // --- IndexedDB 儲存邏輯 ---
@@ -348,6 +347,8 @@
                     
                     video.srcObject = cameraStream;
                     
+                    let lastCheckTime = 0; // 綠色看門狗：計時器
+
                     video.addEventListener('loadedmetadata', () => {
                         video.play(); 
                         canvas.width = video.videoWidth || 1280;
@@ -360,14 +361,21 @@
                             canvasStream.addTrack(audioTracks[0]);
                         }
 
-                        // 啟動畫布渲染迴圈
                         requestAnimationFrame(drawCanvas);
-                        
-                        // 畫布準備完畢，放行
                         resolve();
                     });
 
                     function drawCanvas() {
+                        // 【零背景耗能的綠色看門狗】整合在此
+                        // 畫布引擎在背景時會完全休眠；當用戶回到網頁喚醒引擎時，順手檢查一次即可，達成 0 浪費！
+                        const currentTime = Date.now();
+                        if (currentTime - lastCheckTime > 1000) {
+                            if (video.paused && cameraStream) {
+                                video.play().catch(e => {}); // iOS 回到前景立刻喚醒
+                            }
+                            lastCheckTime = currentTime;
+                        }
+
                         if (video.readyState >= 2 && video.videoWidth > 0) {
                             if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
                                 canvas.width = video.videoWidth;
@@ -456,8 +464,7 @@
             if (mediaRecorder.state === "recording") {
                 mediaRecorder.stop(); 
             }
-            // 點擊存檔後，強制喚醒一下畫面確保順暢
-            forceResumeVideo();
+            // 由於會觸發系統視窗，綠色看門狗會負責處理後續的喚醒
         }
 
         // --- 錄影核心 ---
@@ -597,7 +604,6 @@
 
         function closeGallery() {
             document.getElementById('gallery-modal').classList.add('hidden');
-            // 關閉 Modal 時也確保畫面恢復播放
             forceResumeVideo();
         }
 
@@ -659,8 +665,6 @@
                     setTimeout(() => {
                         document.body.removeChild(a);
                         URL.revokeObjectURL(url);
-                        // 下載完成後可能會有系統彈窗，確保返回時喚醒
-                        forceResumeVideo();
                     }, 100);
                 }
             } catch (err) {
