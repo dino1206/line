@@ -9,7 +9,7 @@
     <style>
         /* 確保全螢幕且不滾動 */
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background-color: #000; }
-        /* 影片填滿畫面 */
+        /* Canvas 預覽畫面填滿 */
         #camera-preview { object-fit: cover; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
         /* UI 覆蓋層 */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
@@ -18,25 +18,22 @@
         /* 閃爍動畫 */
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
         .recording-dot { animation: blink 1.5s infinite; color: red; }
-        /* 時鐘浮水印陰影效果，確保任何背景下清晰 */
-        .watermark-text { text-shadow: 2px 2px 4px rgba(0,0,0,0.9), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; }
     </style>
 </head>
 <body class="text-white font-sans antialiased">
 
-    <!-- 攝影機預覽 -->
-    <video id="camera-preview" autoplay muted playsinline></video>
+    <!-- 原始攝影機影像 (使用透明度隱藏，避免被瀏覽器停止渲染) -->
+    <video id="hidden-video" autoplay muted playsinline style="position: absolute; opacity: 0.01; z-index: -1; pointer-events: none; width: 100%; height: 100%;"></video>
+
+    <!-- 實際顯示與錄製用的 Canvas (包含燒錄的時間) -->
+    <canvas id="camera-preview"></canvas>
 
     <!-- UI 覆蓋層 -->
     <div id="ui-layer" class="p-4 sm:p-8 relative">
         
-        <!-- 即時實際時間 (浮水印) 移動至畫面正上方 -->
-        <div id="real-time-clock" class="absolute top-4 left-0 w-full text-center text-white text-xl sm:text-2xl font-mono font-bold tracking-widest watermark-text pointer-events-none z-0">
-            載入時間中...
-        </div>
-
         <!-- 頂部資訊 -->
-        <div class="flex justify-between items-start interactive relative z-10 mt-8 sm:mt-10">
+        <div class="flex justify-between items-start interactive relative z-10">
+            <!-- 左側：狀態面板 -->
             <div class="bg-black/60 backdrop-blur-md rounded-lg p-3 border border-white/20 shadow-lg">
                 <div id="status-text" class="text-lg font-bold flex items-center gap-2">
                     <i class="fas fa-video"></i> 系統就緒
@@ -49,12 +46,22 @@
                 <div id="timer-text" class="text-lg sm:text-xl text-yellow-400 mt-2 font-mono font-bold hidden tracking-wider">
                     <i class="fas fa-stopwatch mr-1"></i><span id="time-elapsed">00:00</span> / 03:00
                 </div>
-                <div class="text-xs text-gray-300 mt-2">覆蓋槽位: <span id="current-index-display">1</span>/20</div>
+                <div class="text-xs text-gray-300 mt-2">背景循環槽位: <span id="current-index-display">1</span>/20</div>
             </div>
 
-            <button onclick="openGallery()" class="bg-gray-800/80 hover:bg-gray-700 p-3 rounded-full shadow-lg transition duration-200 border border-gray-600">
-                <i class="fas fa-folder-open text-xl"></i>
-            </button>
+            <!-- 右側：功能按鈕群 -->
+            <div class="flex flex-col items-end gap-3">
+                <!-- 直接存入相簿按鈕 (緊急備份) -->
+                <button onclick="saveCurrentToAlbum()" class="bg-blue-600/90 hover:bg-blue-500 px-4 py-2.5 rounded-full shadow-[0_0_15px_rgba(37,99,235,0.6)] transition duration-200 border border-blue-400 flex items-center gap-2 active:scale-95">
+                    <i class="fas fa-download text-lg"></i>
+                    <span class="font-bold tracking-wider text-sm">直接存入</span>
+                </button>
+                <!-- 歷史檔案庫按鈕 (找回20個循環檔) -->
+                <button onclick="openGallery()" class="bg-gray-800/80 hover:bg-gray-700 px-4 py-2.5 rounded-full shadow-lg transition duration-200 border border-gray-600 flex items-center gap-2 active:scale-95">
+                    <i class="fas fa-folder-open text-yellow-500 text-lg"></i>
+                    <span class="font-bold tracking-wider text-sm text-gray-200">歷史檔案</span>
+                </button>
+            </div>
         </div>
 
         <!-- 畫面下方控制項 -->
@@ -77,7 +84,7 @@
         </div>
         <div class="p-4 bg-yellow-900/30 text-yellow-200 text-sm border-b border-yellow-700/50 flex items-start gap-2">
             <i class="fas fa-info-circle mt-0.5"></i> 
-            <div>提示：瀏覽此清單時，背景的錄影<b>會持續進行</b>。請點擊下載圖示將重要影片存入手機相簿。</div>
+            <div>提示：瀏覽此清單時，背景的錄影<b>會持續進行</b>。如果手機內建播放器會卡頓，建議下載後使用 VLC 等專業播放器觀看。</div>
         </div>
         <div id="file-list" class="flex-1 overflow-y-auto p-4 space-y-3">
             <div class="text-center text-gray-500 mt-10">載入中...</div>
@@ -94,8 +101,8 @@
                 <p class="text-gray-300 text-sm">目前剩餘空間：<span id="available-gb-text" class="text-red-400 font-mono font-bold"></span></p>
             </div>
             <p class="text-gray-400 text-sm mb-6 text-left">
-                為了確保 20 個影片檔能順利循環儲存且不會中途當機，系統已自動攔截錄影。<br><br>
-                請清理手機儲存空間（或刪除部分歷史影片），然後再試一次。
+                為了確保影片檔能順利儲存且不會中途當機，系統已自動攔截錄影。<br><br>
+                請清理手機儲存空間，然後再試一次。
             </p>
             <button onclick="closeStorageWarning()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition active:scale-95">
                 我知道了
@@ -109,14 +116,16 @@
         const RECORD_DURATION_MS = 3 * 60 * 1000; 
         const REQUIRED_SPACE_BYTES = 2 * 1024 * 1024 * 1024; 
         
-        let stream = null;
+        let cameraStream = null;      
+        let canvasStream = null;      
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
         let recordTimer = null;
         let displayTimer = null;
         let startTime = 0;
-        let wakeLock = null; // 喚醒鎖物件
+        let wakeLock = null; 
+        let isEmergencySave = false; // 標記是否為點擊「直接存入」
         
         let currentIndex = parseInt(localStorage.getItem('dashcam_index')) || 1;
         document.getElementById('current-index-display').innerText = currentIndex;
@@ -127,49 +136,27 @@
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
                     document.getElementById('wake-lock-status').classList.remove('hidden');
-                    console.log('Screen Wake Lock 啟動：螢幕將保持長亮');
-                    
-                    // 當鎖定被釋放時的事件
-                    wakeLock.addEventListener('release', () => {
-                        console.log('Screen Wake Lock 釋放');
-                    });
+                    wakeLock.addEventListener('release', () => console.log('Screen Wake Lock 釋放'));
                 }
             } catch (err) {
                 console.warn(`無法請求螢幕喚醒鎖: ${err.name}, ${err.message}`);
-                // 某些舊版瀏覽器或非 https 環境可能不支援，隱藏提示
             }
         }
 
         function releaseWakeLock() {
             if (wakeLock !== null) {
-                wakeLock.release()
-                .then(() => {
+                wakeLock.release().then(() => {
                     wakeLock = null;
                     document.getElementById('wake-lock-status').classList.add('hidden');
                 });
             }
         }
 
-        // 處理網頁可見度改變（例如縮小網頁再回來，需重新請求喚醒鎖）
         document.addEventListener('visibilitychange', async () => {
             if (wakeLock !== null && document.visibilityState === 'visible' && isRecording) {
                 await requestWakeLock();
             }
         });
-
-        // --- 即時時鐘邏輯 (浮水印) ---
-        function updateRealTimeClock() {
-            const now = new Date();
-            const yyyy = now.getFullYear();
-            const MM = String(now.getMonth() + 1).padStart(2, '0');
-            const dd = String(now.getDate()).padStart(2, '0');
-            const HH = String(now.getHours()).padStart(2, '0');
-            const mm = String(now.getMinutes()).padStart(2, '0');
-            const ss = String(now.getSeconds()).padStart(2, '0');
-            document.getElementById('real-time-clock').innerText = `${yyyy}/${MM}/${dd} ${HH}:${mm}:${ss}`;
-        }
-        setInterval(updateRealTimeClock, 1000);
-        updateRealTimeClock(); 
 
         // --- 儲存空間容量檢查機制 ---
         async function checkStorageSpace() {
@@ -187,7 +174,7 @@
                     return { hasSpace: true, availableGB: "未知" }; 
                 }
             }
-            return { hasSpace: true, availableGB: "瀏覽器不支援容量檢查" }; 
+            return { hasSpace: true, availableGB: "瀏覽器不支援" }; 
         }
 
         function showStorageWarning(availableGB) {
@@ -199,7 +186,7 @@
             document.getElementById('storage-warning-modal').classList.add('hidden');
         }
 
-        // --- IndexedDB 儲存邏輯 ---
+        // --- IndexedDB 儲存邏輯 (保留背景循環功能) ---
         const dbName = "DashcamStorage";
         const storeName = "videos";
         let db;
@@ -218,12 +205,12 @@
             });
         }
 
-        async function saveVideoToDB(id, blob, timestamp) {
+        async function saveVideoToDB(id, blob, timestamp, mimeType) {
             return new Promise((resolve, reject) => {
                 const transaction = db.transaction([storeName], "readwrite");
                 const store = transaction.objectStore(storeName);
-                const ext = blob.type.includes("mp4") ? "mp4" : "webm";
-                const filename = `行車紀錄_${String(id).padStart(2, '0')}.${ext}`;
+                const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+                const filename = `行車紀錄_備份_${String(id).padStart(2, '0')}.${ext}`;
                 
                 const data = {
                     id: id,
@@ -263,14 +250,70 @@
             });
         }
 
-        // --- 攝影機與錄影邏輯 ---
+        // --- 攝影機與 Canvas 浮水印繪製邏輯 ---
         async function initCamera() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
                     audio: true
                 });
-                document.getElementById('camera-preview').srcObject = stream;
+                
+                const video = document.getElementById('hidden-video');
+                const canvas = document.getElementById('camera-preview');
+                const ctx = canvas.getContext('2d');
+                
+                video.srcObject = cameraStream;
+                
+                video.addEventListener('loadedmetadata', () => {
+                    video.play(); // 確保影片開始播放
+                    canvas.width = video.videoWidth || 1280;
+                    canvas.height = video.videoHeight || 720;
+                    
+                    // 從 Canvas 提取包含畫面的串流
+                    canvasStream = canvas.captureStream(30);
+                    
+                    const audioTracks = cameraStream.getAudioTracks();
+                    if (audioTracks.length > 0) {
+                        canvasStream.addTrack(audioTracks[0]);
+                    }
+                });
+
+                function drawCanvas() {
+                    // 確保影片已經準備好且有寬度
+                    if (video.readyState >= 2 && video.videoWidth > 0) {
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                        const now = new Date();
+                        const yyyy = now.getFullYear();
+                        const MM = String(now.getMonth() + 1).padStart(2, '0');
+                        const dd = String(now.getDate()).padStart(2, '0');
+                        const HH = String(now.getHours()).padStart(2, '0');
+                        const mm = String(now.getMinutes()).padStart(2, '0');
+                        const ss = String(now.getSeconds()).padStart(2, '0');
+                        const timeStr = `${yyyy}/${MM}/${dd}  ${HH}:${mm}:${ss}`;
+
+                        const fontSize = Math.max(24, Math.floor(canvas.height / 15)); 
+                        ctx.font = `bold ${fontSize}px monospace`;
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "top";
+                        
+                        ctx.shadowColor = "rgba(0,0,0,0.8)";
+                        ctx.shadowBlur = 8;
+                        ctx.lineWidth = Math.max(2, Math.floor(fontSize / 15));
+                        ctx.strokeStyle = "black";
+                        ctx.fillStyle = "#FFD700"; 
+
+                        const textX = canvas.width / 2;
+                        const textY = 20; 
+
+                        ctx.strokeText(timeStr, textX, textY);
+                        ctx.fillText(timeStr, textX, textY);
+                    }
+                    requestAnimationFrame(drawCanvas);
+                }
+                
+                requestAnimationFrame(drawCanvas);
+
             } catch (err) {
                 alert("無法存取相機，請確認是否給予權限。錯誤: " + err.message);
             }
@@ -288,22 +331,20 @@
                 return; 
             }
 
-            if (!stream) await initCamera();
-            if (!stream) return;
-
+            if (!canvasStream) return;
             startRecordingSession();
         }
 
         async function startRecordingSession() {
             isRecording = true;
-            await requestWakeLock(); // 啟動錄影時請求螢幕常亮
+            await requestWakeLock(); 
             updateUI();
             startSingleCycle();
         }
 
         function stopRecording() {
             isRecording = false;
-            releaseWakeLock(); // 停止錄影時釋放螢幕常亮
+            releaseWakeLock(); 
             clearTimeout(recordTimer);
             clearInterval(displayTimer);
             if (mediaRecorder && mediaRecorder.state === "recording") {
@@ -312,19 +353,48 @@
             updateUI();
         }
 
+        // --- 手動觸發：直接存入相簿 ---
+        function saveCurrentToAlbum() {
+            if (!isRecording || !mediaRecorder) {
+                alert("請先開始錄影，才能進行存檔喔！");
+                return;
+            }
+            
+            // 設定標記，並立即中斷當前錄影以觸發存檔
+            isEmergencySave = true;
+            if (mediaRecorder.state === "recording") {
+                mediaRecorder.stop(); // 停止會立刻觸發 onstop 進行下載
+            }
+        }
+
+        // --- 錄影核心 ---
         function startSingleCycle() {
             if (!isRecording) return;
             recordedChunks = [];
             
-            let options = { mimeType: 'video/webm' };
-            if (MediaRecorder.isTypeSupported('video/mp4')) {
-                options = { mimeType: 'video/mp4' };
+            let options = {};
+            const preferredTypes = [
+                'video/mp4;codecs=avc1',
+                'video/mp4',
+                'video/webm;codecs=h264',
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8',
+                'video/webm'
+            ];
+            
+            for (let type of preferredTypes) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    options.mimeType = type;
+                    break;
+                }
             }
+            
+            options.videoBitsPerSecond = 3000000; 
 
             try {
-                mediaRecorder = new MediaRecorder(stream, options);
+                mediaRecorder = new MediaRecorder(canvasStream, options);
             } catch (e) {
-                mediaRecorder = new MediaRecorder(stream); 
+                mediaRecorder = new MediaRecorder(canvasStream); 
             }
 
             mediaRecorder.ondataavailable = event => {
@@ -335,13 +405,36 @@
 
             mediaRecorder.onstop = async () => {
                 if (recordedChunks.length > 0) {
-                    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
+                    const finalMimeType = mediaRecorder.mimeType || 'video/webm';
+                    const blob = new Blob(recordedChunks, { type: finalMimeType });
                     const timestamp = new Date().getTime();
                     
+                    // 1. 保留背景寫入 DB (作為黑盒子備份)
                     try {
-                        await saveVideoToDB(currentIndex, blob, timestamp);
+                        await saveVideoToDB(currentIndex, blob, timestamp, finalMimeType);
                     } catch (err) {
                         console.error(err);
+                    }
+
+                    // 2. 如果是用戶點擊了「直接存入相簿」，觸發下載到手機
+                    if (isEmergencySave) {
+                        isEmergencySave = false; // 復原標記
+                        const ext = finalMimeType.includes("mp4") ? "mp4" : "webm";
+                        // 讓檔名包含明確時間，方便在相簿尋找
+                        const filename = `行車紀錄_手動存檔_${timestamp}.${ext}`;
+                        
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        }, 100);
                     }
 
                     currentIndex++;
@@ -350,12 +443,13 @@
                     document.getElementById('current-index-display').innerText = currentIndex;
                 }
 
+                // 若錄影狀態仍在進行中 (未按下停止鍵)，則無縫銜接下一次循環
                 if (isRecording) {
                     startSingleCycle();
                 }
             };
 
-            mediaRecorder.start();
+            mediaRecorder.start(1000);
             startTime = Date.now();
             
             recordTimer = setTimeout(() => {
@@ -385,7 +479,6 @@
                 label.innerText = '停止錄影';
                 
                 statusText.innerHTML = '<i class="fas fa-circle recording-dot"></i> 錄影中';
-                // 錄影開始，顯示進度時間
                 timerText.classList.remove('hidden');
             } else {
                 btn.classList.add('bg-red-600', 'hover:bg-red-500');
@@ -395,7 +488,6 @@
                 label.innerText = '開始錄影';
 
                 statusText.innerHTML = '<i class="fas fa-video"></i> 系統就緒';
-                // 錄影停止，隱藏進度時間
                 timerText.classList.add('hidden');
                 document.getElementById('time-elapsed').innerText = "00:00";
             }
