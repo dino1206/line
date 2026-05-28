@@ -53,7 +53,7 @@
             padding: 10px 24px; display: flex; justify-content: space-between; align-items: center;
             flex-shrink: 0; z-index: 200; gap: 16px;
         }
-        .logo { display: flex; align-items: center; gap: 12px; flex: 1; }
+        .logo { display: flex; align-items: center; gap: 12px; }
         .logo i { font-size: 1.5rem; color: var(--primary); }
         .logo h1 { font-size: 1.1rem; font-weight: 700; margin: 0; white-space: nowrap; }
         
@@ -165,6 +165,11 @@
         .layer-list-container, .annotation-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; margin-top: 8px;}
         .layer-item, .annotation-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: white; border: 1px solid #d2d2d7; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
         .layer-item.active, .annotation-item.active { border-color: var(--primary); background: rgba(0,122,255,0.08); font-weight: 600; box-shadow: 0 0 0 2px rgba(0,122,255,0.1); }
+        .layer-transform-panel { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.05); }
+        .layer-transform-panel.disabled { opacity: 0.45; }
+        .layer-transform-inputs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; }
+        .layer-transform-inputs input { min-width: 0; text-align: center; }
+        .layer-transform-status { font-size: 0.72rem; color: var(--text-muted); }
         
         .layer-icon { opacity: 0.5; transition: opacity 0.2s; font-size: 0.9rem; color: var(--text-main); cursor: pointer; }
         .layer-icon:hover { opacity: 1; color: var(--primary); }
@@ -199,6 +204,14 @@
         .anno-handle { position: absolute; width: 24px; height: 24px; background: rgba(0,122,255,0.85); border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); cursor: grab; pointer-events: all; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); transition: background 0.15s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); user-select: none;}
         .anno-handle:hover { background: var(--primary-hover); transform: translate(-50%, -50%) scale(1.1); }
         .anno-handle.selected { background: #FF3B30; transform: translate(-50%, -50%) scale(1.15); box-shadow: 0 4px 10px rgba(255,59,48,0.4); }
+        .active-layer-box { position: absolute; border: 2px solid rgba(0,122,255,0.95); background: rgba(0,122,255,0.04); box-shadow: 0 0 0 1px rgba(255,255,255,0.9), 0 4px 14px rgba(0,0,0,0.12); pointer-events: all; cursor: grab; z-index: 48; }
+        .active-layer-box::before { content: "拖曳圖層"; position: absolute; left: -2px; top: -24px; padding: 3px 7px; border-radius: 6px; background: rgba(0,122,255,0.95); color: white; font-size: 11px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.16); }
+        .active-layer-box.dragging { cursor: grabbing; background: rgba(0,122,255,0.1); }
+        .active-layer-handle { position: absolute; width: 10px; height: 10px; background: #fff; border: 2px solid var(--primary); border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,0.25); pointer-events: all; }
+        .active-layer-handle[data-handle="nw"] { left: 0; top: 0; transform: translate(-50%, -50%); cursor: nwse-resize; }
+        .active-layer-handle[data-handle="ne"] { right: 0; top: 0; transform: translate(50%, -50%); cursor: nesw-resize; }
+        .active-layer-handle[data-handle="sw"] { left: 0; bottom: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
+        .active-layer-handle[data-handle="se"] { right: 0; bottom: 0; transform: translate(50%, 50%); cursor: nwse-resize; }
 
         #eraser-overlay { position: absolute; inset: 0; z-index: 60; cursor: crosshair; }
         #shape-preview { position: absolute; border: 1.5px dashed #007AFF; background: transparent; z-index: 61; pointer-events: none; box-sizing: border-box; }
@@ -224,6 +237,7 @@
 
         <!-- 頂部下拉選單列 -->
         <div class="top-menus" id="top-menus">
+            
             <!-- 畫布規格 -->
             <div class="dropdown">
                 <button class="dropdown-toggle"><i class="fa-solid fa-crop-simple"></i> 畫布設定</button>
@@ -235,6 +249,7 @@
                         <div class="preset-item" data-w="180" data-h="180">表情貼<br><span class="size-label">180x180</span></div>
                         <div class="preset-item" data-w="96" data-h="74">LINE 標籤<br><span class="size-label">96x74</span></div>
                         <div class="preset-item" data-w="1920" data-h="1080">16:9 橫式<br><span class="size-label">1920x1080</span></div>
+                        <div class="preset-item" id="btn-autofit-crop" data-w="autofit">Autofit<br><span class="size-label">貼合圖片外框</span></div>
                         <div class="preset-item" data-w="custom">自訂比例<br><span class="size-label">自由設定</span></div>
                     </div>
                     <div id="custom-size-box" class="form-row hidden mb-2" style="background: rgba(0,122,255,0.05); padding: 8px; border-radius: 8px;">
@@ -295,6 +310,7 @@
                     <div class="form-row" style="border-top:1px solid rgba(0,0,0,0.05); padding-top:8px;"><label>間距：<span id="grid-size-val">20</span>px</label><input type="range" id="grid-size" min="10" max="100" step="10" value="20" style="width:90px"></div>
                 </div>
             </div>
+
         </div>
 
         <!-- 匯出控制列 -->
@@ -397,6 +413,11 @@
             <div class="tool-divider"></div>
             <button class="tool-btn" data-tool="rect" title="矩形工具 (U)"><i class="fa-solid fa-vector-square"></i></button>
             <button class="tool-btn" data-tool="circle" title="橢圓工具 (O)"><i class="fa-regular fa-circle"></i></button>
+            
+            <!-- 新增的圖片插入按鈕 -->
+            <div class="tool-divider"></div>
+            <button class="tool-btn" id="btn-insert-image" title="插入圖片作為新圖層"><i class="fa-solid fa-image"></i></button>
+            <input type="file" id="insert-image-input" accept="image/*" hidden>
         </aside>
 
         <!-- 中央編輯區 -->
@@ -444,6 +465,26 @@
                     <div class="form-row mt-2" style="padding-top:8px; border-top: 1px solid rgba(0,0,0,0.05);">
                         <label>不透明度</label>
                         <input type="range" id="layer-opacity" min="0" max="1" step="0.05" value="1" style="width:120px">
+                    </div>
+                    <div id="layer-transform-panel" class="layer-transform-panel disabled">
+                        <div class="form-row mb-2">
+                            <label>圖層尺寸</label>
+                            <span id="layer-transform-status" class="layer-transform-status">選取圖片圖層</span>
+                        </div>
+                        <div class="layer-transform-inputs mb-2">
+                            <input type="number" id="layer-transform-w" min="1" step="1" placeholder="寬">
+                            <span style="color:var(--text-muted)">x</span>
+                            <input type="number" id="layer-transform-h" min="1" step="1" placeholder="高">
+                        </div>
+                        <div class="form-row mb-2">
+                            <label for="layer-keep-ratio">鎖定比例</label>
+                            <label class="switch"><input type="checkbox" id="layer-keep-ratio" checked><span class="slider"></span></label>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button id="btn-layer-reset-size" class="btn btn-outline btn-sm w-100" title="回到原始像素大小">100%</button>
+                            <button id="btn-layer-fit-canvas" class="btn btn-outline btn-sm w-100" title="等比例貼合整張畫布">貼合畫布</button>
+                            <button id="btn-layer-center" class="btn btn-outline btn-sm w-100" title="將目前圖層置中"><i class="fa-solid fa-align-center"></i></button>
+                        </div>
                     </div>
                 </div>
             </details>
@@ -533,7 +574,17 @@
             sidebarLeft:      $('slim-toolbar'),      sidebarRight:     $('sidebar-right'),
             
             btnAddLayer:      $('btn-add-layer'),     layersList:       $('layers-list'),
-            layerOpacity:     $('layer-opacity')
+            layerOpacity:     $('layer-opacity'),
+            layerTransformPanel: $('layer-transform-panel'),
+            layerTransformStatus: $('layer-transform-status'),
+            layerTransformW:   $('layer-transform-w'), layerTransformH:  $('layer-transform-h'),
+            layerKeepRatio:    $('layer-keep-ratio'),
+            btnLayerResetSize: $('btn-layer-reset-size'),
+            btnLayerFitCanvas: $('btn-layer-fit-canvas'),
+            btnLayerCenter:    $('btn-layer-center'),
+
+            btnInsertImage:   $('btn-insert-image'),  insertImageInput: $('insert-image-input'), // 插入圖片的新增按鈕
+            btnAutofitCrop:   $('btn-autofit-crop')
         };
 
         /* ══ 狀態 ══ */
@@ -562,6 +613,11 @@
         let activeLayerId = null;
         let layerCounter = 0;
         let wandCanvas, wandCtx; 
+        let activeLayerDrag = null;
+        let transformPreviewDirty = false;
+        let isSyncingLayerTransform = false;
+        let layerTransformPreviewTimer = null;
+        let layerTransformRenderTimer = null;
         
         // 工具狀態: erase (去背), fill (填色), stroke (描邊)
         let currentProcessAction = 'erase'; 
@@ -659,7 +715,7 @@
         function saveSettings() {
             let activePreset = '370x320';
             if (isCustomSize) activePreset = 'custom';
-            else { const activeEl = document.querySelector('.preset-item.active'); if (activeEl) activePreset = activeEl.dataset.w === 'custom' ? 'custom' : `${activeEl.dataset.w}x${activeEl.dataset.h}`; }
+            else { const activeEl = document.querySelector('.preset-item.active'); if (activeEl) activePreset = ['custom', 'autofit'].includes(activeEl.dataset.w) ? 'custom' : `${activeEl.dataset.w}x${activeEl.dataset.h}`; }
             const settings = {
                 presetSize: activePreset, customW: DOM.customW ? DOM.customW.value : 370, customH: DOM.customH ? DOM.customH.value : 320,
                 tolerance: DOM.tolerance ? DOM.tolerance.value : 20, contiguous: DOM.contiguous ? DOM.contiguous.checked : true, limitToCrop: DOM.limitToCrop ? DOM.limitToCrop.checked : true,
@@ -686,10 +742,13 @@
         };
 
         document.querySelectorAll('.tool-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tool = e.currentTarget.dataset.tool;
-                activateTool(tool);
-            });
+            // 防止綁定到非 data-tool 的按鈕（如插入圖片）
+            if (btn.hasAttribute('data-tool')) {
+                btn.addEventListener('click', (e) => {
+                    const tool = e.currentTarget.dataset.tool;
+                    activateTool(tool);
+                });
+            }
         });
 
         // 統一整合所有鍵盤快捷鍵，避免事件遺漏或覆蓋
@@ -762,7 +821,7 @@
         function activateTool(tool) {
             if (!cropper && tool !== 'move') return; 
             
-            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
             const activeBtn = document.querySelector(`.tool-btn[data-tool="${tool}"]`);
             if(activeBtn) activeBtn.classList.add('active');
 
@@ -818,8 +877,53 @@
             const c = document.createElement('canvas');
             return {
                 id: `layer_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                name: name, canvas: c, ctx: c.getContext('2d', { willReadFrequently: true }), visible: true, opacity: 1
+                name: name,
+                canvas: c,
+                ctx: c.getContext('2d', { willReadFrequently: true }),
+                visible: true,
+                opacity: 1,
+                sourceCanvas: null,
+                transform: null
             };
+        }
+
+        function createImageLayer(name, sourceCanvas, baseWidth, baseHeight, transform) {
+            const layer = createLayer(name);
+            layer.canvas.width = baseWidth;
+            layer.canvas.height = baseHeight;
+            layer.sourceCanvas = sourceCanvas;
+            layer.transform = { ...transform };
+            return layer;
+        }
+
+        function isTransformLayer(layer) {
+            return !!(layer && layer.sourceCanvas && layer.transform);
+        }
+
+        function drawLayerToContext(ctx, layer) {
+            if (!layer || !layer.visible || layer._suppressRender) return;
+            ctx.save();
+            ctx.globalAlpha = layer.opacity;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            if (isTransformLayer(layer)) {
+                const t = layer.transform;
+                ctx.drawImage(layer.sourceCanvas, t.x, t.y, t.width, t.height);
+            } else {
+                ctx.drawImage(layer.canvas, 0, 0);
+            }
+            ctx.restore();
+        }
+
+        function materializeTransformLayer(layer) {
+            if (!isTransformLayer(layer)) return;
+            layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+            layer.ctx.imageSmoothingEnabled = true;
+            layer.ctx.imageSmoothingQuality = 'high';
+            const t = layer.transform;
+            layer.ctx.drawImage(layer.sourceCanvas, t.x, t.y, t.width, t.height);
+            layer.sourceCanvas = null;
+            layer.transform = null;
         }
 
         function renderLayersUI() {
@@ -842,32 +946,452 @@
                     if (e.target.classList.contains('layer-up')) {
                         if (idx < layers.length - 1) { 
                             const temp = layers[idx]; layers[idx] = layers[idx+1]; layers[idx+1] = temp;
-                            updateCompositeImage(); renderLayersUI(); saveState(); updatePreview();
+                            updateCompositeImage(); renderLayersUI(); rebuildAnnoOverlay(); saveState(); updatePreview();
                         }
                     } else if (e.target.classList.contains('layer-down')) {
                         if (idx > 0) { 
                             const temp = layers[idx]; layers[idx] = layers[idx-1]; layers[idx-1] = temp;
-                            updateCompositeImage(); renderLayersUI(); saveState(); updatePreview();
+                            updateCompositeImage(); renderLayersUI(); rebuildAnnoOverlay(); saveState(); updatePreview();
                         }
                     } else if(e.target.classList.contains('layer-vis')) {
-                        l.visible = !l.visible; updateCompositeImage(); renderLayersUI(); saveState(); updatePreview();
+                        l.visible = !l.visible; updateCompositeImage(); renderLayersUI(); rebuildAnnoOverlay(); saveState(); updatePreview();
                     } else if (e.target.classList.contains('layer-del')) {
                         if(layers.length <= 1) { alert('至少保留一個圖層！'); return; }
                         layers = layers.filter(layer => layer.id !== l.id);
                         if(activeLayerId === l.id) selectLayer(layers[layers.length-1].id);
-                        updateCompositeImage(); renderLayersUI(); saveState(); updatePreview();
+                        updateCompositeImage(); renderLayersUI(); rebuildAnnoOverlay(); saveState(); updatePreview();
                     } else { selectLayer(l.id); }
                 };
                 DOM.layersList.appendChild(item);
             });
             const activeL = layers.find(l => l.id === activeLayerId);
             if(activeL && DOM.layerOpacity) DOM.layerOpacity.value = activeL.opacity;
+            syncLayerTransformPanel();
         }
 
         function selectLayer(id) {
             activeLayerId = id; const l = layers.find(l => l.id === id);
+            if (l && activeEraserTool) materializeTransformLayer(l);
             if(l) { wandCanvas = l.canvas; wandCtx = l.ctx; }
             renderLayersUI();
+            refreshCropperDragMode();
+            rebuildAnnoOverlay();
+        }
+
+        function getActiveLayer() {
+            return layers.find(layer => layer.id === activeLayerId) || null;
+        }
+
+        function isBaseLayer(layer) {
+            return !!(layer && layers.length && layer.id === layers[0].id);
+        }
+
+        function canDragActiveLayer() {
+            const layer = getActiveLayer();
+            return !!(cropper && layer && layer.visible && !isBaseLayer(layer) && currentMode === 'move' && !activeEraserTool);
+        }
+
+        function getTransformTargetLayer() {
+            const active = getActiveLayer();
+            if (active && active.visible && !isBaseLayer(active) && getLayerVisibleBounds(active)) return active;
+            for (let i = layers.length - 1; i >= 1; i--) {
+                if (layers[i].visible && getLayerVisibleBounds(layers[i])) return layers[i];
+            }
+            return active || layers[0] || null;
+        }
+
+        function refreshCropperDragMode() {
+            if (!cropper) return;
+            if (currentMode === 'crop') {
+                cropper.setDragMode('crop');
+            } else {
+                cropper.setDragMode(canDragActiveLayer() ? 'none' : 'move');
+            }
+            const container = DOM.mainImage ? DOM.mainImage.nextElementSibling : null;
+            if (container && container.classList.contains('cropper-container')) {
+                container.style.cursor = canDragActiveLayer() ? 'grab' : '';
+            }
+        }
+
+        function clientToLayerPoint(clientX, clientY, layer) {
+            if (!cropper || !DOM.canvasWrapper || !layer) return null;
+            const canvasData = cropper.getCanvasData();
+            const rect = DOM.canvasWrapper.getBoundingClientRect();
+            if (!canvasData.width || !canvasData.height) return null;
+            return {
+                x: (clientX - rect.left - canvasData.left) * (layer.canvas.width / canvasData.width),
+                y: (clientY - rect.top - canvasData.top) * (layer.canvas.height / canvasData.height)
+            };
+        }
+
+        function layerHasVisiblePixel(layer, pt) {
+            if (!layer || !pt) return false;
+            if (isTransformLayer(layer)) {
+                const t = layer.transform;
+                if (pt.x < t.x || pt.y < t.y || pt.x >= t.x + t.width || pt.y >= t.y + t.height) return false;
+                const sx = Math.floor((pt.x - t.x) * (layer.sourceCanvas.width / t.width));
+                const sy = Math.floor((pt.y - t.y) * (layer.sourceCanvas.height / t.height));
+                if (sx < 0 || sy < 0 || sx >= layer.sourceCanvas.width || sy >= layer.sourceCanvas.height) return false;
+                try {
+                    return layer.sourceCanvas.getContext('2d', { willReadFrequently: true }).getImageData(sx, sy, 1, 1).data[3] > 8;
+                } catch (err) {
+                    return true;
+                }
+            }
+            const x = Math.round(pt.x);
+            const y = Math.round(pt.y);
+            if (x < 0 || y < 0 || x >= layer.canvas.width || y >= layer.canvas.height) return false;
+            const canvasData = cropper.getCanvasData();
+            const hitRadius = Math.max(2, Math.ceil(6 * (layer.canvas.width / Math.max(canvasData.width, 1))));
+            const left = Math.max(0, x - hitRadius);
+            const top = Math.max(0, y - hitRadius);
+            const width = Math.min(layer.canvas.width - left, hitRadius * 2 + 1);
+            const height = Math.min(layer.canvas.height - top, hitRadius * 2 + 1);
+            try {
+                const data = layer.ctx.getImageData(left, top, width, height).data;
+                for (let i = 3; i < data.length; i += 4) {
+                    if (data[i] > 8) return true;
+                }
+            } catch (err) {
+                return false;
+            }
+            return false;
+        }
+
+        function getLayerVisibleBounds(layer) {
+            if (!layer) return null;
+            if (isTransformLayer(layer)) {
+                const t = layer.transform;
+                return {
+                    x: t.x,
+                    y: t.y,
+                    width: t.width,
+                    height: t.height
+                };
+            }
+            const w = layer.canvas.width;
+            const h = layer.canvas.height;
+            let data;
+            try {
+                data = layer.ctx.getImageData(0, 0, w, h).data;
+            } catch (err) {
+                return null;
+            }
+
+            let minX = w, minY = h, maxX = -1, maxY = -1;
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const alpha = data[(y * w + x) * 4 + 3];
+                    if (alpha > 8) {
+                        if (x < minX) minX = x;
+                        if (y < minY) minY = y;
+                        if (x > maxX) maxX = x;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+
+            if (maxX < minX || maxY < minY) return null;
+            return {
+                x: minX,
+                y: minY,
+                width: maxX - minX + 1,
+                height: maxY - minY + 1
+            };
+        }
+
+        function syncLayerTransformPanel() {
+            if (!DOM.layerTransformPanel) return;
+            const layer = getActiveLayer();
+            const enabled = isTransformLayer(layer);
+            DOM.layerTransformPanel.classList.toggle('disabled', !enabled);
+            [DOM.layerTransformW, DOM.layerTransformH, DOM.layerKeepRatio, DOM.btnLayerResetSize, DOM.btnLayerFitCanvas, DOM.btnLayerCenter]
+                .filter(Boolean)
+                .forEach(el => el.disabled = !enabled);
+
+            isSyncingLayerTransform = true;
+            if (enabled) {
+                const t = layer.transform;
+                DOM.layerTransformStatus.textContent = `${Math.round((t.width / layer.sourceCanvas.width) * 100)}%`;
+                DOM.layerTransformW.value = Math.max(1, Math.round(t.width));
+                DOM.layerTransformH.value = Math.max(1, Math.round(t.height));
+            } else {
+                if (DOM.layerTransformStatus) DOM.layerTransformStatus.textContent = layer ? '需為可縮放圖片' : '選取圖片圖層';
+                if (DOM.layerTransformW) DOM.layerTransformW.value = '';
+                if (DOM.layerTransformH) DOM.layerTransformH.value = '';
+            }
+            isSyncingLayerTransform = false;
+        }
+
+        function scheduleLayerTransformPreview() {
+            clearTimeout(layerTransformPreviewTimer);
+            layerTransformPreviewTimer = setTimeout(() => {
+                updatePreview();
+                rebuildAnnoOverlay();
+            }, 140);
+        }
+
+        function scheduleLayerTransformRender() {
+            clearTimeout(layerTransformRenderTimer);
+            layerTransformRenderTimer = setTimeout(() => {
+                updateCompositeImage({ replace: false });
+                scheduleLayerTransformPreview();
+            }, 90);
+        }
+
+        function applyLayerTransform(layer, nextTransform, options = {}) {
+            if (!isTransformLayer(layer)) return;
+            const minSize = 1;
+            layer.transform = {
+                x: Number.isFinite(nextTransform.x) ? nextTransform.x : layer.transform.x,
+                y: Number.isFinite(nextTransform.y) ? nextTransform.y : layer.transform.y,
+                width: Math.max(minSize, Number.isFinite(nextTransform.width) ? nextTransform.width : layer.transform.width),
+                height: Math.max(minSize, Number.isFinite(nextTransform.height) ? nextTransform.height : layer.transform.height)
+            };
+            if (options.live) {
+                scheduleLayerTransformRender();
+            } else {
+                clearTimeout(layerTransformRenderTimer);
+                clearTimeout(layerTransformPreviewTimer);
+                updateCompositeImage({ replace: false });
+                updatePreview();
+                rebuildAnnoOverlay();
+            }
+            syncLayerTransformPanel();
+            if (options.save) saveState();
+        }
+
+        function resizeActiveTransformLayer(changedAxis) {
+            if (isSyncingLayerTransform) return;
+            const layer = getActiveLayer();
+            if (!isTransformLayer(layer)) return;
+            const t = layer.transform;
+            let nextW = parseFloat(DOM.layerTransformW.value);
+            let nextH = parseFloat(DOM.layerTransformH.value);
+            if (!Number.isFinite(nextW) || nextW <= 0) nextW = t.width;
+            if (!Number.isFinite(nextH) || nextH <= 0) nextH = t.height;
+
+            if (DOM.layerKeepRatio && DOM.layerKeepRatio.checked) {
+                const ratio = t.height / Math.max(t.width, 1);
+                if (changedAxis === 'w') nextH = Math.max(1, Math.round(nextW * ratio));
+                if (changedAxis === 'h') nextW = Math.max(1, Math.round(nextH / Math.max(ratio, 0.0001)));
+            }
+
+            applyLayerTransform(layer, { ...t, width: Math.round(nextW), height: Math.round(nextH) }, { live: true });
+        }
+
+        function centerActiveTransformLayer(options = {}) {
+            const layer = getActiveLayer();
+            if (!isTransformLayer(layer) || !layers.length) return;
+            const base = layers[0].canvas;
+            const t = layer.transform;
+            applyLayerTransform(layer, {
+                ...t,
+                x: Math.round((base.width - t.width) / 2),
+                y: Math.round((base.height - t.height) / 2)
+            }, options);
+        }
+
+        function createCanvasFromImageData(imageData) {
+            const c = document.createElement('canvas');
+            c.width = imageData.width;
+            c.height = imageData.height;
+            c.getContext('2d').putImageData(imageData, 0, 0);
+            return c;
+        }
+
+        function serializeLayer(layer) {
+            const serialized = {
+                id: layer.id,
+                name: layer.name,
+                visible: layer.visible,
+                opacity: layer.opacity,
+                imgData: layer.ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height),
+                transform: layer.transform ? { ...layer.transform } : null,
+                sourceData: null
+            };
+            if (layer.sourceCanvas) {
+                serialized.sourceData = layer.sourceCanvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, layer.sourceCanvas.width, layer.sourceCanvas.height);
+            }
+            return serialized;
+        }
+
+        function restoreLayer(serialized) {
+            const layer = createLayer(serialized.name);
+            layer.id = serialized.id;
+            layer.visible = serialized.visible;
+            layer.opacity = serialized.opacity;
+            layer.canvas.width = serialized.imgData.width;
+            layer.canvas.height = serialized.imgData.height;
+            layer.ctx.putImageData(serialized.imgData, 0, 0);
+            layer.transform = serialized.transform ? { ...serialized.transform } : null;
+            layer.sourceCanvas = serialized.sourceData ? createCanvasFromImageData(serialized.sourceData) : null;
+            return layer;
+        }
+
+        function renderTransformPreview() {
+            if (!activeLayerDrag || !activeLayerDrag.layerBox) return;
+            const drag = activeLayerDrag;
+            drag.layerBox.style.left = (drag.layerBoxLeft + (drag.currentX - drag.sourceBounds.x) * drag.screenScaleX) + 'px';
+            drag.layerBox.style.top = (drag.layerBoxTop + (drag.currentY - drag.sourceBounds.y) * drag.screenScaleY) + 'px';
+            drag.layerBox.style.width = Math.max(12, drag.currentW * drag.screenScaleX) + 'px';
+            drag.layerBox.style.height = Math.max(12, drag.currentH * drag.screenScaleY) + 'px';
+        }
+
+        function requestTransformPreview() {
+            if (transformPreviewDirty) return;
+            transformPreviewDirty = true;
+            requestAnimationFrame(() => {
+                transformPreviewDirty = false;
+                renderTransformPreview();
+            });
+        }
+
+        function startActiveLayerDrag(e) {
+            if (e.button !== 0 || !canDragActiveLayer()) return;
+            if (e.target && e.target.closest && e.target.closest('.anno-handle')) return;
+            const layer = getActiveLayer();
+            const pt = clientToLayerPoint(e.clientX, e.clientY, layer);
+            const fromLayerBox = !!(e.target && e.target.closest && e.target.closest('.active-layer-box'));
+            const resizeHandle = e.target && e.target.dataset ? e.target.dataset.handle : null;
+            if (!fromLayerBox && !layerHasVisiblePixel(layer, pt)) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+
+            const container = DOM.mainImage ? DOM.mainImage.nextElementSibling : null;
+            if (container && container.classList.contains('cropper-container')) container.style.cursor = 'grabbing';
+            const layerBox = DOM.annoOverlay ? DOM.annoOverlay.querySelector('.active-layer-box') : null;
+            if (layerBox) layerBox.classList.add('dragging');
+            const canvasData = cropper.getCanvasData();
+            const bounds = getLayerVisibleBounds(layer);
+            if (!bounds) return;
+            const sourceBoundsCanvas = isTransformLayer(layer) ? layer.sourceCanvas : createCanvasFromImageData(layer.ctx.getImageData(bounds.x, bounds.y, bounds.width, bounds.height));
+            const sourceImageData = isTransformLayer(layer) ? null : layer.ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height);
+            const startTransform = isTransformLayer(layer) ? { ...layer.transform } : null;
+            if (layerBox) {
+                layerBox.style.backgroundImage = `url(${sourceBoundsCanvas.toDataURL('image/png')})`;
+                layerBox.style.backgroundRepeat = 'no-repeat';
+                layerBox.style.backgroundSize = '100% 100%';
+                layerBox.style.backgroundColor = 'transparent';
+                layerBox.style.opacity = layer.opacity;
+            }
+            if (isTransformLayer(layer)) {
+                layer._suppressRender = true;
+            } else {
+                layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+            }
+            updateCompositeImage({ replace: false });
+
+            activeLayerDrag = {
+                layer,
+                mode: resizeHandle ? 'resize' : 'move',
+                handle: resizeHandle,
+                startPoint: pt,
+                sourceImageData,
+                startTransform,
+                sourceBounds: bounds,
+                sourceBoundsCanvas,
+                layerBox,
+                layerBoxLeft: layerBox ? parseFloat(layerBox.style.left) || 0 : 0,
+                layerBoxTop: layerBox ? parseFloat(layerBox.style.top) || 0 : 0,
+                layerBoxWidth: layerBox ? parseFloat(layerBox.style.width) || bounds.width * (canvasData.width / layer.canvas.width) : 0,
+                layerBoxHeight: layerBox ? parseFloat(layerBox.style.height) || bounds.height * (canvasData.height / layer.canvas.height) : 0,
+                screenScaleX: canvasData.width / layer.canvas.width,
+                screenScaleY: canvasData.height / layer.canvas.height,
+                currentX: bounds.x,
+                currentY: bounds.y,
+                currentW: bounds.width,
+                currentH: bounds.height
+            };
+        }
+
+        function moveActiveLayerDrag(e) {
+            if (!activeLayerDrag) return;
+            e.preventDefault();
+            const pt = clientToLayerPoint(e.clientX, e.clientY, activeLayerDrag.layer);
+            if (!pt) return;
+            const layer = activeLayerDrag.layer;
+            if (activeLayerDrag.mode === 'resize') {
+                const b = activeLayerDrag.sourceBounds;
+                const minSize = 8;
+                let scale = 1;
+                if (activeLayerDrag.handle === 'se') scale = Math.max((pt.x - b.x) / b.width, (pt.y - b.y) / b.height);
+                else if (activeLayerDrag.handle === 'nw') scale = Math.max((b.x + b.width - pt.x) / b.width, (b.y + b.height - pt.y) / b.height);
+                else if (activeLayerDrag.handle === 'ne') scale = Math.max((pt.x - b.x) / b.width, (b.y + b.height - pt.y) / b.height);
+                else if (activeLayerDrag.handle === 'sw') scale = Math.max((b.x + b.width - pt.x) / b.width, (pt.y - b.y) / b.height);
+                scale = Math.max(minSize / Math.max(b.width, b.height), scale);
+
+                const newW = Math.max(minSize, Math.round(b.width * scale));
+                const newH = Math.max(minSize, Math.round(b.height * scale));
+                let newX = b.x;
+                let newY = b.y;
+                if (activeLayerDrag.handle.includes('w')) newX = b.x + b.width - newW;
+                if (activeLayerDrag.handle.includes('n')) newY = b.y + b.height - newH;
+
+                activeLayerDrag.currentX = newX;
+                activeLayerDrag.currentY = newY;
+                activeLayerDrag.currentW = newW;
+                activeLayerDrag.currentH = newH;
+                if (isTransformLayer(layer)) {
+                    layer.transform = { x: newX, y: newY, width: newW, height: newH };
+                }
+
+            } else {
+                const dx = Math.round(pt.x - activeLayerDrag.startPoint.x);
+                const dy = Math.round(pt.y - activeLayerDrag.startPoint.y);
+                activeLayerDrag.currentX = activeLayerDrag.sourceBounds.x + dx;
+                activeLayerDrag.currentY = activeLayerDrag.sourceBounds.y + dy;
+                activeLayerDrag.currentW = activeLayerDrag.sourceBounds.width;
+                activeLayerDrag.currentH = activeLayerDrag.sourceBounds.height;
+                if (isTransformLayer(layer)) {
+                    layer.transform = {
+                        ...activeLayerDrag.startTransform,
+                        x: activeLayerDrag.startTransform.x + dx,
+                        y: activeLayerDrag.startTransform.y + dy
+                    };
+                }
+            }
+            requestTransformPreview();
+        }
+
+        function finishActiveLayerDrag(commit = true) {
+            if (!activeLayerDrag) return;
+            const drag = activeLayerDrag;
+            const shouldReplaceCropper = !isTransformLayer(drag.layer);
+            if (isTransformLayer(drag.layer)) {
+                drag.layer._suppressRender = false;
+                if (!commit && drag.startTransform) drag.layer.transform = { ...drag.startTransform };
+            } else {
+                drag.layer.ctx.clearRect(0, 0, drag.layer.canvas.width, drag.layer.canvas.height);
+                if (commit) {
+                drag.layer.ctx.imageSmoothingEnabled = true;
+                drag.layer.ctx.imageSmoothingQuality = 'high';
+                drag.layer.ctx.drawImage(drag.sourceBoundsCanvas, drag.currentX, drag.currentY, drag.currentW, drag.currentH);
+                } else {
+                drag.layer.ctx.putImageData(drag.sourceImageData, 0, 0);
+                }
+            }
+            activeLayerDrag = null;
+            refreshCropperDragMode();
+            updateCompositeImage({ replace: shouldReplaceCropper });
+            updatePreview();
+            rebuildAnnoOverlay();
+            syncLayerTransformPanel();
+            if (commit) saveState();
+        }
+
+        function endActiveLayerDrag() {
+            finishActiveLayerDrag(true);
+        }
+
+        if (DOM.canvasWrapper) {
+            DOM.canvasWrapper.addEventListener('mousedown', startActiveLayerDrag, true);
+            document.addEventListener('mousemove', moveActiveLayerDrag);
+            document.addEventListener('mouseup', endActiveLayerDrag);
+            window.addEventListener('blur', () => finishActiveLayerDrag(false));
+            document.addEventListener('keydown', e => { if (e.key === 'Escape' && activeLayerDrag) finishActiveLayerDrag(false); });
         }
 
         if(DOM.btnAddLayer) DOM.btnAddLayer.onclick = () => {
@@ -885,13 +1409,74 @@
             DOM.layerOpacity.onchange = () => saveState();
         }
 
-        function updateCompositeImage() {
+        if (DOM.layerTransformW) {
+            DOM.layerTransformW.oninput = () => resizeActiveTransformLayer('w');
+            DOM.layerTransformW.onchange = () => {
+                if (isTransformLayer(getActiveLayer())) {
+                    clearTimeout(layerTransformRenderTimer);
+                    updateCompositeImage({ replace: false });
+                    updatePreview();
+                    rebuildAnnoOverlay();
+                    saveState();
+                }
+            };
+        }
+
+        if (DOM.layerTransformH) {
+            DOM.layerTransformH.oninput = () => resizeActiveTransformLayer('h');
+            DOM.layerTransformH.onchange = () => {
+                if (isTransformLayer(getActiveLayer())) {
+                    clearTimeout(layerTransformRenderTimer);
+                    updateCompositeImage({ replace: false });
+                    updatePreview();
+                    rebuildAnnoOverlay();
+                    saveState();
+                }
+            };
+        }
+
+        if (DOM.btnLayerResetSize) {
+            DOM.btnLayerResetSize.onclick = () => {
+                const layer = getActiveLayer();
+                if (!isTransformLayer(layer)) return;
+                const t = layer.transform;
+                applyLayerTransform(layer, {
+                    ...t,
+                    width: layer.sourceCanvas.width,
+                    height: layer.sourceCanvas.height
+                }, { save: true });
+            };
+        }
+
+        if (DOM.btnLayerFitCanvas) {
+            DOM.btnLayerFitCanvas.onclick = () => {
+                const layer = getActiveLayer();
+                if (!isTransformLayer(layer) || !layers.length) return;
+                const base = layers[0].canvas;
+                const scale = Math.min(base.width / layer.sourceCanvas.width, base.height / layer.sourceCanvas.height);
+                const width = Math.max(1, Math.round(layer.sourceCanvas.width * scale));
+                const height = Math.max(1, Math.round(layer.sourceCanvas.height * scale));
+                applyLayerTransform(layer, {
+                    x: Math.round((base.width - width) / 2),
+                    y: Math.round((base.height - height) / 2),
+                    width,
+                    height
+                }, { save: true });
+            };
+        }
+
+        if (DOM.btnLayerCenter) {
+            DOM.btnLayerCenter.onclick = () => centerActiveTransformLayer({ save: true });
+        }
+
+        function updateCompositeImage(options = {}) {
+            const shouldReplace = options.replace !== false;
             if(!layers.length) return;
             const compCanvas = document.createElement('canvas');
             compCanvas.width = layers[0].canvas.width; compCanvas.height = layers[0].canvas.height;
             const compCtx = compCanvas.getContext('2d');
             
-            layers.forEach(l => { if (l.visible) { compCtx.globalAlpha = l.opacity; compCtx.drawImage(l.canvas, 0, 0); } });
+            layers.forEach(l => drawLayerToContext(compCtx, l));
             
             // 繪製鋼筆預覽
             if (penPath.length > 0) {
@@ -936,17 +1521,17 @@
             }
 
             originalImageSrc = compCanvas.toDataURL('image/png');
-            updateCropperImagesFast(originalImageSrc);
+            updateCropperImagesFast(originalImageSrc, shouldReplace);
         }
 
         /* ══ 歷史紀錄全域封裝引擎 (Undo / Redo) ══ */
         function saveState() {
             if (!cropper) return;
             const state = {
-                layers: layers.map(l => ({ id: l.id, name: l.name, visible: l.visible, opacity: l.opacity, imgData: l.ctx.getImageData(0, 0, l.canvas.width, l.canvas.height) })),
+                layers: layers.map(serializeLayer),
                 activeLayerId: activeLayerId, annotations: JSON.parse(JSON.stringify(annotations)), cropData: cropper.getData(),
                 targetWidth: targetWidth, targetHeight: targetHeight, isCustomSize: isCustomSize,
-                presetSize: document.querySelector('.preset-item.active')?.dataset.w === 'custom' ? 'custom' : `${targetWidth}x${targetHeight}`,
+                presetSize: ['custom', 'autofit'].includes(document.querySelector('.preset-item.active')?.dataset.w) ? 'custom' : `${targetWidth}x${targetHeight}`,
                 
                 penPath: JSON.parse(JSON.stringify(penPath || [])),
                 penClosed: penClosed || false,
@@ -993,10 +1578,7 @@
             } 
             else { if(DOM.customSizeBox) DOM.customSizeBox.classList.add('hidden'); }
             
-            layers = state.layers.map(ls => {
-                const l = createLayer(ls.name); l.id = ls.id; l.visible = ls.visible; l.opacity = ls.opacity;
-                l.canvas.width = ls.imgData.width; l.canvas.height = ls.imgData.height; l.ctx.putImageData(ls.imgData, 0, 0); return l;
-            });
+            layers = state.layers.map(restoreLayer);
             
             if(layers.find(l => l.id === state.activeLayerId)) selectLayer(state.activeLayerId);
             else selectLayer(layers[layers.length-1].id);
@@ -1055,6 +1637,56 @@
         if(DOM.btnCaptureZone) DOM.btnCaptureZone.onclick = (e) => { e.stopPropagation(); captureScreen(); };
         if(DOM.btnCaptureHeader) DOM.btnCaptureHeader.onclick = captureScreen;
 
+        // 插入圖片的新增邏輯
+        if (DOM.btnInsertImage && DOM.insertImageInput) {
+            DOM.btnInsertImage.onclick = () => DOM.insertImageInput.click();
+            DOM.insertImageInput.onchange = (e) => {
+                if (e.target.files.length) {
+                    const file = e.target.files[0];
+                    if (!file.type.startsWith('image/')) return;
+                    
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            if (!layers.length) return; // 需要有基礎畫布
+                            const w = layers[0].canvas.width; const h = layers[0].canvas.height;
+                            const sourceCanvas = document.createElement('canvas');
+                            sourceCanvas.width = img.width;
+                            sourceCanvas.height = img.height;
+                            sourceCanvas.getContext('2d').drawImage(img, 0, 0);
+                            
+                            // 預設將插入的圖片置中並保持比例縮放至畫布內
+                            const scale = Math.min(w / img.width, h / img.height) * 0.8; 
+                            const dw = img.width * scale;
+                            const dh = img.height * scale;
+                            const dx = (w - dw) / 2;
+                            const dy = (h - dh) / 2;
+                            
+                            const newL = createImageLayer(`插入圖片 ${++layerCounter}`, sourceCanvas, w, h, {
+                                x: dx,
+                                y: dy,
+                                width: dw,
+                                height: dh
+                            });
+                            layers.push(newL);
+                            selectLayer(newL.id);
+                            activateTool('move');
+                            updateCompositeImage();
+                            updatePreview();
+                            rebuildAnnoOverlay();
+                            saveState();
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+                // 清空 input 讓下次選同張圖能觸發
+                e.target.value = '';
+            };
+        }
+
+
         function handleFile(file) {
             if (!file.type.startsWith('image/')) { alert('請上傳有效的圖片檔案。'); return; }
             currentFilename = file.name.replace(/\.[^/.]+$/, "");
@@ -1080,10 +1712,20 @@
                 const w = DOM.mainImage.naturalWidth; const h = DOM.mainImage.naturalHeight;
                 
                 layers = []; layerCounter = 0;
-                const bgLayer = createLayer('原圖背景'); bgLayer.canvas.width = w; bgLayer.canvas.height = h; bgLayer.ctx.drawImage(DOM.mainImage, 0, 0); layers.push(bgLayer);
-                const drawLayer = createLayer('編輯圖層 1'); drawLayer.canvas.width = w; drawLayer.canvas.height = h; layers.push(drawLayer);
+                // 原圖背景也保留 sourceCanvas + transform，才能用右側尺寸欄做非破壞式縮放。
+                const sourceCanvas = document.createElement('canvas');
+                sourceCanvas.width = w;
+                sourceCanvas.height = h;
+                sourceCanvas.getContext('2d').drawImage(DOM.mainImage, 0, 0);
+                const bgLayer = createImageLayer('原圖背景', sourceCanvas, w, h, {
+                    x: 0,
+                    y: 0,
+                    width: w,
+                    height: h
+                });
+                layers.push(bgLayer);
                 
-                selectLayer(drawLayer.id); updateCompositeImage();
+                selectLayer(bgLayer.id); updateCompositeImage();
                 cropper = _createCropper('move'); activateTool('move');
                 
                 history = []; currentIndex = -1; annotations = [];
@@ -1091,15 +1733,39 @@
             };
         }
 
-        function updateCropperImagesFast(newSrc) {
-            const imgLoader = new Image();
-            imgLoader.onload = () => {
+        function updateCropperImagesFast(newSrc, replaceCropper = true) {
+            if (!replaceCropper) {
                 if(DOM.mainImage) DOM.mainImage.src = newSrc;
                 if (cropper && DOM.mainImage) {
                     const container = DOM.mainImage.nextElementSibling;
                     if (container && container.classList.contains('cropper-container')) {
                         const imgs = container.querySelectorAll('img'); imgs.forEach(img => img.src = newSrc);
                     }
+                    refreshCropperDragMode();
+                }
+                return;
+            }
+            const imgLoader = new Image();
+            imgLoader.onload = () => {
+                if(DOM.mainImage) DOM.mainImage.src = newSrc;
+                if (cropper && DOM.mainImage) {
+                    const cropData = cropper.getData();
+                    const canvasData = cropper.getCanvasData();
+                    if (replaceCropper && typeof cropper.replace === 'function') {
+                        cropper.replace(newSrc, true);
+                        requestAnimationFrame(() => {
+                            try { cropper.setCanvasData(canvasData); } catch(e) {}
+                            try { isUserInteractingWithCropBox = true; cropper.setData(cropData); lockedCropData = cropper.getData(); isUserInteractingWithCropBox = false; } catch(e) { isUserInteractingWithCropBox = false; }
+                            refreshCropperDragMode();
+                            updatePreview();
+                            rebuildAnnoOverlay();
+                        });
+                    }
+                    const container = DOM.mainImage.nextElementSibling;
+                    if (container && container.classList.contains('cropper-container')) {
+                        const imgs = container.querySelectorAll('img'); imgs.forEach(img => img.src = newSrc);
+                    }
+                    refreshCropperDragMode();
                 }
             };
             imgLoader.src = newSrc;
@@ -1166,7 +1832,29 @@
         function switchMode(mode) {
             if (!cropper) return;
             currentMode = mode;
-            cropper.setDragMode(mode); 
+            refreshCropperDragMode();
+        }
+
+        function setCropDataSafely(cropData, aspectRatio, afterApply) {
+            if (!cropper || !cropData) return;
+            isUserInteractingWithCropBox = true;
+            isSyncing = true;
+            try {
+                cropper.setAspectRatio(aspectRatio);
+                cropper.setData(cropData);
+                lockedCropData = cropper.getData();
+            } finally {
+                isSyncing = false;
+            }
+
+            requestAnimationFrame(() => {
+                if (!cropper) return;
+                lockedCropData = cropper.getData();
+                isUserInteractingWithCropBox = false;
+                updatePreview();
+                rebuildAnnoOverlay();
+                if (typeof afterApply === 'function') afterApply();
+            });
         }
 
         /* ══ 畫布規格按鈕處理 ══ */
@@ -1174,6 +1862,10 @@
             item.onclick = () => {
                 DOM.presetItems.forEach(i => i.classList.remove('active')); item.classList.add('active');
                 const wData = item.dataset.w;
+                if (wData === 'autofit') {
+                    fitCropToActiveLayerBounds();
+                    return;
+                }
                 if (wData === 'custom') {
                     isCustomSize = true; if(DOM.customSizeBox) DOM.customSizeBox.classList.remove('hidden');
                     if (cropper) {
@@ -1195,6 +1887,34 @@
             };
         });
 
+        function fitCropToActiveLayerBounds() {
+            if (!cropper || !layers.length) return;
+            const layer = getTransformTargetLayer();
+            const bounds = getLayerVisibleBounds(layer);
+            if (!bounds) return;
+
+            isCustomSize = true;
+            targetWidth = Math.max(1, Math.round(bounds.width));
+            targetHeight = Math.max(1, Math.round(bounds.height));
+
+            DOM.presetItems.forEach(i => i.classList.remove('active'));
+            if (DOM.btnAutofitCrop) DOM.btnAutofitCrop.classList.add('active');
+            if (layer && layer.id !== activeLayerId) selectLayer(layer.id);
+            if(DOM.customSizeBox) DOM.customSizeBox.classList.remove('hidden');
+            if(DOM.customW) DOM.customW.value = targetWidth;
+            if(DOM.customH) DOM.customH.value = targetHeight;
+
+            setCropDataSafely({
+                x: bounds.x,
+                y: bounds.y,
+                width: targetWidth,
+                height: targetHeight
+            }, targetWidth / targetHeight, () => saveState());
+
+            updateStatSize();
+            saveSettings();
+        }
+
         if(DOM.customW) DOM.customW.onchange = () => saveState(); 
         if(DOM.customH) DOM.customH.onchange = () => saveState();
         
@@ -1215,7 +1935,7 @@
             DOM.borderRadius.oninput = () => { if(DOM.radiusVal) DOM.radiusVal.textContent = DOM.borderRadius.value; updatePreview(); saveSettings(); };
         }
         if(DOM.showGrid) DOM.showGrid.onchange = () => { rebuildAnnoOverlay(); saveSettings(); };
-        if(DOM.snapGrid) DOM.snapGrid.onchange = () => { if(DOM.annoAngle) DOM.annoAngle.step = DOM.snapGrid.checked ? 15 : 1; saveSettings(); };
+        if(DOM.snapGrid) DOM.snapGrid.onchange = () => { DOM.annoAngle.step = DOM.snapGrid.checked ? 15 : 1; saveSettings(); };
         if(DOM.gridSize) DOM.gridSize.oninput = () => { if(DOM.gridSizeVal) DOM.gridSizeVal.textContent = DOM.gridSize.value; rebuildAnnoOverlay(); saveSettings(); };
 
         /* ══ 智慧去背與填色系統 (支援描邊) ══ */
@@ -1281,6 +2001,16 @@
         if(DOM.limitToCrop) DOM.limitToCrop.addEventListener('change', saveSettings);
 
         function setEraserTool(tool, skipReset = false) {
+            if (tool) {
+                const activeLayer = getActiveLayer();
+                if (isTransformLayer(activeLayer)) {
+                    materializeTransformLayer(activeLayer);
+                    wandCanvas = activeLayer.canvas;
+                    wandCtx = activeLayer.ctx;
+                    updateCompositeImage();
+                    rebuildAnnoOverlay();
+                }
+            }
             activeEraserTool = tool;
             
             if (!skipReset && tool !== 'pen') {
@@ -1301,6 +2031,7 @@
                 DOM.eraserOverlay.classList.add('hidden'); isEyedropperActive = false; 
                 if(DOM.btnEyedropper) DOM.btnEyedropper.classList.replace('btn-primary', 'btn-outline');
                 DOM.eraserOverlay.classList.remove('eyedropper-cursor'); DOM.eraserOverlay.classList.remove('brush-cursor-mode'); if(DOM.brushCursor) DOM.brushCursor.classList.add('hidden');
+                refreshCropperDragMode();
             }
         }
 
@@ -1314,18 +2045,9 @@
 
         function screenToImage(clientX, clientY) {
             if(!DOM.eraserOverlay || !cropper) return {x:0, y:0};
-            const canvasData = cropper.getCanvasData(); 
-            const cropData = cropper.getData();
-            const nw = canvasData.naturalWidth || 1; 
-            const nh = canvasData.naturalHeight || 1;
-            const scaleX = canvasData.width / nw; 
-            const scaleY = canvasData.height / nh;
-
-            const rect = DOM.eraserOverlay.getBoundingClientRect();
-            
-            // 螢幕上的絕對像素轉換成實際影像(Image)的內部像素
-            const x = Math.floor((clientX - rect.left - canvasData.left) / scaleX);
-            const y = Math.floor((clientY - rect.top  - canvasData.top) / scaleY);
+            const cd = cropper.getCanvasData(); const rect = DOM.eraserOverlay.getBoundingClientRect();
+            const x = Math.floor((clientX - rect.left - cd.left) * (wandCanvas.width  / cd.width));
+            const y = Math.floor((clientY - rect.top  - cd.top)  * (wandCanvas.height / cd.height));
             return {x, y};
         }
 
@@ -1408,7 +2130,9 @@
                 if (isDraggingPen && penPath.length > 0) {
                     const last = penPath[penPath.length - 1];
                     last.cp2x = pt.x; last.cp2y = pt.y;
-                    last.cp1x = last.x - (pt.x - last.x); last.cp1y = last.y - (pt.y - last.y);
+                    // 對稱延伸反方向的把手
+                    last.cp1x = last.x - (pt.x - last.x);
+                    last.cp1y = last.y - (pt.y - last.y);
                 }
                 
                 if (!isRenderingErase) {
@@ -1791,6 +2515,35 @@
                 }
             }
 
+            if (canDragActiveLayer()) {
+                const activeLayer = getActiveLayer();
+                const bounds = getLayerVisibleBounds(activeLayer);
+                if (bounds) {
+                    const tl = {
+                        x: canvasData.left + bounds.x * scaleX,
+                        y: canvasData.top + bounds.y * scaleY
+                    };
+                    const br = {
+                        x: canvasData.left + (bounds.x + bounds.width) * scaleX,
+                        y: canvasData.top + (bounds.y + bounds.height) * scaleY
+                    };
+                    const layerBox = document.createElement('div');
+                    layerBox.className = 'active-layer-box';
+                    layerBox.style.left = tl.x + 'px';
+                    layerBox.style.top = tl.y + 'px';
+                    layerBox.style.width = Math.max(12, br.x - tl.x) + 'px';
+                    layerBox.style.height = Math.max(12, br.y - tl.y) + 'px';
+                    layerBox.innerHTML = `
+                        <span class="active-layer-handle" data-handle="nw"></span>
+                        <span class="active-layer-handle" data-handle="ne"></span>
+                        <span class="active-layer-handle" data-handle="sw"></span>
+                        <span class="active-layer-handle" data-handle="se"></span>
+                    `;
+                    layerBox.onmousedown = startActiveLayerDrag;
+                    DOM.annoOverlay.appendChild(layerBox);
+                }
+            }
+
             // 繪製標註 (實體 DOM 元素)
             annotations.forEach(anno => {
                 const pos = toWrapperPx(anno.x, anno.y);
@@ -1799,7 +2552,7 @@
                 visual.style.position = 'absolute';
                 visual.style.left = pos.x + 'px';
                 visual.style.top = pos.y + 'px';
-                visual.style.pointerEvents = 'none'; // 讓滑鼠穿透到把手
+                visual.style.pointerEvents = 'none'; 
                 visual.style.zIndex = '49';
                 
                 let transformStr = `translate(-50%, -50%) rotate(${anno.angle}deg)`;
@@ -1881,17 +2634,13 @@
                 const gridOverlay = document.createElement('div');
                 gridOverlay.style.position = 'absolute'; gridOverlay.style.top = '0'; gridOverlay.style.left = '0'; gridOverlay.style.width = '100%'; gridOverlay.style.height = '100%';
                 gridOverlay.style.pointerEvents = 'none'; gridOverlay.style.boxSizing = 'border-box'; gridOverlay.style.border = '1px solid rgba(255, 59, 48, 0.8)';
-                
-                const splits = sliceMode === '3x3' ? 3 : 4;
-                let svgStr = `<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">`;
-                for(let i=1; i<splits; i++) {
-                    const posStr = (i * 100 / splits).toFixed(2) + '%';
-                    svgStr += `<line x1="${posStr}" y1="0" x2="${posStr}" y2="100%" stroke="rgba(255,59,48,0.8)" stroke-width="2"/>`;
-                    svgStr += `<line x1="0" y1="${posStr}" x2="100%" y2="${posStr}" stroke="rgba(255,59,48,0.8)" stroke-width="2"/>`;
+                let bgImage = '';
+                if (sliceMode === '3x3') {
+                    bgImage = `linear-gradient(to right, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px)), linear-gradient(to bottom, transparent calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% - 1px), rgba(255,59,48,0.8) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% - 1px), rgba(255,59,48,0.8) calc(66.66% + 1px), transparent calc(66.66% + 1px))`;
+                } else if (sliceMode === '4x4') {
+                    bgImage = `linear-gradient(to right, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px)), linear-gradient(to bottom, transparent calc(25% - 1px), rgba(255,59,48,0.8) calc(25% - 1px), rgba(255,59,48,0.8) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255,59,48,0.8) calc(50% - 1px), rgba(255,59,48,0.8) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(255,59,48,0.8) calc(75% - 1px), rgba(255,59,48,0.8) calc(75% + 1px), transparent calc(75% + 1px))`;
                 }
-                svgStr += `</svg>`;
-                gridOverlay.innerHTML = svgStr;
-                imgWrapper.appendChild(gridOverlay);
+                gridOverlay.style.backgroundImage = bgImage; imgWrapper.appendChild(gridOverlay);
             }
             DOM.previewContainer.appendChild(imgWrapper);
         }
@@ -1905,9 +2654,7 @@
             const compCanvas = document.createElement('canvas');
             compCanvas.width = layers[0].canvas.width; compCanvas.height = layers[0].canvas.height;
             const compCtx = compCanvas.getContext('2d');
-            layers.forEach(l => {
-                if(l.visible) { compCtx.globalAlpha = l.opacity; compCtx.drawImage(l.canvas, 0, 0); }
-            });
+            layers.forEach(l => drawLayerToContext(compCtx, l));
 
             const sliceMode = DOM.exportSlice ? DOM.exportSlice.value : 'none';
             let splits = 1;
