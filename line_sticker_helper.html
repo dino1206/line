@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LINE 貼圖上架專用圖片工具</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+
+    <style>
+        :root {
+            --primary: #06C755; /* LINE Official Green */
+            --primary-hover: #05b04b;
+            --primary-light: rgba(6, 199, 85, 0.1);
+            --bg-color: #0f1015; /* Dark Premium Theme */
+            --surface: rgba(22, 24, 30, 0.95);
+            --surface-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f5f5f7;
+            --text-muted: #8e8e93;
+            --border-radius: 16px;
+            --shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+            --toolbar-bg: #16181e;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .app-background {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(circle at 10% 20%, rgba(6, 199, 85, 0.08), transparent 40%),
+                        radial-gradient(circle at 90% 80%, rgba(255, 255, 255, 0.02), transparent 40%);
+            z-index: -1;
+        }
+
+        /* 頂部 Header */
+        .glass-header {
+            background: var(--surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--surface-border);
+            padding: 12px 24px; display: flex; justify-content: space-between; align-items: center;
+            flex-shrink: 0; z-index: 200; gap: 16px;
+        }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo i { font-size: 1.6rem; color: var(--primary); }
+        .logo h1 { font-size: 1.15rem; font-weight: 700; margin: 0; white-space: nowrap; letter-spacing: 0.5px; }
+        .logo span { font-size: 0.75rem; background: var(--primary-light); color: var(--primary); border: 1px solid rgba(6, 199, 85, 0.3); padding: 2px 8px; border-radius: 20px; font-weight: 600; margin-left: 4px; }
+
+        /* 匯出命名與打包區域 */
+        .header-export {
+            display: flex; align-items: center; gap: 12px;
+            background: rgba(255, 255, 255, 0.03); padding: 6px 14px; border-radius: 10px; border: 1px solid var(--surface-border);
+            flex-shrink: 0;
+        }
+        .header-export label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+        .header-export input[type="text"] {
+            border: 1px solid var(--surface-border); background: rgba(0,0,0,0.2); color: var(--text-main);
+            font-weight: 600; padding: 4px 10px; border-radius: 6px; outline: none; font-size: 0.85rem; width: 80px; text-align: center;
+        }
+        .header-export input[type="text"]:focus { border-color: var(--primary); }
+        .header-export .divider { width: 1px; height: 16px; background: var(--surface-border); margin: 0 4px; }
+
+        .header-actions { display: flex; gap: 10px; }
+
+        /* 按鈕樣式 */
+        .btn { padding: 8px 14px; border-radius: 8px; border: none; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+        .btn-primary { background: var(--primary); color: #ffffff; }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 15px rgba(6, 199, 85, 0.35); }
+        .btn-main { background: #007AFF; color: #ffffff; }
+        .btn-main:hover:not(:disabled) { background: #0062cc; transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0, 122, 255, 0.35); }
+        .btn-tab { background: #5E5CE6; color: #ffffff; }
+        .btn-tab:hover:not(:disabled) { background: #4A48C8; transform: translateY(-1px); box-shadow: 0 4px 15px rgba(94, 92, 230, 0.35); }
+        .btn-outline { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--surface-border); color: var(--text-main); }
+        .btn-outline:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.3); }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; }
+
+        /* 動態選項列 (Tool Options Bar) */
+        .tool-options-bar {
+            background: rgba(22, 24, 30, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--surface-border);
+            display: flex; align-items: center; padding: 8px 24px; gap: 16px; flex-shrink: 0;
+            min-height: 48px; overflow-x: auto; z-index: 99;
+        }
+        .tool-options-bar.hidden-bar { display: none !important; }
+        .opt-group { display: flex; align-items: center; gap: 10px; padding-right: 16px; border-right: 1px solid var(--surface-border); font-size: 0.85rem; white-space: nowrap; }
+        .opt-group:last-child { border-right: none; }
+        .opt-label { color: var(--text-muted); font-weight: 500; font-size: 0.8rem; }
+        .opt-tool-name { font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 6px; }
+
+        /* 主要工作區 */
+        .main-layout { display: flex; flex: 1; overflow: hidden; }
+
+        /* 左側極簡工具列 (Slim Toolbar) */
+        .slim-toolbar {
+            width: 64px; background: var(--toolbar-bg); border-right: 1px solid var(--surface-border);
+            display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 8px; z-index: 10;
+            flex-shrink: 0; box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+        }
+        .tool-btn {
+            width: 44px; height: 44px; border-radius: 12px; font-size: 1.15rem;
+            background: transparent; border: none; color: var(--text-muted);
+            display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.2s ease;
+        }
+        .tool-btn:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-main); }
+        .tool-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(6, 199, 85, 0.35); }
+        .tool-divider { width: 32px; height: 1px; background: var(--surface-border); margin: 6px 0; }
+
+        /* 中央編輯區 */
+        .editor-container { flex: 1; display: flex; flex-direction: column; padding: 16px; min-width: 0; position: relative;}
+        .editor-area {
+            flex: 1; background: #1a1c23; border-radius: var(--border-radius); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
+            border: 1px solid var(--surface-border); box-shadow: inset 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        /* 上傳提示區 */
+        .upload-box { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+        .upload-content { text-align: center; color: var(--text-muted); pointer-events: none; }
+        .upload-content i { font-size: 4.5rem; color: rgba(255, 255, 255, 0.1); margin-bottom: 20px; transition: 0.3s ease; }
+        .upload-box:hover .upload-content i { color: var(--primary); transform: translateY(-5px); }
+        .upload-content h2 { color: var(--text-main); margin-bottom: 8px; font-size: 1.3rem; }
+        .upload-actions { margin-top: 24px; display: flex; gap: 12px; pointer-events: all; justify-content: center; }
+        .canvas-wrapper { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        .hidden { display: none !important; }
+
+        /* 去背疊加層 */
+        /* Loading 遮罩 */
+        #loading-overlay {
+            position: absolute; inset: 0; z-index: 200;
+            background: rgba(15, 16, 21, 0.72); backdrop-filter: blur(4px);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 14px; border-radius: var(--border-radius); pointer-events: all;
+        }
+        #loading-overlay.hidden { display: none !important; }
+        #loading-overlay .spin { font-size: 2rem; color: var(--primary); animation: spin 0.8s linear infinite; }
+        #loading-overlay p { font-size: 0.85rem; color: var(--text-muted); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #eraser-overlay { position: absolute; inset: 0; z-index: 60; cursor: crosshair; }
+        #brush-cursor { position: absolute; border: 1px solid rgba(255,255,255,0.8); border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); z-index: 62; box-shadow: 0 0 0 1px rgba(0,0,0,0.5); background: rgba(6, 199, 85, 0.15); }
+        .eyedropper-cursor { cursor: crosshair !important; } .brush-cursor-mode { cursor: none !important; }
+
+        /* 右側面板 (Right Sidebar) */
+        .sidebar-right {
+            width: 340px; background: var(--surface); border-left: 1px solid var(--surface-border);
+            display: flex; flex-direction: column; padding: 20px; overflow-y: auto; flex-shrink: 0;
+            box-shadow: -4px 0 20px rgba(0,0,0,0.2); gap: 20px;
+        }
+
+        .panel-section {
+            background: rgba(255, 255, 255, 0.02); border: 1px solid var(--surface-border); border-radius: 12px;
+            padding: 16px; display: flex; flex-direction: column; gap: 12px;
+        }
+        .section-title { font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--primary); border-bottom: 1px solid var(--surface-border); padding-bottom: 8px; margin-bottom: 4px; }
+
+        /* 滑桿與開關 */
+        .form-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; }
+        .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink:0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.15); transition: .3s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        input[type="range"] { -webkit-appearance: none; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; cursor: pointer; width: 120px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: white; border: 2px solid var(--primary); border-radius: 50%; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        input[type="range"]:focus { outline: none; }
+        
+        .color-picker { width: 28px; height: 28px; border: 1px solid var(--surface-border); padding: 0; background: none; cursor: pointer; border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+
+        /* LINE 預覽視窗群組 */
+        .preview-grid { display: flex; flex-direction: column; gap: 14px; }
+        .preview-item-box {
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .preview-header { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
+        
+        .preview-canvas-container {
+            width: 100%; display: flex; align-items: center; justify-content: center; border: 1px solid var(--surface-border); border-radius: 8px;
+            background-size: 12px 12px;
+            position: relative; overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        /* 網格透明背景定義 */
+        .bg-transparent {
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.03) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.03) 75%, rgba(255,255,255,0.03)),
+                              repeating-linear-gradient(45deg, rgba(255,255,255,0.03) 25%, rgba(0,0,0,0.2) 25%, rgba(0,0,0,0.2) 75%, rgba(255,255,255,0.03) 75%, rgba(255,255,255,0.03));
+            background-position: 0 0, 6px 6px;
+        }
+        .bg-white { background: #ffffff; }
+        .bg-black { background: #18191e; }
+        .bg-green { background: #81c14b; } /* 去背綠色 */
+
+        .preview-canvas-container canvas { max-width: 100%; height: auto; display: block; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
+
+        .sponsor-link { text-align: center; font-size: 0.75rem; color: var(--text-muted); text-decoration: none; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; transition: color 0.2s; }
+        .sponsor-link:hover { color: #FF9500; }
+    </style>
+</head>
+<body>
+    <div class="app-background"></div>
+    
+    <!-- 頂部 Header -->
+    <header class="glass-header">
+        <div class="logo">
+            <i class="fa-solid fa-face-smile-wink"></i>
+            <div>
+                <h1>LINE 貼圖上架專用圖片工具</h1>
+            </div>
+            <span>LINE 上架專用版</span>
+        </div>
+
+        <!-- 匯出控制 -->
+        <div class="header-export">
+            <label for="export-filename">貼圖檔名</label>
+            <input type="text" id="export-filename" value="01" placeholder="例如 01" maxlength="15">
+            <div class="divider"></div>
+            <button id="btn-dl-sticker" class="btn btn-primary btn-sm" disabled title="370 × 320 px">
+                <i class="fa-solid fa-download"></i> 貼圖
+            </button>
+            <button id="btn-dl-main" class="btn btn-main btn-sm" disabled title="240 × 240 px">
+                <i class="fa-solid fa-download"></i> 主圖
+            </button>
+            <button id="btn-dl-tab" class="btn btn-tab btn-sm" disabled title="96 × 74 px">
+                <i class="fa-solid fa-download"></i> 標籤
+            </button>
+        </div>
+
+        <div class="header-actions">
+            <button id="btn-new-file" class="btn btn-outline btn-sm" style="display:none"><i class="fa-solid fa-rotate"></i> 重新載入</button>
+        </div>
+    </header>
+
+    <!-- 動態選項列 -->
+    <div class="tool-options-bar hidden-bar" id="tool-options-bar">
+        <div class="opt-group">
+            <span class="opt-tool-name" id="opt-tool-name"><i class="fa-solid fa-mouse-pointer"></i> 模式</span>
+        </div>
+        
+        <!-- 操作提示 -->
+        <div class="opt-group" id="opt-group-hint" style="color: var(--text-muted); border: none;">
+            <i class="fa-solid fa-info-circle"></i> 調整裁剪框來選擇匯出的主體
+        </div>
+
+        <!-- 動作選擇: 描邊 / 填滿 / 挖空 -->
+        <div class="opt-group opt-group-action" id="opt-group-action" style="display:none;">
+            <div class="d-flex" style="background:rgba(255,255,255,0.05); padding:2px; border-radius:8px;">
+                <button id="btn-action-erase" class="btn btn-sm" style="background:var(--primary); color:white;"><i class="fa-solid fa-eraser"></i> 橡皮擦</button>
+                <button id="btn-action-rect-erase" class="btn btn-sm" style="background:transparent; color:var(--text-muted);"><i class="fa-solid fa-vector-square"></i> 矩形</button>
+                <button id="btn-action-circle-erase" class="btn btn-sm" style="background:transparent; color:var(--text-muted);"><i class="fa-regular fa-circle"></i> 圓形</button>
+                <button id="btn-action-brush" class="btn btn-sm" style="background:transparent; color:var(--text-muted);"><i class="fa-solid fa-paint-brush"></i> 修補</button>
+            </div>
+            <span class="opt-label" style="margin-left:12px; font-size:0.75rem; color:var(--primary);"><i class="fa-solid fa-lightbulb"></i> 提示：按住 Shift 可畫正方形/正圓形</span>
+        </div>
+
+        <!-- 顏色選擇 (僅用於修補) -->
+        <div class="opt-group opt-group-color" id="opt-group-color" style="display:none;">
+            <input type="color" id="fill-color" class="color-picker" value="#06C755" title="繪圖顏色">
+            <button id="btn-eyedropper" class="btn btn-outline btn-sm" style="padding:4px 8px; border:none; background:transparent;" title="滴管取色"><i class="fa-solid fa-eye-dropper"></i></button>
+        </div>
+
+        <!-- 大小設定 (筆刷、描邊) -->
+        <div class="opt-group opt-group-size" id="opt-group-size" style="display:none;">
+            <span class="opt-label">筆刷粗細：<span id="brush-size-val">15</span>px</span>
+            <input type="range" id="brush-size" min="1" max="150" value="15" style="width:100px;">
+        </div>
+
+        <!-- 魔棒專屬 -->
+        <div class="opt-group opt-group-wand" id="opt-group-wand" style="display:none;">
+            <span class="opt-label">容差：<span id="tol-val">20</span></span>
+            <input type="range" id="tolerance" min="0" max="150" value="20" style="width:80px;">
+        </div>
+    </div>
+
+    <div class="main-layout">
+        <!-- 左側極簡工具列 -->
+        <aside class="slim-toolbar" id="slim-toolbar">
+            <button class="tool-btn active" data-tool="move" title="移動圖片與縮放 (V)"><i class="fa-solid fa-arrows-up-down-left-right"></i></button>
+            <button class="tool-btn" data-tool="crop" title="選取範圍 / 裁切 (C)"><i class="fa-solid fa-crop-simple"></i></button>
+            <div class="tool-divider"></div>
+            <button class="tool-btn" data-tool="wand" title="魔棒去背 (W)"><i class="fa-solid fa-wand-magic"></i></button>
+            <button class="tool-btn" data-tool="brush" title="筆刷/橡皮擦 (B)"><i class="fa-solid fa-paint-brush"></i></button>
+            <div class="tool-divider"></div>
+        </aside>
+
+        <!-- 中央編輯區 -->
+        <section class="editor-container">
+            <div class="editor-area" id="editor-area">
+                <div class="upload-box" id="drop-zone">
+                    <input type="file" id="file-input" accept="image/*" hidden>
+                    <div class="upload-content">
+                        <i class="fa-regular fa-image"></i>
+                        <h2>放入貼圖圖片開始編輯</h2>
+                        <p style="font-size: 0.9rem;">支援帶去背的透明 PNG 或一般 JPG/WEBP 圖片</p>
+                        <div class="upload-actions">
+                            <button id="btn-browse-file" class="btn btn-primary"><i class="fa-regular fa-folder-open"></i> 瀏覽檔案</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="canvas-wrapper hidden" id="canvas-wrapper">
+                    <div id="loading-overlay" class="hidden"><i class="fa-solid fa-circle-notch spin"></i><p>處理中...</p></div>
+                    <div id="eraser-overlay" class="hidden"></div>
+                    <div id="brush-cursor" class="hidden"></div>
+                    <div id="selection-rect" style="position:absolute; border: 2px dashed #ff3b30; background: rgba(255, 59, 48, 0.25); box-shadow: 0 0 0 1px rgba(255,255,255,0.8), inset 0 0 0 1px rgba(255,255,255,0.8); pointer-events: none; display: none; z-index: 65;"></div>
+                    <img id="main-image" src="" alt="Editor" style="max-width:100%">
+                </div>
+            </div>
+        </section>
+
+        <!-- 右側面板 -->
+        <aside class="sidebar-right" id="sidebar-right">
+            
+            <!-- 1. 輸出外觀設定 -->
+            <div class="panel-section">
+                <div class="section-title"><i class="fa-solid fa-shapes"></i> 輸出外觀設定</div>
+                
+                <!-- 圓角 -->
+                <div class="form-row">
+                    <label>邊緣平滑圓角</label>
+                    <label class="switch">
+                        <input type="checkbox" id="radius-enable">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="radius-controls-group" class="hidden">
+                    <div class="form-row">
+                        <label>圓角弧度：<span id="radius-size-val">20</span>%</label>
+                        <input type="range" id="radius-size" min="1" max="50" value="20">
+                    </div>
+                </div>
+
+                <div style="width: 100%; height: 1px; background: var(--surface-border); margin: 4px 0;"></div>
+
+                <!-- 描邊 -->
+                <div class="form-row">
+                    <label>啟用白色描邊</label>
+                    <label class="switch">
+                        <input type="checkbox" id="stroke-enable" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="stroke-controls-group">
+                    <div class="form-row">
+                        <label>描邊粗細：<span id="stroke-size-val">6</span>px</label>
+                        <input type="range" id="stroke-size" min="1" max="25" value="6">
+                    </div>
+                    <div class="form-row">
+                        <label>描邊顏色</label>
+                        <input type="color" id="stroke-color" class="color-picker" value="#ffffff">
+                    </div>
+                </div>
+                <div class="form-row" style="border-top: 1px solid var(--surface-border); padding-top: 10px; margin-top: 4px;">
+                    <label>啟用貼圖陰影</label>
+                    <label class="switch">
+                        <input type="checkbox" id="shadow-enable">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="shadow-controls-group" class="hidden">
+                    <div class="form-row">
+                        <label>陰影羽化：<span id="shadow-blur-val">6</span>px</label>
+                        <input type="range" id="shadow-blur" min="1" max="20" value="6">
+                    </div>
+                    <div class="form-row">
+                        <label>陰影透明：<span id="shadow-opacity-val">0.3</span></label>
+                        <input type="range" id="shadow-opacity" min="0.1" max="1" step="0.05" value="0.3">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 即時三合一預覽 -->
+            <div class="panel-section" style="flex: 1; min-height: 0; overflow-y: auto;">
+                <div class="section-title" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fa-solid fa-eye"></i> LINE 規格預覽</span>
+                    <select id="preview-bg-select" style="background: rgba(255,255,255,0.05); border: 1px solid var(--surface-border); color: var(--text-main); font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; outline: none; cursor: pointer;">
+                        <option value="transparent">網格底</option>
+                        <option value="white">白底</option>
+                        <option value="black">黑底</option>
+                        <option value="green">綠底</option>
+                    </select>
+                </div>
+                
+                <div class="preview-grid">
+                    <!-- A. 貼圖 370 x 320 (最大) -->
+                    <div class="preview-item-box">
+                        <div class="preview-header">
+                            <span>貼圖圖片 (sticker.png)</span>
+                            <span>最大 370 × 320 px</span>
+                        </div>
+                        <div class="preview-canvas-container bg-transparent" style="aspect-ratio: 370/320;">
+                            <canvas id="canvas-sticker" width="370" height="320"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- B. 主圖 240 x 240 -->
+                    <div class="preview-item-box">
+                        <div class="preview-header">
+                            <span>商店主圖 (main.png)</span>
+                            <span>固定 240 × 240 px</span>
+                        </div>
+                        <div class="preview-canvas-container bg-transparent" style="aspect-ratio: 1; max-width: 180px; margin: 0 auto;">
+                            <canvas id="canvas-main" width="240" height="240"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- C. 標籤 96 x 74 -->
+                    <div class="preview-item-box">
+                        <div class="preview-header">
+                            <span>聊天分頁標籤 (tab.png)</span>
+                            <span>固定 96 × 74 px</span>
+                        </div>
+                        <div class="preview-canvas-container bg-transparent" style="aspect-ratio: 96/74; max-width: 110px; margin: 0 auto;">
+                            <canvas id="canvas-tab" width="96" height="74"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <a href="https://store.line.me/stickershop/author/61922/zh-Hant" target="_blank" class="sponsor-link">
+                <i class="fa-solid fa-mug-hot"></i> 支持開發者創作者貼圖
+            </a>
+        </aside>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const $ = id => document.getElementById(id);
+        
+        // DOM 元素快取
+        const DOM = {
+            dropZone: $('drop-zone'),
+            fileInput: $('file-input'),
+            btnBrowseFile: $('btn-browse-file'),
+            canvasWrapper: $('canvas-wrapper'),
+            mainImage: $('main-image'),
+            editorArea: $('editor-area'),
+            btnNewFile: $('btn-new-file'),
+            
+            toolOptionsBar: $('tool-options-bar'),
+            optToolName: $('opt-tool-name'),
+            optGroupAction: $('opt-group-action'),
+            optGroupColor: $('opt-group-color'),
+            optGroupSize: $('opt-group-size'),
+            optGroupWand: $('opt-group-wand'),
+            
+            btnActionErase: $('btn-action-erase'),
+            btnActionRectErase: $('btn-action-rect-erase'),
+            btnActionCircleErase: $('btn-action-circle-erase'),
+            btnActionBrush: $('btn-action-brush'),
+            btnEyedropper: $('btn-eyedropper'),
+            fillColor: $('fill-color'),
+            brushSize: $('brush-size'),
+            brushSizeVal: $('brush-size-val'),
+            tolerance: $('tolerance'),
+            tolVal: $('tol-val'),
+            
+            eraserOverlay: $('eraser-overlay'),
+            brushCursor: $('brush-cursor'),
+            selectionRect: $('selection-rect'),
+            
+            strokeEnable: $('stroke-enable'),
+            strokeSize: $('stroke-size'),
+            strokeSizeVal: $('stroke-size-val'),
+            strokeColor: $('stroke-color'),
+            strokeControlsGroup: $('stroke-controls-group'),
+            
+            radiusEnable: $('radius-enable'),
+            radiusControlsGroup: $('radius-controls-group'),
+            radiusSize: $('radius-size'),
+            radiusSizeVal: $('radius-size-val'),
+            
+            shadowEnable: $('shadow-enable'),
+            shadowBlur: $('shadow-blur'),
+            shadowBlurVal: $('shadow-blur-val'),
+            shadowOpacity: $('shadow-opacity'),
+            shadowOpacityVal: $('shadow-opacity-val'),
+            shadowControlsGroup: $('shadow-controls-group'),
+            
+            previewBgSelect: $('preview-bg-select'),
+            canvasSticker: $('canvas-sticker'),
+            canvasMain: $('canvas-main'),
+            canvasTab: $('canvas-tab'),
+            
+            exportFilename: $('export-filename'),
+            btnDlSticker: $('btn-dl-sticker'),
+            btnDlMain: $('btn-dl-main'),
+            btnDlTab: $('btn-dl-tab')
+        };
+
+        // 狀態管理
+        let cropper = null;
+        let originalImageSrc = null;
+        let currentMode = 'move'; // move, crop, wand, brush
+        let drawAction = 'erase'; // erase, brush
+        const undoStack = []; // Undo 歷史
+        const UNDO_LIMIT = 20;
+        
+        // 核心去背畫布 (維護使用者編輯過後的去背透明資訊)
+        let editCanvas = null;
+        let editCtx = null;
+
+        // Loading 遮罩
+        const loadingOverlay = $('loading-overlay');
+        function showLoading() { loadingOverlay.classList.remove('hidden'); }
+        function hideLoading() { loadingOverlay.classList.add('hidden'); }
+
+        // Undo 歷史操作
+        function pushUndo() {
+            if (!editCanvas) return;
+            const imgData = editCtx.getImageData(0, 0, editCanvas.width, editCanvas.height);
+            undoStack.push(imgData);
+            if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+        }
+        function performUndo() {
+            if (!editCanvas || undoStack.length === 0) return;
+            const imgData = undoStack.pop();
+            editCtx.putImageData(imgData, 0, 0);
+            syncEditCanvasToCropper();
+        }
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                performUndo();
+            }
+            if (!cropper) return;
+            const map = { v: 'move', c: 'crop', w: 'wand', b: 'brush' };
+            const t = map[e.key.toLowerCase()];
+            if (t && !e.ctrlKey && !e.metaKey) activateTool(t);
+        });
+
+        let isDrawing = false;
+        let lastPt = { x: 0, y: 0 };
+        let isShapeErasing = false;
+        let rectStartPt = { x: 0, y: 0 };
+        let rectStartScreen = { x: 0, y: 0 };
+        let isDirty = false;
+        let currentOverlayRect = null; // 快取以避免 layout thrashing
+        let tempSavedImgData = null; // 供魔棒復原或預覽使用
+
+        // JSZip 與下載檔名
+        let lastCroppedCanvas = null; // 暫存最後裁剪出來的主體
+
+        // 初始化選項開關控制
+        DOM.strokeEnable.onchange = () => {
+            DOM.strokeControlsGroup.classList.toggle('hidden', !DOM.strokeEnable.checked);
+            updateAllPreviews();
+        };
+        DOM.strokeSize.oninput = () => {
+            DOM.strokeSizeVal.textContent = DOM.strokeSize.value;
+            updateAllPreviews();
+        };
+        DOM.strokeColor.oninput = () => {
+            updateAllPreviews();
+        };
+        
+        DOM.shadowEnable.onchange = () => {
+            DOM.shadowControlsGroup.classList.toggle('hidden', !DOM.shadowEnable.checked);
+            updateAllPreviews();
+        };
+        DOM.shadowBlur.oninput = () => {
+            DOM.shadowBlurVal.textContent = DOM.shadowBlur.value;
+            updateAllPreviews();
+        };
+        DOM.shadowOpacity.oninput = () => {
+            DOM.shadowOpacityVal.textContent = DOM.shadowOpacity.value;
+            updateAllPreviews();
+        };
+
+        DOM.radiusEnable.onchange = () => {
+            DOM.radiusControlsGroup.classList.toggle('hidden', !DOM.radiusEnable.checked);
+            updateAllPreviews();
+        };
+        DOM.radiusSize.oninput = () => {
+            DOM.radiusSizeVal.textContent = DOM.radiusSize.value;
+            updateAllPreviews();
+        };
+
+        // 預覽背景變更
+        DOM.previewBgSelect.onchange = () => {
+            const bgClass = 'bg-' + DOM.previewBgSelect.value;
+            document.querySelectorAll('.preview-canvas-container').forEach(container => {
+                container.className = 'preview-canvas-container ' + bgClass;
+            });
+        };
+
+        // 頂部與左側工具列按鈕點擊
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.onclick = () => {
+                setToolbarActive(btn.dataset.tool);
+                activateTool(btn.dataset.tool);
+            };
+        });
+
+        function setToolbarActive(tool) {
+            document.querySelectorAll('.tool-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.tool === tool);
+            });
+        }
+
+        function setActionBtnActive(activeId) {
+            const btns = [
+                { el: DOM.btnActionErase, id: 'erase' },
+                { el: DOM.btnActionRectErase, id: 'rect-erase' },
+                { el: DOM.btnActionCircleErase, id: 'circle-erase' },
+                { el: DOM.btnActionBrush, id: 'brush' }
+            ];
+            btns.forEach(b => {
+                if (!b.el) return;
+                if (b.id === activeId) {
+                    b.el.style.background = 'var(--primary)';
+                    b.el.style.color = 'white';
+                } else {
+                    b.el.style.background = 'transparent';
+                    b.el.style.color = 'var(--text-muted)';
+                }
+            });
+
+            if (currentMode === 'brush') {
+                if (activeId === 'rect-erase' || activeId === 'circle-erase') {
+                    DOM.eraserOverlay.classList.remove('brush-cursor-mode');
+                    DOM.eraserOverlay.classList.add('eyedropper-cursor');
+                    DOM.brushCursor.classList.add('hidden');
+                } else {
+                    DOM.eraserOverlay.classList.remove('eyedropper-cursor');
+                    DOM.eraserOverlay.classList.add('brush-cursor-mode');
+                    DOM.brushCursor.classList.remove('hidden');
+                }
+            }
+        }
+
+        if (DOM.btnActionErase) {
+            DOM.btnActionErase.onclick = () => {
+                drawAction = 'erase';
+                setActionBtnActive('erase');
+            };
+        }
+        if (DOM.btnActionRectErase) {
+            DOM.btnActionRectErase.onclick = () => {
+                drawAction = 'rect-erase';
+                setActionBtnActive('rect-erase');
+            };
+        }
+        if (DOM.btnActionCircleErase) {
+            DOM.btnActionCircleErase.onclick = () => {
+                drawAction = 'circle-erase';
+                setActionBtnActive('circle-erase');
+            };
+        }
+        if (DOM.btnActionBrush) {
+            DOM.btnActionBrush.onclick = () => {
+                drawAction = 'brush';
+                setActionBtnActive('brush');
+            };
+        }
+
+        DOM.brushSize.oninput = () => { DOM.brushSizeVal.textContent = DOM.brushSize.value; };
+        DOM.tolerance.oninput = () => { DOM.tolVal.textContent = DOM.tolerance.value; };
+
+        // 螢幕座標轉影像內像素座標
+        function screenToImage(clientX, clientY) {
+            if (!DOM.eraserOverlay || !cropper) return { x: 0, y: 0 };
+            const canvasData = cropper.getCanvasData();
+            const nw = canvasData.naturalWidth || 1;
+            const nh = canvasData.naturalHeight || 1;
+            const scaleX = canvasData.width / nw;
+            const scaleY = canvasData.height / nh;
+
+            const rect = currentOverlayRect || DOM.eraserOverlay.getBoundingClientRect();
+            const x = Math.floor((clientX - rect.left - canvasData.left) / scaleX);
+            const y = Math.floor((clientY - rect.top - canvasData.top) / scaleY);
+            return { x, y };
+        }
+
+        // 啟用或切換工具
+        function activateTool(tool) {
+            currentMode = tool;
+            setToolbarActive(tool);
+            
+            // 隱藏各細項面板
+            DOM.optGroupAction.style.display = 'none';
+            DOM.optGroupColor.style.display = 'none';
+            DOM.optGroupSize.style.display = 'none';
+            DOM.optGroupWand.style.display = 'none';
+            DOM.eraserOverlay.classList.add('hidden');
+            DOM.brushCursor.classList.add('hidden');
+            DOM.eraserOverlay.classList.remove('eyedropper-cursor', 'brush-cursor-mode');
+
+            if (tool === 'move') {
+                DOM.optToolName.innerHTML = `<i class="fa-solid fa-arrows-up-down-left-right"></i> 移動畫布`;
+                if (cropper) cropper.setDragMode('move');
+            } 
+            else if (tool === 'crop') {
+                DOM.optToolName.innerHTML = `<i class="fa-solid fa-crop-simple"></i> 調整裁剪框`;
+                if (cropper) cropper.setDragMode('crop');
+            } 
+            else if (tool === 'wand') {
+                DOM.optToolName.innerHTML = `<i class="fa-solid fa-wand-magic"></i> 魔棒去背`;
+                DOM.optGroupWand.style.display = 'flex';
+                DOM.eraserOverlay.classList.remove('hidden');
+                DOM.eraserOverlay.classList.add('eyedropper-cursor');
+                if (cropper) cropper.setDragMode('none');
+            } 
+            else if (tool === 'brush') {
+                DOM.optToolName.innerHTML = `<i class="fa-solid fa-paint-brush"></i> 筆刷修整`;
+                DOM.optGroupAction.style.display = 'flex';
+                DOM.optGroupColor.style.display = 'flex';
+                DOM.optGroupSize.style.display = 'flex';
+                DOM.eraserOverlay.classList.remove('hidden');
+                setActionBtnActive(drawAction);
+                if (cropper) cropper.setDragMode('none');
+            }
+        }
+
+        // 滴管取色
+        if (DOM.btnEyedropper) {
+            DOM.btnEyedropper.onclick = async () => {
+                if (window.EyeDropper) {
+                    try {
+                        const eyeDropper = new EyeDropper();
+                        const result = await eyeDropper.open();
+                        DOM.fillColor.value = result.sRGBHex;
+                    } catch (e) { console.log('Eyedropper cancelled'); }
+                } else {
+                    alert('您的瀏覽器不支援滴管 API。');
+                }
+            };
+        }
+
+        // 檔案上傳與拖曳
+        if (DOM.dropZone) {
+            DOM.dropZone.ondragover = e => { e.preventDefault(); DOM.dropZone.style.borderColor = 'var(--primary)'; };
+            DOM.dropZone.ondragleave = () => { DOM.dropZone.style.borderColor = 'var(--surface-border)'; };
+            DOM.dropZone.ondrop = e => {
+                e.preventDefault();
+                DOM.dropZone.style.borderColor = 'var(--surface-border)';
+                if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+            };
+            DOM.dropZone.onclick = (e) => {
+                if (e.target.closest('.upload-actions')) return;
+                DOM.fileInput.click();
+            };
+        }
+        
+        DOM.btnBrowseFile.onclick = (e) => { e.stopPropagation(); DOM.fileInput.click(); };
+        DOM.fileInput.onchange = e => { if (e.target.files.length) handleFile(e.target.files[0]); };
+
+        // 剪貼簿 Ctrl+V 貼上貼圖圖片
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    const file = new File([blob], "paste_sticker.png", { type: "image/png" });
+                    handleFile(file);
+                    break;
+                }
+            }
+        });
+
+        DOM.btnNewFile.onclick = () => DOM.fileInput.click();
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) { alert('請上傳正確的圖片格式！'); return; }
+            const reader = new FileReader();
+            reader.onload = e => {
+                originalImageSrc = e.target.result;
+                initEditor(originalImageSrc);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function initEditor(src) {
+            DOM.dropZone.classList.add('hidden');
+            DOM.canvasWrapper.classList.remove('hidden');
+            DOM.btnNewFile.style.display = 'flex';
+            DOM.toolOptionsBar.classList.remove('hidden-bar');
+            DOM.btnDlSticker.disabled = false;
+            DOM.btnDlMain.disabled = false;
+            DOM.btnDlTab.disabled = false;
+
+            if (cropper) { cropper.destroy(); cropper = null; }
+            DOM.mainImage.src = src;
+
+            const setupCropper = () => {
+                DOM.mainImage.onload = null;
+                const w = DOM.mainImage.naturalWidth;
+                const h = DOM.mainImage.naturalHeight;
+
+                editCanvas = document.createElement('canvas');
+                editCanvas.width = w;
+                editCanvas.height = h;
+                editCtx = editCanvas.getContext('2d');
+                editCtx.drawImage(DOM.mainImage, 0, 0);
+
+                cropper = new Cropper(DOM.mainImage, {
+                    viewMode: 0,
+                    dragMode: 'crop',
+                    aspectRatio: NaN,
+                    autoCrop: true,
+                    background: false,
+                    movable: true,
+                    zoomable: true,
+                    modal: false,
+                    guides: false,
+                    center: false,
+                    highlight: false,
+                    ready() {
+                        cropper.setData({
+                            x: -2,
+                            y: -2,
+                            width: w + 4,
+                            height: h + 4
+                        });
+                    },
+                    crop() {
+                        renderAllPreviews();
+                    }
+                });
+
+                activateTool('crop');
+            };
+
+            if (DOM.mainImage.complete) {
+                setupCropper();
+            } else {
+                DOM.mainImage.onload = setupCropper;
+            }
+        }
+
+        // 當 editCanvas 被去背修改後，同步更新 Cropper 的顯示圖像
+        function syncEditCanvasToCropper() {
+            if (!cropper) return;
+            const newSrc = editCanvas.toDataURL();
+            const imgs = DOM.editorArea.querySelectorAll('.cropper-canvas img, .cropper-view-box img');
+            imgs.forEach(img => img.src = newSrc);
+            DOM.mainImage.src = newSrc;
+            renderAllPreviews();
+        }
+
+        function renderLoop() {
+            if (isDirty && cropper) {
+                syncEditCanvasToCropper();
+                isDirty = false;
+            }
+            requestAnimationFrame(renderLoop);
+        }
+        renderLoop();
+
+        function updateOverlayRect() {
+            if (DOM.eraserOverlay) currentOverlayRect = DOM.eraserOverlay.getBoundingClientRect();
+        }
+        window.addEventListener('resize', updateOverlayRect);
+
+        // 游標隱顯控制
+        DOM.eraserOverlay.addEventListener('mouseenter', () => {
+            updateOverlayRect();
+            if (currentMode === 'brush') DOM.brushCursor.classList.remove('hidden');
+        });
+        DOM.eraserOverlay.addEventListener('mouseleave', () => {
+            DOM.brushCursor.classList.add('hidden');
+        });
+
+        // ════ 繪圖去背滑鼠操作 ════
+        DOM.eraserOverlay.addEventListener('mousedown', e => {
+            if (e.button !== 0 || !cropper) return;
+            updateOverlayRect();
+            const pt = screenToImage(e.clientX, e.clientY);
+            
+            if (currentMode === 'wand') {
+                pushUndo();
+                floodFill(pt.x, pt.y);
+            } 
+            else if (currentMode === 'brush') {
+                if (drawAction === 'rect-erase' || drawAction === 'circle-erase') {
+                    isShapeErasing = true;
+                    rectStartPt = pt;
+                    rectStartScreen = { x: e.clientX, y: e.clientY };
+                    DOM.selectionRect.style.display = 'block';
+                    DOM.selectionRect.style.left = (e.clientX - currentOverlayRect.left) + 'px';
+                    DOM.selectionRect.style.top = (e.clientY - currentOverlayRect.top) + 'px';
+                    DOM.selectionRect.style.width = '0px';
+                    DOM.selectionRect.style.height = '0px';
+                    DOM.selectionRect.style.borderRadius = drawAction === 'circle-erase' ? '50%' : '0';
+                } else {
+                    pushUndo();
+                    isDrawing = true;
+                    lastPt = pt;
+                }
+            }
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (!cropper || !currentOverlayRect) return;
+            const rect = currentOverlayRect;
+            const currX = Math.max(rect.left, Math.min(e.clientX, rect.right));
+            const currY = Math.max(rect.top, Math.min(e.clientY, rect.bottom));
+
+            // 更新筆刷游標位置與大小
+            if (currentMode === 'brush') {
+                if (drawAction === 'rect-erase' || drawAction === 'circle-erase') {
+                    DOM.brushCursor.classList.add('hidden');
+                } else {
+                    DOM.brushCursor.classList.remove('hidden');
+                    const canvasData = cropper.getCanvasData();
+                    const zoomRatio = canvasData.width / editCanvas.width;
+                    const displaySize = parseInt(DOM.brushSize.value) * zoomRatio;
+                    DOM.brushCursor.style.width = displaySize + 'px';
+                    DOM.brushCursor.style.height = displaySize + 'px';
+                    DOM.brushCursor.style.left = (currX - rect.left) + 'px';
+                    DOM.brushCursor.style.top = (currY - rect.top) + 'px';
+                }
+            }
+
+            if (isDrawing && currentMode === 'brush') {
+                const pt = screenToImage(currX, currY);
+                applyBrush(lastPt, pt);
+                lastPt = pt;
+            }
+
+            if (isShapeErasing && currentMode === 'brush') {
+                let w = currX - rectStartScreen.x;
+                let h = currY - rectStartScreen.y;
+                
+                // Shift 等比例限制
+                if (e.shiftKey) {
+                    const size = Math.max(Math.abs(w), Math.abs(h));
+                    w = size * (w < 0 ? -1 : 1);
+                    h = size * (h < 0 ? -1 : 1);
+                }
+
+                DOM.selectionRect.style.left = (w < 0 ? rectStartScreen.x + w : rectStartScreen.x) - rect.left + 'px';
+                DOM.selectionRect.style.top = (h < 0 ? rectStartScreen.y + h : rectStartScreen.y) - rect.top + 'px';
+                DOM.selectionRect.style.width = Math.abs(w) + 'px';
+                DOM.selectionRect.style.height = Math.abs(h) + 'px';
+            }
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (isDrawing) {
+                isDrawing = false;
+                syncEditCanvasToCropper();
+            }
+            if (isShapeErasing) {
+                isShapeErasing = false;
+                DOM.selectionRect.style.display = 'none';
+                
+                const rectW = parseFloat(DOM.selectionRect.style.width) || 0;
+                const rectH = parseFloat(DOM.selectionRect.style.height) || 0;
+                const rectL = parseFloat(DOM.selectionRect.style.left) + currentOverlayRect.left;
+                const rectT = parseFloat(DOM.selectionRect.style.top) + currentOverlayRect.top;
+
+                const pt1 = screenToImage(rectL, rectT);
+                const pt2 = screenToImage(rectL + rectW, rectT + rectH);
+                const x = Math.min(pt1.x, pt2.x);
+                const y = Math.min(pt1.y, pt2.y);
+                const width = Math.abs(pt2.x - pt1.x);
+                const height = Math.abs(pt2.y - pt1.y);
+                
+                if (width > 2 && height > 2) {
+                    eraseShape(x, y, width, height, drawAction);
+                }
+            }
+        });
+
+        // 形狀擦除操作 (矩形/圓形)
+        function eraseShape(x, y, w, h, type) {
+            pushUndo();
+            editCtx.save();
+            
+            // 先用當前裁切框進行全局 Clipping
+            const cropData = cropper.getData(true);
+            editCtx.beginPath();
+            editCtx.rect(cropData.x, cropData.y, cropData.width, cropData.height);
+            editCtx.clip();
+
+            editCtx.globalCompositeOperation = 'destination-out';
+            editCtx.fillStyle = 'rgba(0,0,0,1)';
+            editCtx.beginPath();
+            
+            if (type === 'circle-erase') {
+                const cx = x + w / 2;
+                const cy = y + h / 2;
+                editCtx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2);
+            } else {
+                editCtx.rect(x, y, w, h);
+            }
+            
+            editCtx.fill();
+            
+            editCtx.restore();
+            syncEditCanvasToCropper();
+            isDirty = true;
+        }
+
+        // 筆刷/橡皮擦操作
+        function applyBrush(pt1, pt2) {
+            editCtx.save();
+            const cropData = cropper.getData(true);
+            editCtx.beginPath();
+            editCtx.rect(cropData.x, cropData.y, cropData.width, cropData.height);
+            editCtx.clip();
+
+            if (drawAction === 'erase') {
+                editCtx.globalCompositeOperation = 'destination-out';
+                editCtx.strokeStyle = 'rgba(0,0,0,1)';
+            } else {
+                editCtx.globalCompositeOperation = 'source-over';
+                editCtx.strokeStyle = DOM.fillColor.value;
+            }
+            editCtx.lineWidth = parseInt(DOM.brushSize.value);
+            editCtx.lineCap = 'round';
+            editCtx.lineJoin = 'round';
+            editCtx.beginPath();
+            editCtx.moveTo(pt1.x, pt1.y);
+            editCtx.lineTo(pt2.x, pt2.y);
+            editCtx.stroke();
+            editCtx.restore();
+            isDirty = true;
+        }
+
+        // 魔棒去背演算法
+        function floodFill(sx, sy) {
+            const cropData = cropper.getData(true);
+            const w = editCanvas.width;
+            const h = editCanvas.height;
+            
+            const minX = Math.max(0, Math.floor(cropData.x));
+            const maxX = Math.min(w - 1, Math.floor(cropData.x + cropData.width) - 1);
+            const minY = Math.max(0, Math.floor(cropData.y));
+            const maxY = Math.min(h - 1, Math.floor(cropData.y + cropData.height) - 1);
+
+            if (sx < minX || sx > maxX || sy < minY || sy > maxY) return;
+
+            const tol = parseInt(DOM.tolerance.value);
+            const imgData = editCtx.getImageData(0, 0, w, h);
+            const data = imgData.data;
+            
+            const startIdx = (Math.floor(sy) * w + Math.floor(sx)) * 4;
+            const r0 = data[startIdx];
+            const g0 = data[startIdx+1];
+            const b0 = data[startIdx+2];
+            const a0 = data[startIdx+3];
+
+            if (a0 === 0) return; // 點擊處已透明則不處理
+
+            const match = idx => {
+                return data[idx+3] > 0 && 
+                       (Math.abs(data[idx] - r0) + Math.abs(data[idx+1] - g0) + Math.abs(data[idx+2] - b0)) <= tol * 3;
+            };
+
+            const clearPixel = idx => { data[idx+3] = 0; };
+
+            // 相鄰，Flood-fill 走訪
+            const stack = [[Math.floor(sx), Math.floor(sy)]];
+            const visited = new Uint8Array(w * h);
+            while (stack.length) {
+                const [px, py] = stack.pop();
+                if (px < minX || px > maxX || py < minY || py > maxY) continue;
+                const v = py * w + px;
+                if (visited[v]) continue;
+                visited[v] = 1;
+                const idx = v * 4;
+                if (match(idx)) {
+                    clearPixel(idx);
+                    if (px > minX) stack.push([px-1, py]);
+                    if (px < maxX) stack.push([px+1, py]);
+                    if (py > minY) stack.push([px, py-1]);
+                    if (py < maxY) stack.push([px, py+1]);
+                }
+            }
+
+            editCtx.putImageData(imgData, 0, 0);
+            syncEditCanvasToCropper();
+        }
+
+        // ════ 描邊與置中演算法 (多角度偏移繪製) ════
+        function renderSubjectWithOutline(ctx, subjectCanvas, targetW, targetH, padding, enableOutline, outlineSize, outlineColor, enableShadow, shadowBlur, shadowOpacity) {
+            ctx.clearRect(0, 0, targetW, targetH);
+
+            // 1. 等比例縮放主體以符合安全邊距
+            const maxW = targetW - padding * 2;
+            const maxH = targetH - padding * 2;
+            const scale = Math.min(maxW / subjectCanvas.width, maxH / subjectCanvas.height);
+            const drawW = subjectCanvas.width * scale;
+            const drawH = subjectCanvas.height * scale;
+
+            // 置中繪製坐標
+            const dx = (targetW - drawW) / 2;
+            const dy = (targetH - drawH) / 2;
+
+            // 建立一個與目標 Canvas 尺寸相同的臨時 Canvas 繪製主體，便於做發光描邊
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = targetW;
+            tempCanvas.height = targetH;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // 繪製主體在置中位置
+            tempCtx.drawImage(subjectCanvas, dx, dy, drawW, drawH);
+
+            ctx.save();
+
+            // A. 若啟用陰影，先在底層繪製陰影
+            if (enableShadow) {
+                ctx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity})`;
+                ctx.shadowBlur = shadowBlur;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 4;
+                ctx.drawImage(tempCanvas, 0, 0);
+                // 重置陰影以防干擾後續繪製
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+            }
+
+            // B. 若啟用白色描邊，繪製膨脹的白色底
+            if (enableOutline && outlineSize > 0) {
+                // 產生純白色的遮罩圖層
+                const maskCanvas = document.createElement('canvas');
+                maskCanvas.width = targetW;
+                maskCanvas.height = targetH;
+                const maskCtx = maskCanvas.getContext('2d');
+                maskCtx.drawImage(tempCanvas, 0, 0);
+                maskCtx.globalCompositeOperation = 'source-in';
+                maskCtx.fillStyle = outlineColor;
+                maskCtx.fillRect(0, 0, targetW, targetH);
+
+                // 使用 32 度角多向偏移法繪製平滑描邊
+                const steps = 32;
+                for (let i = 0; i < steps; i++) {
+                    const angle = (i / steps) * Math.PI * 2;
+                    const ox = Math.cos(angle) * outlineSize;
+                    const oy = Math.sin(angle) * outlineSize;
+                    ctx.drawImage(maskCanvas, ox, oy);
+                }
+            }
+
+            // C. 最後繪製主體
+            ctx.drawImage(tempCanvas, 0, 0);
+            ctx.restore();
+        }
+
+        // 渲染三種規格的預覽
+        function renderAllPreviews() {
+            if (!cropper || !editCanvas) return;
+
+            // 取得當前的裁剪範圍（相對於原始大圖像素）
+            const cropData = cropper.getData(true);
+            if (!cropData || cropData.width <= 0 || cropData.height <= 0) return;
+
+            // 建立一個臨時 Canvas，直接複製該裁剪區域的像素，這比 getCroppedCanvas() 快 1000 倍！
+            const tempSubject = document.createElement('canvas');
+            tempSubject.width = cropData.width;
+            tempSubject.height = cropData.height;
+            const tempSubCtx = tempSubject.getContext('2d');
+            
+            // 處理圓角遮罩
+            if (DOM.radiusEnable && DOM.radiusEnable.checked) {
+                const radiusPercent = parseInt(DOM.radiusSize.value) / 100;
+                const minDim = Math.min(cropData.width, cropData.height);
+                const r = minDim * radiusPercent;
+                
+                tempSubCtx.beginPath();
+                if (tempSubCtx.roundRect) {
+                    tempSubCtx.roundRect(0, 0, cropData.width, cropData.height, r);
+                } else {
+                    // Fallback for older browsers (though unlikely needed in modern envs)
+                    tempSubCtx.rect(0, 0, cropData.width, cropData.height);
+                }
+                tempSubCtx.clip();
+            }
+
+            tempSubCtx.drawImage(editCanvas, cropData.x, cropData.y, cropData.width, cropData.height, 0, 0, cropData.width, cropData.height);
+
+            lastCroppedCanvas = tempSubject;
+
+            // 讀取設定選項
+            const enableOutline = DOM.strokeEnable.checked;
+            const outlineSize = parseInt(DOM.strokeSize.value);
+            const outlineColor = DOM.strokeColor.value;
+
+            const enableShadow = DOM.shadowEnable.checked;
+            const shadowBlur = parseInt(DOM.shadowBlur.value);
+            const shadowOpacity = parseFloat(DOM.shadowOpacity.value);
+
+            // A. 貼圖 370 x 320 px (安全邊距：10px)
+            const ctxSticker = DOM.canvasSticker.getContext('2d');
+            renderSubjectWithOutline(
+                ctxSticker, tempSubject, 370, 320, 10,
+                enableOutline, outlineSize, outlineColor,
+                enableShadow, shadowBlur, shadowOpacity
+            );
+
+            // B. 主要圖片 240 x 240 px (安全邊距：10px)
+            const ctxMain = DOM.canvasMain.getContext('2d');
+            renderSubjectWithOutline(
+                ctxMain, tempSubject, 240, 240, 10,
+                enableOutline, outlineSize, outlineColor,
+                enableShadow, shadowBlur, shadowOpacity
+            );
+
+            // C. 標籤圖片 96 x 74 px (安全邊距：5px)
+            const ctxTab = DOM.canvasTab.getContext('2d');
+            renderSubjectWithOutline(
+                ctxTab, tempSubject, 96, 74, 5,
+                enableOutline, outlineSize, outlineColor,
+                enableShadow, shadowBlur, shadowOpacity
+            );
+        }
+
+        // 外部呼叫強制更新
+        function updateAllPreviews() {
+            if (cropper) {
+                renderAllPreviews();
+            }
+        }
+
+        // ════ 匯出存檔 ════
+
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        DOM.btnDlSticker.onclick = () => {
+            const filename = DOM.exportFilename.value.trim() || 'sticker';
+            downloadCanvas(DOM.canvasSticker, `${filename}.png`);
+        };
+
+        DOM.btnDlMain.onclick = () => {
+            downloadCanvas(DOM.canvasMain, 'main.png');
+        };
+
+        DOM.btnDlTab.onclick = () => {
+            downloadCanvas(DOM.canvasTab, 'tab.png');
+        };
+    });
+    </script>
+</body>
+</html>
