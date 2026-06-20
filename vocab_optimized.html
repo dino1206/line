@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>單字騎士團 - AI 升級版 v2026.06.20-ai-auto-proxy</title>
+    <title>單字騎士團 - AI 升級版 v2026.06.20-safe-image-proxy</title>
     <meta name="description" content="結合 RPG 戰鬥與 AI 技術的英文單字學習遊戲，讓背單字變成一場冒險！">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -273,7 +273,7 @@
                     <div class="text-left">
                         <h1 class="font-pixel text-base sm:text-lg text-amber-900 tracking-wider leading-relaxed">⚔️ 單字騎士團</h1>
                         <div class="mt-1 inline-flex items-center rounded-full bg-purple-100 border border-purple-200 px-2 py-0.5 text-[10px] font-black text-purple-700">
-                            v2026.06.20-ai-auto-proxy
+                            v2026.06.20-safe-image-proxy
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -870,6 +870,44 @@
             }
         }
 
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = () => reject(new Error("圖片讀取失敗，請換一張圖片試試。"));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function prepareImageForAI(file) {
+            const sourceDataUrl = await readFileAsDataURL(file);
+            const img = new Image();
+            img.decoding = 'async';
+
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = () => reject(new Error("圖片格式無法讀取，請改用 JPG 或 PNG。"));
+                img.src = sourceDataUrl;
+            });
+
+            const maxSide = 1600;
+            const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const safeDataUrl = canvas.toDataURL('image/jpeg', 0.86);
+            return {
+                mimeType: 'image/jpeg',
+                rawBase64: safeDataUrl.split(',')[1]
+            };
+        }
+
         window.handleAIImageUpload = (event) => {
             if (!apiKey && !geminiProxyUrl) {
                 document.getElementById('error-msg').innerText = "尚未載入 API Key！\n請確認 vocabapi.txt 存在，並使用本地伺服器(Local Server)執行網頁以支援讀取外部檔案。";
@@ -888,12 +926,9 @@
             document.getElementById('loading-desc').innerText = '這可能需要幾秒鐘，請施展耐心魔法！';
             window.showScreen('screen-loading');
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const fullBase64 = e.target.result;
-                const mimeType = fullBase64.split(';')[0].split(':')[1];
-                const rawBase64 = fullBase64.split(',')[1];
-                
+            (async () => {
+                const { rawBase64, mimeType } = await prepareImageForAI(file);
+
                 const aiCountSetting = document.getElementById('ai-challenge-count').value || 'auto';
                 const isAutoAIQuizCount = aiCountSetting === 'auto';
                 const aiTargetCount = isAutoAIQuizCount ? 80 : parseInt(aiCountSetting, 10);
@@ -956,8 +991,12 @@
                 }
                 
                 event.target.value = '';
-            };
-            reader.readAsDataURL(file);
+            })().catch(err => {
+                resetLoadingUI();
+                document.getElementById('error-msg').innerText = err.message || "圖片處理失敗，請換成 JPG 或 PNG 再試一次。";
+                window.showScreen('screen-error');
+                event.target.value = '';
+            });
         };
 
         function resetLoadingUI() {
