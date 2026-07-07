@@ -1332,6 +1332,8 @@
       <div class="magic-panel">
         <!-- 算式面板 -->
         <div class="formula-display">
+          <span class="f-start" id="game-formula-start" style="color: #f5a623;">0</span>
+          <span style="color: #64748b; font-size: 1.5rem; margin: 0 4px;">+</span>
           <span class="f-face" id="game-formula-face">+</span>
           <span class="parentheses">(</span>
           <span class="f-step" id="game-formula-step">+2</span>
@@ -1745,10 +1747,14 @@
     }
 
     function updateGameFormulaDisplay() {
+      const startSpan = document.getElementById('game-formula-start');
       const faceSpan = document.getElementById('game-formula-face');
       const stepSpan = document.getElementById('game-formula-step');
       const resultSpan = document.getElementById('game-formula-result');
 
+      if (startSpan) {
+        startSpan.innerText = currentPosition > 0 ? `+${currentPosition}` : currentPosition;
+      }
       faceSpan.innerText = gameState.face;
       stepSpan.innerText = gameState.step > 0 ? `+${gameState.step}` : gameState.step;
       resultSpan.innerText = '?';
@@ -1760,19 +1766,18 @@
       if (resetScore) {
         gameState.score = 0;
         document.getElementById('game-score').innerText = 0;
+        // 重新開始時才重置企鵝回原點 0
+        currentPosition = 0;
+        updatePenguinVisualPosition();
+        heroPenguin.classList.remove('facing-left');
+        heroPenguin.classList.remove('show-arrow');
       }
 
-      // 新題目開始時，立刻讓企鵝重置回原點 0，避免玩家誤會要從上一題的位置出發
-      currentPosition = 0;
-      updatePenguinVisualPosition();
-      heroPenguin.classList.remove('facing-left');
-      heroPenguin.classList.remove('show-arrow');
-
-      // 隨機產生一個目標點 (-5 到 5，但不等於 0)
+      // 隨機產生一個目標點，限制與目前位置的距離在 1 到 5 之間，確保現有步伐按鈕可解
       let target;
       do {
         target = Math.floor(Math.random() * (MAX_VAL - MIN_VAL + 1)) + MIN_VAL;
-      } while (target === 0 || target === currentPosition);
+      } while (target === 0 || target === currentPosition || Math.abs(target - currentPosition) > 5);
 
       gameState.targetPosition = target;
 
@@ -1784,8 +1789,9 @@
       fishTarget.style.opacity = '1';
 
       // 提示文字
+      const startSign = currentPosition > 0 ? `+${currentPosition}` : currentPosition;
       document.getElementById('game-prompt').innerHTML = `
-        🐟 小魚在 <b>${target > 0 ? '+' : ''}${target}</b>！請發射指令幫助小企鵝吃魚！
+        🐟 企鵝在 <b>${startSign}</b>，小魚在 <b>${target > 0 ? '+' : ''}${target}</b>！請發射指令吃魚！
       `;
 
       // 重設發射器狀態
@@ -1803,8 +1809,8 @@
       const launchBtn = document.getElementById('game-launch-btn');
       launchBtn.disabled = true;
 
-      // 1. 回歸原點，準備發射
-      await moveToPosition(0, false);
+      // 1. 保留原本的起點位置，不再強制回歸 0 點，直接從當前位置出發
+      const startPos = currentPosition;
 
       const logPanel = document.getElementById('game-step-log-panel');
       logPanel.classList.add('active');
@@ -1812,7 +1818,7 @@
 
       const face = gameState.face;
       const step = gameState.step;
-      const finalResult = (face === '+' ? 1 : -1) * step;
+      const finalResult = startPos + (face === '+' ? 1 : -1) * step;
 
       // 第一步：轉面向
       const step1 = document.createElement('div');
@@ -1850,7 +1856,7 @@
       const percentage = ((finalResult - MIN_VAL) / (MAX_VAL - MIN_VAL)) * 100;
       heroPenguin.style.left = `calc(${percentage}% - 35px)`;
 
-      showPathIndicator(0, finalResult);
+      showPathIndicator(startPos, finalResult);
 
       if (face === '-' && step < 0) {
         triggerBubble(`面向左，倒退走！<b>負負得正</b>，所以我是在往右走唷！`);
@@ -1882,9 +1888,10 @@
       const step3 = document.createElement('div');
       step3.className = 'log-item done';
 
+      const startSign = startPos > 0 ? `+${startPos}` : startPos;
       if (finalResult === gameState.targetPosition) {
         // 成功！
-        step3.innerHTML = `🎉 <b>成功吃到魚了！好棒！</b> 你的算式 <b>${face} ( ${step > 0 ? '+' : ''}${step} ) = ${finalResult > 0 ? '+' : ''}${finalResult}</b> 非常正確！`;
+        step3.innerHTML = `🎉 <b>成功吃到魚了！好棒！</b> 你的算式 <b>${startSign} + ${face} ( ${step > 0 ? '+' : ''}${step} ) = ${finalResult > 0 ? '+' : ''}${finalResult}</b> 非常正確！`;
         logPanel.appendChild(step3);
         
         triggerBubble("美味的小魚！我抓到了！🐟 Yummy!");
