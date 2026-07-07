@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小企鵝的數線大冒險！輕鬆學會正負數與負負得正</title>
+  <!-- 載入優雅字型 Outfit 與 Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <style>
+    /* -------------------------------------------------------------
+       1. 全域變數與 Reset
+       ------------------------------------------------------------- */
+    :root {
+      --bg-gradient: linear-gradient(135deg, hsl(35, 100%, 98%) 0%, hsl(20, 100%, 94%) 100%);
+      --text-dark: hsl(215, 30%, 18%);
+      --text-light: hsl(215, 20%, 95%);
+      --card-bg: rgba(255, 255, 255, 0.75);
+      --card-border: 1px solid rgba(255, 255, 255, 0.5);
+      --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.04);
+      --shadow-premium: 0 20px 40px rgba(31, 38, 135, 0.07);
+      
+      --color-positive: hsl(145, 55%, 43%);
+      --color-positive-bg: hsl(145, 65%, 93%);
+      --color-negative: hsl(355, 75%, 58%);
+      --color-negative-bg: hsl(355, 85%, 94%);
+      --color-zero: hsl(42, 100%, 53%);
+      --color-zero-bg: hsl(42, 100%, 92%);
+      
+      --accent-blue: #4a90e2;
+      --accent-purple: #9b59b6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', 'Noto Sans TC', sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+
+    /* -------------------------------------------------------------
+       2. 頁面標題與佈局
+       ------------------------------------------------------------- */
+    header {
+      text-align: center;
+      margin-bottom: 25px;
+      margin-top: 10px;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: var(--text-dark);
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    h1 span.logo-emoji {
+      animation: float 3s ease-in-out infinite;
+      display: inline-block;
+    }
+
+    p.subtitle {
+      font-size: 1.1rem;
+      color: hsl(215, 20%, 45%);
+    }
+
+    main {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+
+    /* -------------------------------------------------------------
+       3. 導覽分頁 (Tabs)
+       ------------------------------------------------------------- */
+    .tabs-container {
+      display: flex;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.4);
+      padding: 6px;
+      border-radius: 50px;
+      border: var(--card-border);
+      box-shadow: var(--shadow-soft);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    .tab-btn {
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      color: hsl(215, 15%, 45%);
+      background: transparent;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 40px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-dark);
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .tab-btn.active {
+      background: var(--text-dark);
+      color: white;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    }
+
+    /* -------------------------------------------------------------
+       4. 共用卡片結構
+       ------------------------------------------------------------- */
+    .card {
+      background: var(--card-bg);
+      border: var(--card-border);
+      border-radius: 24px;
+      padding: 30px;
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-premium);
+      display: none;
+      flex-direction: column;
+      gap: 25px;
+      transition: all 0.3s ease;
+    }
+
+    .card.active {
+      display: flex;
+    }
+
+    .section-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--text-dark);
+      border-left: 5px solid var(--text-dark);
+      padding-left: 12px;
+      line-height: 1.2;
+    }
+
+    /* -------------------------------------------------------------
+       5. 企鵝角色設計 (純 CSS)
+       ------------------------------------------------------------- */
+    .penguin {
+      position: absolute;
+      bottom: 24px; /* 數線正上方 */
+      width: 70px;
+      height: 85px;
+      transform-origin: bottom center;
+      transition: left 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.4s ease-in-out;
+      z-index: 10;
+    }
+
+    /* 面向左邊的類別 */
+    .penguin.facing-left .penguin-body-wrapper {
+      transform: scaleX(-1);
+    }
+
+    .penguin-body-wrapper {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transition: transform 0.4s ease-in-out;
+    }
+
+    .penguin-body {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #2c3e50;
+      border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+
+    .penguin-belly {
+      position: absolute;
+      bottom: 5px;
+      left: 10%;
+      width: 80%;
+      height: 68%;
+      background: #ffffff;
+      border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+    }
+
+    .penguin-eye {
+      position: absolute;
+      top: 22%;
+      width: 11px;
+      height: 11px;
+      background: #000;
+      border-radius: 50%;
+    }
+
+    .penguin-eye.left { left: 24%; }
+    .penguin-eye.right { right: 24%; }
+
+    .penguin-eye::after {
+      content: '';
+      position: absolute;
+      top: 1.5px;
+      left: 1.5px;
+      width: 4px;
+      height: 4px;
+      background: #fff;
+      border-radius: 50%;
+    }
+
+    /* 腮紅，顯得可愛 */
+    .penguin-blush {
+      position: absolute;
+      top: 32%;
+      width: 8px;
+      height: 5px;
+      background: #ff7675;
+      border-radius: 50%;
+      opacity: 0.7;
+    }
+    .penguin-blush.left { left: 16%; }
+    .penguin-blush.right { right: 16%; }
+
+    /* 企鵝嘴巴 - 朝右的三角形/水滴形 */
+    .penguin-beak {
+      position: absolute;
+      top: 28%;
+      left: 45%;
+      width: 15px;
+      height: 12px;
+      background: #fdcb6e;
+      border-radius: 30% 70% 70% 30% / 50% 50% 50% 50%;
+      transform-origin: left center;
+      transition: transform 0.2s ease;
+    }
+
+    .penguin-wing {
+      position: absolute;
+      top: 35%;
+      width: 15px;
+      height: 38px;
+      background: #1e272e;
+      border-radius: 50%;
+      transform-origin: top center;
+      transition: transform 0.3s ease;
+    }
+
+    .penguin-wing.left {
+      left: -9px;
+      transform: rotate(25deg);
+      z-index: -1;
+    }
+
+    .penguin-wing.right {
+      right: -9px;
+      transform: rotate(-25deg);
+    }
+
+    .penguin-foot {
+      position: absolute;
+      bottom: -6px;
+      width: 22px;
+      height: 12px;
+      background: #e1b12c;
+      border-radius: 12px 12px 4px 4px;
+      z-index: -1;
+    }
+
+    .penguin-foot.left { left: 12%; transform: rotate(10deg); }
+    .penguin-foot.right { right: 12%; transform: rotate(-10deg); }
+
+    /* 走路/滑行動態樣式 */
+    .penguin.walking {
+      animation: walk-bounce 0.4s infinite ease-in-out;
+    }
+
+    .penguin.walking .penguin-wing.right {
+      animation: wing-flap-r 0.4s infinite ease-in-out;
+    }
+    .penguin.walking .penguin-wing.left {
+      animation: wing-flap-l 0.4s infinite ease-in-out;
+    }
+
+    @keyframes walk-bounce {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-8px) rotate(4deg); }
+    }
+    @keyframes wing-flap-r {
+      0%, 100% { transform: rotate(-25deg); }
+      50% { transform: rotate(-60deg); }
+    }
+    @keyframes wing-flap-l {
+      0%, 100% { transform: rotate(25deg); }
+      50% { transform: rotate(60deg); }
+    }
+
+    /* -------------------------------------------------------------
+       6. 數線系統
+       ------------------------------------------------------------- */
+    .adventure-zone {
+      position: relative;
+      height: 190px;
+      width: 100%;
+      margin-top: 20px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.45);
+      border: 1px dashed rgba(0, 0, 0, 0.08);
+      display: flex;
+      align-items: flex-end;
+      padding-bottom: 20px;
+    }
+
+    .number-line-wrapper {
+      position: relative;
+      width: 90%;
+      margin: 0 auto;
+      height: 40px;
+    }
+
+    /* 數線骨架 */
+    .line-bar {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 8px;
+      background: linear-gradient(to right, var(--color-negative) 0%, #cbd5e1 50%, var(--color-positive) 100%);
+      transform: translateY(-50%);
+      border-radius: 10px;
+    }
+
+    /* 刻度與數字 */
+    .ticks-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .tick {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 18px;
+      height: 18px;
+      background: #ffffff;
+      border: 3.5px solid #94a3b8;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .tick:hover, .tick.active {
+      width: 26px;
+      height: 26px;
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .tick.pos {
+      border-color: var(--color-positive);
+    }
+
+    .tick.neg {
+      border-color: var(--color-negative);
+    }
+
+    .tick.zero {
+      border-color: var(--color-zero);
+      width: 22px;
+      height: 22px;
+    }
+
+    .tick.zero:hover, .tick.zero.active {
+      width: 28px;
+      height: 28px;
+    }
+
+    .tick-label {
+      position: absolute;
+      top: 26px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 15px;
+      font-weight: 800;
+      color: hsl(215, 20%, 35%);
+      transition: color 0.3s ease, font-size 0.3s ease;
+      user-select: none;
+    }
+
+    .tick.active .tick-label {
+      color: var(--text-dark);
+      font-size: 18px;
+    }
+
+    /* 移動路徑指示線 */
+    .path-indicator {
+      position: absolute;
+      top: 50%;
+      height: 4px;
+      background: repeating-linear-gradient(
+        45deg,
+        var(--text-dark),
+        var(--text-dark) 8px,
+        transparent 8px,
+        transparent 16px
+      );
+      transform: translateY(-50%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* -------------------------------------------------------------
+       7. 对话解说泡泡 (Bubble)
+       ------------------------------------------------------------- */
+    .dialogue-bubble {
+      position: absolute;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.9);
+      background: white;
+      border: 2px solid var(--text-dark);
+      border-radius: 20px;
+      padding: 12px 20px;
+      max-width: 320px;
+      width: max-content;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 15;
+      text-align: center;
+    }
+
+    .dialogue-bubble.active {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+
+    .dialogue-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 12px 10px 0;
+      border-style: solid;
+      border-color: white transparent;
+      display: block;
+      width: 0;
+      z-index: 10;
+    }
+
+    .dialogue-bubble::before {
+      content: '';
+      position: absolute;
+      bottom: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 14px 12px 0;
+      border-style: solid;
+      border-color: var(--text-dark) transparent;
+      display: block;
+      width: 0;
+      z-index: 9;
+    }
+
+    .bubble-text {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    /* -------------------------------------------------------------
+       8. 教學區與按鈕互動 (單元一與二)
+       ------------------------------------------------------------- */
+    .explain-card {
+      background: white;
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    @media (max-width: 600px) {
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .info-box {
+      padding: 16px;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .info-box.pos {
+      background: var(--color-positive-bg);
+      border-left: 5px solid var(--color-positive);
+    }
+
+    .info-box.neg {
+      background: var(--color-negative-bg);
+      border-left: 5px solid var(--color-negative);
+    }
+
+    .info-box h3 {
+      font-size: 1.1rem;
+      font-weight: 800;
+    }
+
+    .info-box p {
+      font-size: 0.95rem;
+      line-height: 1.4;
+      color: hsl(215, 20%, 35%);
+    }
+
+    /* -------------------------------------------------------------
+       9. 魔法指令發射器 UI
+       ------------------------------------------------------------- */
+    .magic-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    /* 算式大看板 */
+    .formula-display {
+      font-size: 2.2rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f8fafc;
+      padding: 15px 35px;
+      border-radius: 50px;
+      border: 2px solid #e2e8f0;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.02);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .formula-display span {
+      display: inline-block;
+      transition: all 0.3s ease;
+      min-width: 40px;
+      text-align: center;
+    }
+
+    .f-face { color: var(--accent-blue); }
+    .f-step { color: var(--accent-purple); }
+    .f-result { color: var(--text-dark); font-weight: 900; }
+
+    .formula-display .parentheses {
+      color: #94a3b8;
+    }
+
+    /* 控制面板 */
+    .control-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 25px;
+      width: 100%;
+    }
+
+    .control-group {
+      background: white;
+      border-radius: 16px;
+      padding: 15px 20px;
+      border: 1px solid rgba(0,0,0,0.06);
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 250px;
+    }
+
+    .group-label {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: hsl(215, 15%, 45%);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-wrap {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* 按鈕樣式 */
+    .action-btn {
+      font-family: inherit;
+      font-size: 1.1rem;
+      font-weight: 800;
+      border: 2.5px solid transparent;
+      padding: 10px 18px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      background: #f1f5f9;
+      color: var(--text-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-2px);
+      background: #e2e8f0;
+    }
+
+    /* 狀態選取色 */
+    .btn-face-plus.active {
+      background: var(--color-positive-bg);
+      border-color: var(--color-positive);
+      color: var(--color-positive);
+    }
+
+    .btn-face-minus.active {
+      background: var(--color-negative-bg);
+      border-color: var(--color-negative);
+      color: var(--color-negative);
+    }
+
+    .btn-step.active {
+      background: hsl(265, 80%, 95%);
+      border-color: var(--accent-purple);
+      color: var(--accent-purple);
+    }
+
+    /* 發射按鈕 */
+    .launch-btn {
+      font-family: inherit;
+      font-size: 1.2rem;
+      font-weight: 800;
+      background: var(--text-dark);
+      color: white;
+      border: none;
+      padding: 12px 35px;
+      border-radius: 50px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      transition: all 0.3s ease;
+    }
+
+    .launch-btn:hover {
+      background: #1e272e;
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    }
+
+    .launch-btn:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* -------------------------------------------------------------
+       10. 拯救小魚關卡專用樣式
+       ------------------------------------------------------------- */
+    .game-status-board {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f8fafc;
+      padding: 15px 25px;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .score-badge {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--text-dark);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .score-num {
+      background: var(--color-zero-bg);
+      color: hsl(42, 100%, 40%);
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .game-instruction {
+      font-size: 1.2rem;
+      font-weight: 800;
+      text-align: center;
+      color: var(--text-dark);
+      background: white;
+      padding: 15px;
+      border-radius: 14px;
+      border: 1.5px solid #e2e8f0;
+      box-shadow: var(--shadow-soft);
+    }
+
+    /* 浮動小魚 */
+    .fish-target {
+      position: absolute;
+      bottom: 24px;
+      width: 45px;
+      height: 40px;
+      z-index: 8;
+      transition: left 0.5s ease-in-out, opacity 0.3s ease;
+      animation: float-fish 2s ease-in-out infinite;
+      cursor: pointer;
+    }
+
+    @keyframes float-fish {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-6px) rotate(5deg); }
+    }
+
+    /* -------------------------------------------------------------
+       11. 動畫與通用類別
+       ------------------------------------------------------------- */
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+
+    /* Canvas 紙屑發射器全螢幕覆蓋 */
+    #confetti-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* 移動說明面板的腳本導覽 */
+    .step-log-panel {
+      background: #f8fafc;
+      border-radius: 14px;
+      padding: 15px;
+      border: 1px solid #e2e8f0;
+      max-height: 150px;
+      overflow-y: auto;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .step-log-panel.active {
+      display: flex;
+    }
+
+    .log-item {
+      font-size: 0.95rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .log-item.done { color: var(--color-positive); }
+    .log-item.waiting { color: hsl(215, 15%, 55%); }
+
+    /* 重玩按鈕 */
+    .reset-btn {
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      background: transparent;
+      border: 2px solid var(--text-dark);
+      padding: 6px 16px;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .reset-btn:hover {
+      background: var(--text-dark);
+      color: white;
+    }
+
+    /* 面向提示箭頭 */
+    .direction-arrow {
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 20px;
+      color: var(--accent-blue);
+      animation: bounce-arrow 1s infinite alternate;
+      pointer-events: none;
+      display: none;
+    }
+
+    @keyframes bounce-arrow {
+      0% { transform: translate(-50%, 0); }
+      100% { transform: translate(-50%, -6px); }
+    }
+
+    .penguin.show-arrow .direction-arrow {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 過關慶祝 Canvas 紙屑特效 -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <header>
+    <h1><span class="logo-emoji">🐧</span> 小企鵝的數線大冒險！</h1>
+    <p class="subtitle">拉動數線，或是利用魔法指令，和企鵝一起玩轉正負數與「負負得正」！</p>
+  </header>
+
+  <main>
+    <!-- 分頁導覽 -->
+    <div class="tabs-container">
+      <button class="tab-btn active" onclick="switchTab('explore')">🔍 數線探索</button>
+      <button class="tab-btn" onclick="switchTab('magic')">⚡ 魔法指令發射器</button>
+      <button class="tab-btn" onclick="switchTab('game')">🎯 拯救小魚挑戰</button>
+    </div>
+
+    <!-- 共用冒險區域 (數線與企鵝) -->
+    <div class="adventure-zone" id="adventure-zone">
+      <!-- 對話泡泡 -->
+      <div class="dialogue-bubble" id="dialogue-bubble">
+        <span class="bubble-text" id="bubble-text">哈囉！我是小企鵝，點擊數線讓我滑過去吧！</span>
+      </div>
+
+      <!-- 企鵝角色 -->
+      <div class="penguin" id="hero-penguin">
+        <div class="direction-arrow" id="dir-arrow">👇</div>
+        <div class="penguin-body-wrapper">
+          <div class="penguin-body">
+            <div class="penguin-eye left"></div>
+            <div class="penguin-eye right"></div>
+            <div class="penguin-blush left"></div>
+            <div class="penguin-blush right"></div>
+            <div class="penguin-beak"></div>
+            <div class="penguin-belly"></div>
+            <div class="penguin-wing left"></div>
+            <div class="penguin-wing right"></div>
+          </div>
+          <div class="penguin-foot left"></div>
+          <div class="penguin-foot right"></div>
+        </div>
+      </div>
+
+      <!-- 目標小魚 (只在遊戲單元顯示) -->
+      <div class="fish-target" id="fish-target" style="display: none; left: 0%;">
+        <!-- SVG 可愛小橘魚 -->
+        <svg viewBox="0 0 100 80" width="100%" height="100%">
+          <!-- 尾巴 -->
+          <polygon points="10,40 35,20 35,60" fill="#ff7f50" />
+          <!-- 身體 -->
+          <ellipse cx="60" cy="40" rx="30" ry="22" fill="#ff7f50" />
+          <!-- 肚白 -->
+          <ellipse cx="58" cy="48" rx="15" ry="8" fill="#ffa07a" />
+          <!-- 眼睛 -->
+          <circle cx="75" cy="34" r="5" fill="#fff" />
+          <circle cx="76" cy="34" r="2.5" fill="#000" />
+          <!-- 魚鰭 -->
+          <path d="M50,18 Q40,5 35,18 Z" fill="#ff6347" />
+          <path d="M50,62 Q40,75 35,62 Z" fill="#ff6347" />
+        </svg>
+      </div>
+
+      <!-- 數線 -->
+      <div class="number-line-wrapper">
+        <div class="line-bar"></div>
+        <!-- 動態路徑指示線 -->
+        <div class="path-indicator" id="path-indicator"></div>
+        <div class="ticks-container" id="ticks-container">
+          <!-- 刻度會由 JavaScript 自動生成 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- -------------------------------------------------------------
+         單元一：數線探索 (卡片)
+         ------------------------------------------------------------- -->
+    <div class="card active" id="card-explore">
+      <h2 class="section-title">點擊數線探險</h2>
+      <p class="subtitle" style="font-size: 1rem; margin-top: -15px;">點選下方數線上任何刻度，觀察企鵝的滑行，認識正數與負數的起點！</p>
+      
+      <div class="explain-card">
+        <div class="info-grid">
+          <div class="info-box pos">
+            <h3>🟢 正數的觀念</h3>
+            <p>在起點「0」的<strong>右邊</strong>。我們可以用正號「+」來表示，數字越大，代表越往右邊。例如 <strong>+3</strong> 代表在 0 的右邊 3 步！</p>
+          </div>
+          <div class="info-box neg">
+            <h3>🔴 負數的觀念</h3>
+            <p>在起點「0」的<strong>左邊</strong>。我們用負號「-」來表示，代表在 0 的左邊。例如 <strong>-2</strong> 代表在 0 的左邊 2 步！</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- -------------------------------------------------------------
+         單元二：魔法指令發射器 (卡片)
+         ------------------------------------------------------------- -->
+    <div class="card" id="card-magic">
+      <h2 class="section-title">魔法指令發射器</h2>
+      <p class="subtitle" style="font-size: 1rem; margin-top: -15px;">組合「面向」與「步伐」按鈕，發射指令給小企鵝，解開「負負得正」的秘密！</p>
+
+      <div class="magic-panel">
+        <!-- 算式面板 -->
+        <div class="formula-display">
+          <span class="f-face" id="formula-face">+</span>
+          <span class="parentheses">(</span>
+          <span class="f-step" id="formula-step">+2</span>
+          <span class="parentheses">)</span>
+          <span>=</span>
+          <span class="f-result" id="formula-result">?</span>
+        </div>
+
+        <!-- 步驟執行記錄面板 -->
+        <div class="step-log-panel" id="step-log-panel">
+          <!-- 動態生成步驟 -->
+        </div>
+
+        <!-- 控制按鈕組 -->
+        <div class="control-row">
+          <!-- 1. 決定面向 -->
+          <div class="control-group">
+            <span class="group-label">👈 決定面向 👉</span>
+            <div class="btn-wrap">
+              <button class="action-btn btn-face-plus active" id="btn-face-plus" onclick="setFace('+')">
+                ➕ 面向右 (正)
+              </button>
+              <button class="action-btn btn-face-minus" id="btn-face-minus" onclick="setFace('-')">
+                ➖ 面向左 (負)
+              </button>
+            </div>
+            <p style="font-size: 0.85rem; color: #64748b; text-align: center; line-height: 1.3;">
+              正號代表面向正數（右邊）<br>負號代表面向負數（左邊）
+            </p>
+          </div>
+
+          <!-- 2. 決定步伐 -->
+          <div class="control-group">
+            <span class="group-label">🚶 決定步伐 (前進 / 後退) 🚶</span>
+            <div class="btn-wrap" style="flex-wrap: wrap;">
+              <button class="action-btn btn-step" onclick="setStep(-3)">🐾 後退 3 (-3)</button>
+              <button class="action-btn btn-step" onclick="setStep(-2)">🐾 後退 2 (-2)</button>
+              <button class="action-btn btn-step" onclick="setStep(-1)">🐾 後退 1 (-1)</button>
+              <button class="action-btn btn-step active" id="default-step-btn" onclick="setStep(2)">🐾 前進 2 (+2)</button>
+              <button class="action-btn btn-step" onclick="setStep(1)">🐾 前進 1 (+1)</button>
+              <button class="action-btn btn-step" onclick="setStep(3)">🐾 前進 3 (+3)</button>
+            </div>
+            <p style="font-size: 0.85rem; color: #64748b; text-align: center; line-height: 1.3;">
+              正數步伐代表「向前走」！<br>負數步伐代表「倒退走（倒退嚕）」！
+            </p>
+          </div>
+        </div>
+
+        <button class="launch-btn" id="launch-btn" onclick="executeMagicCommand()">
+          🚀 發射魔法指令！
+        </button>
+      </div>
+    </div>
+
+    <!-- -------------------------------------------------------------
+         單元三：拯救小魚挑戰 (卡片)
+         ------------------------------------------------------------- -->
+    <div class="card" id="game-card">
+      <div class="game-status-board">
+        <h2 class="section-title" style="margin: 0;">拯救小魚大挑戰</h2>
+        <div class="score-badge">
+          得分: <span class="score-num" id="game-score">0</span>
+        </div>
+        <button class="reset-btn" onclick="nextQuestion(true)">重新開始</button>
+      </div>
+
+      <div class="game-instruction" id="game-prompt">
+        小企鵝肚子餓了！小魚在 <b>-3</b> 的位置。請用魔法指令送企鵝去吃魚！
+      </div>
+
+      <div class="magic-panel">
+        <!-- 算式面板 -->
+        <div class="formula-display">
+          <span class="f-face" id="game-formula-face">+</span>
+          <span class="parentheses">(</span>
+          <span class="f-step" id="game-formula-step">+2</span>
+          <span class="parentheses">)</span>
+          <span>=</span>
+          <span class="f-result" id="game-formula-result">?</span>
+        </div>
+
+        <!-- 步驟執行記錄面板 -->
+        <div class="step-log-panel" id="game-step-log-panel"></div>
+
+        <!-- 控制按鈕組 -->
+        <div class="control-row">
+          <!-- 1. 決定面向 -->
+          <div class="control-group">
+            <span class="group-label">👈 決定面向 👉</span>
+            <div class="btn-wrap">
+              <button class="action-btn btn-face-plus active" id="game-btn-face-plus" onclick="setGameFace('+')">
+                ➕ 面向右 (正)
+              </button>
+              <button class="action-btn btn-face-minus" id="game-btn-face-minus" onclick="setGameFace('-')">
+                ➖ 面向左 (負)
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. 決定步伐 -->
+          <div class="control-group">
+            <span class="group-label">🚶 決定步伐 (前進 / 後退) 🚶</span>
+            <div class="btn-wrap" style="flex-wrap: wrap;">
+              <button class="action-btn btn-step" id="game-step-btn-m3" onclick="setGameStep(-3)">🐾 後退 3 (-3)</button>
+              <button class="action-btn btn-step" id="game-step-btn-m2" onclick="setGameStep(-2)">🐾 後退 2 (-2)</button>
+              <button class="action-btn btn-step" id="game-step-btn-m1" onclick="setGameStep(-1)">🐾 後退 1 (-1)</button>
+              <button class="action-btn btn-step active" id="game-step-btn-p2" onclick="setGameStep(2)">🐾 前進 2 (+2)</button>
+              <button class="action-btn btn-step" id="game-step-btn-p1" onclick="setGameStep(1)">🐾 前進 1 (+1)</button>
+              <button class="action-btn btn-step" id="game-step-btn-p3" onclick="setGameStep(3)">🐾 前進 3 (+3)</button>
+            </div>
+          </div>
+        </div>
+
+        <button class="launch-btn" id="game-launch-btn" onclick="executeGameCommand()">
+          🐟 送出指令，出發吃魚！
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- -------------------------------------------------------------
+       JavaScript 邏輯控制
+       ------------------------------------------------------------- -->
+  <script>
+    // -------------------------------------------------------------
+    // A. 基礎狀態配置
+    // -------------------------------------------------------------
+    const MIN_VAL = -5;
+    const MAX_VAL = 5;
+    let currentPosition = 0; // 企鵝目前的數線位置
+    let isMoving = false;    // 企鵝是否正在移動中
+    let activeTab = 'explore';
+
+    // 魔法指令發射器狀態
+    let magicState = {
+      face: '+',  // '+' 或 '-'
+      step: 2,    // 整數 -3 到 3 (不為 0)
+    };
+
+    // 遊戲模式狀態
+    let gameState = {
+      targetPosition: 0,
+      score: 0,
+      face: '+',
+      step: 2,
+    };
+
+    // -------------------------------------------------------------
+    // B. 初始化數線與刻度
+    // -------------------------------------------------------------
+    const ticksContainer = document.getElementById('ticks-container');
+    const heroPenguin = document.getElementById('hero-penguin');
+    const dialogueBubble = document.getElementById('dialogue-bubble');
+    const bubbleText = document.getElementById('bubble-text');
+
+    function initNumberLine() {
+      ticksContainer.innerHTML = '';
+      for (let i = MIN_VAL; i <= MAX_VAL; i++) {
+        const tick = document.createElement('div');
+        tick.className = 'tick';
+        
+        // 依照正負零套用不同樣式
+        if (i > 0) tick.classList.add('pos');
+        else if (i < 0) tick.classList.add('neg');
+        else tick.classList.add('zero');
+        
+        // 計算百分比定位 (從 0% 到 100%)
+        const percentage = ((i - MIN_VAL) / (MAX_VAL - MIN_VAL)) * 100;
+        tick.style.left = `${percentage}%`;
+        tick.id = `tick-${i}`;
+
+        // 標記數字
+        const label = document.createElement('span');
+        label.className = 'tick-label';
+        label.innerText = i > 0 ? `+${i}` : i;
+        tick.appendChild(label);
+
+        // 單元一（數線探索）點擊事件
+        tick.addEventListener('click', () => {
+          if (activeTab === 'explore' && !isMoving) {
+            moveToPosition(i, true);
+          }
+        });
+
+        ticksContainer.appendChild(tick);
+      }
+      // 將企鵝放在 0 的位置
+      updatePenguinVisualPosition();
+    }
+
+    // 更新企鵝在畫面上的 left 百分比與狀態
+    function updatePenguinVisualPosition() {
+      const percentage = ((currentPosition - MIN_VAL) / (MAX_VAL - MIN_VAL)) * 100;
+      // 由於企鵝寬度是 70px，置中對齊刻度
+      heroPenguin.style.left = `calc(${percentage}% - 35px)`;
+      
+      // 更新刻度 active 狀態
+      for (let i = MIN_VAL; i <= MAX_VAL; i++) {
+        const t = document.getElementById(`tick-${i}`);
+        if (t) {
+          if (i === currentPosition) t.classList.add('active');
+          else t.classList.remove('active');
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
+    // C. 企鵝移動核心控制 (含動畫與氣泡說明)
+    // -------------------------------------------------------------
+    function moveToPosition(targetPos, showDialogue = false, customDescription = '') {
+      if (isMoving) return Promise.resolve();
+      isMoving = true;
+      heroPenguin.classList.add('walking');
+      
+      const startPos = currentPosition;
+      
+      // 動態更新路徑指示線
+      showPathIndicator(startPos, targetPos);
+
+      // 設定企鵝轉向（若往右走面朝右，往左走面朝左）
+      // 僅在自由探索模式時採用方向自適應；魔法模式時由指令決定面朝向
+      if (activeTab === 'explore') {
+        if (targetPos > startPos) {
+          heroPenguin.classList.remove('facing-left');
+        } else if (targetPos < startPos) {
+          heroPenguin.classList.add('facing-left');
+        }
+      }
+
+      currentPosition = targetPos;
+      updatePenguinVisualPosition();
+
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          heroPenguin.classList.remove('walking');
+          hidePathIndicator();
+          isMoving = false;
+
+          if (showDialogue) {
+            let desc = customDescription;
+            if (!desc) {
+              if (targetPos === 0) {
+                desc = "我回到了原點 0 囉！";
+              } else if (targetPos > 0) {
+                desc = `我來到了正數區的 <b>+${targetPos}</b>！從 0 往右走 ${targetPos} 步。`;
+              } else {
+                desc = `我來到了負數區的 <b>${targetPos}</b>！從 0 往左走 ${Math.abs(targetPos)} 步。`;
+              }
+            }
+            triggerBubble(desc);
+          }
+          resolve();
+        }, 800); // 與 CSS transition 的 0.8s 同步
+      });
+    }
+
+    // 顯示兩點之間的移動虛線
+    function showPathIndicator(from, to) {
+      const pathIndicator = document.getElementById('path-indicator');
+      const fromPercent = ((from - MIN_VAL) / (MAX_VAL - MIN_VAL)) * 100;
+      const toPercent = ((to - MIN_VAL) / (MAX_VAL - MIN_VAL)) * 100;
+      
+      const left = Math.min(fromPercent, toPercent);
+      const width = Math.abs(fromPercent - toPercent);
+      
+      pathIndicator.style.left = `${left}%`;
+      pathIndicator.style.width = `${width}%`;
+      pathIndicator.style.opacity = '0.7';
+    }
+
+    function hidePathIndicator() {
+      document.getElementById('path-indicator').style.opacity = '0';
+    }
+
+    // 觸發對話氣泡
+    function triggerBubble(text) {
+      bubbleText.innerHTML = text;
+      dialogueBubble.classList.add('active');
+      
+      // 4 秒後自動隱藏
+      if (window.bubbleTimeout) clearTimeout(window.bubbleTimeout);
+      window.bubbleTimeout = setTimeout(() => {
+        dialogueBubble.classList.remove('active');
+      }, 4500);
+    }
+
+    // -------------------------------------------------------------
+    // D. 分頁切換
+    // -------------------------------------------------------------
+    function switchTab(tabName) {
+      if (isMoving) return; // 移動中不給切換
+      activeTab = tabName;
+
+      // 更新 Tab 按鈕樣式
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      const activeIndex = tabName === 'explore' ? 0 : tabName === 'magic' ? 1 : 2;
+      document.querySelectorAll('.tab-btn')[activeIndex].classList.add('active');
+
+      // 更新卡片顯示
+      document.querySelectorAll('.card').forEach(card => card.classList.remove('active'));
+      if (tabName === 'explore') {
+        document.getElementById('card-explore').classList.add('active');
+        document.getElementById('fish-target').style.display = 'none';
+        heroPenguin.classList.remove('show-arrow');
+        moveToPosition(0, true, "開始探索數線吧！點擊任何數字試試看！");
+      } else if (tabName === 'magic') {
+        document.getElementById('card-magic').classList.add('active');
+        document.getElementById('fish-target').style.display = 'none';
+        heroPenguin.classList.remove('show-arrow');
+        moveToPosition(0, true, "進入魔法發射器！組合下方的按鈕，看我如何出發！");
+        updateFormulaDisplay();
+      } else if (tabName === 'game') {
+        document.getElementById('game-card').classList.add('active');
+        document.getElementById('fish-target').style.display = 'block';
+        heroPenguin.classList.remove('show-arrow');
+        nextQuestion();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // E. 魔法指令發射器邏輯
+    // -------------------------------------------------------------
+    function setFace(faceSign) {
+      magicState.face = faceSign;
+      document.getElementById('btn-face-plus').classList.toggle('active', faceSign === '+');
+      document.getElementById('btn-face-minus').classList.toggle('active', faceSign === '-');
+      updateFormulaDisplay();
+    }
+
+    function setStep(stepVal) {
+      magicState.step = stepVal;
+      // 移除同組其他按鈕的 active
+      const buttons = document.querySelectorAll('#card-magic .btn-step');
+      buttons.forEach(btn => {
+        const val = parseInt(btn.innerText.match(/-?\d+/)[0]);
+        btn.classList.toggle('active', val === stepVal);
+      });
+      updateFormulaDisplay();
+    }
+
+    function updateFormulaDisplay() {
+      const faceSpan = document.getElementById('formula-face');
+      const stepSpan = document.getElementById('formula-step');
+      const resultSpan = document.getElementById('formula-result');
+
+      faceSpan.innerText = magicState.face;
+      stepSpan.innerText = magicState.step > 0 ? `+${magicState.step}` : magicState.step;
+      resultSpan.innerText = '?';
+      resultSpan.className = 'f-result';
+    }
+
+    // 執行魔法指令 (展示動畫流程)
+    async function executeMagicCommand() {
+      if (isMoving) return;
+      
+      const launchBtn = document.getElementById('launch-btn');
+      launchBtn.disabled = true;
+
+      // 1. 回歸原點，準備發射
+      await moveToPosition(0, false);
+      
+      const logPanel = document.getElementById('step-log-panel');
+      logPanel.classList.add('active');
+      logPanel.innerHTML = '';
+
+      // 算式拆解
+      const face = magicState.face; // '+' or '-'
+      const step = magicState.step; // 數字 (正或負)
+      const finalResult = (face === '+' ? 1 : -1) * step;
+
+      // 第一步：調整面向
+      const step1 = document.createElement('div');
+      step1.className = 'log-item waiting';
+      step1.innerHTML = `<span>1️⃣ 調整面向：</span> 面向符號是 <b>${face === '+' ? '正號 (+)' : '負號 (-)'}</b>...`;
+      logPanel.appendChild(step1);
+
+      await sleep(600);
+      step1.className = 'log-item done';
+      if (face === '+') {
+        heroPenguin.classList.remove('facing-left');
+        step1.innerHTML += ` 👉 <b>面向右邊（正方向）</b>！`;
+      } else {
+        heroPenguin.classList.add('facing-left');
+        step1.innerHTML += ` 👈 <b>面向左邊（負方向）</b>！`;
+      }
+      heroPenguin.classList.add('show-arrow'); // 秀出指向箭頭
+      triggerBubble(`呼！我轉身朝向<b>${face === '+' ? '右邊' : '左邊'}</b>囉！`);
+
+      await sleep(1200);
+
+      // 第二步：行走步數（前進或後退）
+      const step2 = document.createElement('div');
+      step2.className = 'log-item waiting';
+      const walkType = step > 0 ? '前進' : '後退 (倒退嚕)';
+      step2.innerHTML = `<span>2️⃣ 開始移動：</span> 步伐是 <b>${step > 0 ? '+' : ''}${step}</b>，代表要 <b>${walkType} ${Math.abs(step)} 步</b>...`;
+      logPanel.appendChild(step2);
+
+      await sleep(800);
+      
+      // 開始走路
+      isMoving = true;
+      heroPenguin.classList.add('walking');
+      heroPenguin.style.transition = 'left 2s ease-in-out'; // 行走時間拉長到 2 秒，感覺是在一步步走
+      
+      const percentage = ((finalResult - MIN_VAL) / (MAX_VAL - MIN_VAL)) * 100;
+      heroPenguin.style.left = `calc(${percentage}% - 35px)`;
+
+      // 在數線上動態描繪路徑
+      showPathIndicator(0, finalResult);
+
+      // 產生行走氣泡對話
+      if (face === '-' && step < 0) {
+        triggerBubble(`哎呀！我面向左邊，卻<b>往後倒退走</b>，所以是一直<b>往右邊</b>退喔！`);
+      } else if (face === '+' && step < 0) {
+        triggerBubble(`我面向右邊，但是<b>往後倒退走</b>，所以是在<b>往左邊</b>退！`);
+      } else {
+        triggerBubble(`預備——起！往前走 ${Math.abs(step)} 步！`);
+      }
+
+      await sleep(2000); // 等待行走動畫完畢
+      
+      heroPenguin.classList.remove('walking');
+      heroPenguin.style.transition = 'left 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)'; // 還原 transition
+      hidePathIndicator();
+      isMoving = false;
+
+      currentPosition = finalResult;
+      updatePenguinVisualPosition();
+
+      // 第三步：宣布答案
+      step2.className = 'log-item done';
+      step2.innerHTML += ` 🚶 到達 <b>${finalResult > 0 ? '+' : ''}${finalResult}</b>！`;
+
+      const step3 = document.createElement('div');
+      step3.className = 'log-item done';
+      
+      // 解說負負得正
+      let explanationText = '';
+      if (face === '-' && step < 0) {
+        explanationText = `🔥 <b>負負得正大發現！</b> 面向左 (-) 加上 倒退走 (-)，結果卻是「<b>向右移動</b>」！所以 <b>- ( -${Math.abs(step)} ) = +${finalResult}</b>！`;
+      } else if (face === '+' && step < 0) {
+        explanationText = `💡 <b>正負得負！</b> 面向右 (+) 加上 倒退走 (-)，結果是「<b>向左移動</b>」，所以 <b>+ ( -${Math.abs(step)} ) = ${finalResult}</b>。`;
+      } else if (face === '-' && step > 0) {
+        explanationText = `💡 <b>負正得負！</b> 面向左 (-) 加上 向前走 (+)，結果是「<b>向左移動</b>」，所以 <b>- ( +${step} ) = ${finalResult}</b>。`;
+      } else {
+        explanationText = `🎉 <b>正正得正！</b> 面向右 (+) 加上 向前走 (+)，當然是「<b>向右移動</b>」，所以 <b>+ ( +${step} ) = +${finalResult}</b>！`;
+      }
+
+      step3.innerHTML = explanationText;
+      logPanel.appendChild(step3);
+
+      // 更新算式結果
+      const resultSpan = document.getElementById('formula-result');
+      resultSpan.innerText = finalResult > 0 ? `+${finalResult}` : finalResult;
+      resultSpan.classList.add(finalResult >= 0 ? 'pos' : 'neg');
+
+      triggerBubble(`我停在 <b>${finalResult > 0 ? '+' : ''}${finalResult}</b>！${explanationText}`);
+      
+      launchBtn.disabled = false;
+    }
+
+    // -------------------------------------------------------------
+    // F. 拯救小魚關卡 (遊戲邏輯)
+    // -------------------------------------------------------------
+    function setGameFace(faceSign) {
+      gameState.face = faceSign;
+      document.getElementById('game-btn-face-plus').classList.toggle('active', faceSign === '+');
+      document.getElementById('game-btn-face-minus').classList.toggle('active', faceSign === '-');
+      updateGameFormulaDisplay();
+    }
+
+    function setGameStep(stepVal) {
+      gameState.step = stepVal;
+      const buttons = document.querySelectorAll('#game-card .btn-step');
+      buttons.forEach(btn => {
+        const val = parseInt(btn.innerText.match(/-?\d+/)[0]);
+        btn.classList.toggle('active', val === stepVal);
+      });
+      updateGameFormulaDisplay();
+    }
+
+    function updateGameFormulaDisplay() {
+      const faceSpan = document.getElementById('game-formula-face');
+      const stepSpan = document.getElementById('game-formula-step');
+      const resultSpan = document.getElementById('game-formula-result');
+
+      faceSpan.innerText = gameState.face;
+      stepSpan.innerText = gameState.step > 0 ? `+${gameState.step}` : gameState.step;
+      resultSpan.innerText = '?';
+      resultSpan.className = 'f-result';
+    }
+
+    // 下一題
+    function nextQuestion(resetScore = false) {
+      if (resetScore) {
+        gameState.score = 0;
+        document.getElementById('game-score').innerText = 0;
+      }
+
+      // 隨機產生一個目標點 (-5 到 5，但不等於 0)
+      let target;
+      do {
+        target = Math.floor(Math.random() * (MAX_VAL - MIN_VAL + 1)) + MIN_VAL;
+      } while (target === 0 || target === currentPosition);
+
+      gameState.targetPosition = target;
+
+      // 放置小魚
+      const fishTarget = document.getElementById('fish-target');
+      const percentage = ((target - MIN_VAL) / (MAX_VAL - MIN_VAL)) * 100;
+      // 置中對齊刻度 (小魚寬 45px)
+      fishTarget.style.left = `calc(${percentage}% - 22px)`;
+      fishTarget.style.opacity = '1';
+
+      // 提示文字
+      document.getElementById('game-prompt').innerHTML = `
+        🌊 小企鵝肚子餓了！小魚游到了 <b>${target > 0 ? '+' : ''}${target}</b> 的位置。<br>
+        請組合出一個指令，幫小企鵝出發吃魚吧！
+      `;
+
+      // 重設發射器狀態
+      setGameFace('+');
+      setGameStep(2);
+      document.getElementById('game-step-log-panel').classList.remove('active');
+      document.getElementById('game-step-log-panel').innerHTML = '';
+      heroPenguin.classList.remove('show-arrow');
+    }
+
+    // 送出挑戰
+    async function executeGameCommand() {
+      if (isMoving) return;
+
+      const launchBtn = document.getElementById('game-launch-btn');
+      launchBtn.disabled = true;
+
+      // 1. 回歸原點，準備發射
+      await moveToPosition(0, false);
+
+      const logPanel = document.getElementById('game-step-log-panel');
+      logPanel.classList.add('active');
+      logPanel.innerHTML = '';
+
+      const face = gameState.face;
+      const step = gameState.step;
+      const finalResult = (face === '+' ? 1 : -1) * step;
+
+      // 第一步：轉面向
+      const step1 = document.createElement('div');
+      step1.className = 'log-item waiting';
+      step1.innerHTML = `<span>1️⃣ 調整面向：</span> 面向符號是 <b>${face === '+' ? '正號 (+)' : '負號 (-)'}</b>...`;
+      logPanel.appendChild(step1);
+
+      await sleep(600);
+      step1.className = 'log-item done';
+      if (face === '+') {
+        heroPenguin.classList.remove('facing-left');
+        step1.innerHTML += ` 👉 <b>面向右邊（正方向）</b>！`;
+      } else {
+        heroPenguin.classList.add('facing-left');
+        step1.innerHTML += ` 👈 <b>面向左邊（負方向）</b>！`;
+      }
+      heroPenguin.classList.add('show-arrow');
+      triggerBubble(`轉好了！朝向<b>${face === '+' ? '右邊' : '左邊'}</b>！`);
+
+      await sleep(1000);
+
+      // 第二步：走步數
+      const step2 = document.createElement('div');
+      step2.className = 'log-item waiting';
+      const walkType = step > 0 ? '前進' : '後退 (倒退嚕)';
+      step2.innerHTML = `<span>2️⃣ 開始移動：</span> 步伐是 <b>${step > 0 ? '+' : ''}${step}</b>，代表要 <b>${walkType} ${Math.abs(step)} 步</b>...`;
+      logPanel.appendChild(step2);
+
+      await sleep(800);
+
+      isMoving = true;
+      heroPenguin.classList.add('walking');
+      heroPenguin.style.transition = 'left 2s ease-in-out';
+
+      const percentage = ((finalResult - MIN_VAL) / (MAX_VAL - MIN_VAL)) * 100;
+      heroPenguin.style.left = `calc(${percentage}% - 35px)`;
+
+      showPathIndicator(0, finalResult);
+
+      if (face === '-' && step < 0) {
+        triggerBubble(`面向左，倒退走！<b>負負得正</b>，所以我是在往右走唷！`);
+      } else if (face === '+' && step < 0) {
+        triggerBubble(`面向右，倒退走！正負得負，我正在退向左邊！`);
+      } else {
+        triggerBubble(`前進！朝目標走 ${Math.abs(step)} 步！`);
+      }
+
+      await sleep(2000);
+
+      heroPenguin.classList.remove('walking');
+      heroPenguin.style.transition = 'left 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+      hidePathIndicator();
+      isMoving = false;
+
+      currentPosition = finalResult;
+      updatePenguinVisualPosition();
+
+      step2.className = 'log-item done';
+      step2.innerHTML += ` 🚶 到達 <b>${finalResult > 0 ? '+' : ''}${finalResult}</b>！`;
+
+      // 更新答案顯示
+      const resultSpan = document.getElementById('game-formula-result');
+      resultSpan.innerText = finalResult > 0 ? `+${finalResult}` : finalResult;
+      resultSpan.classList.add(finalResult >= 0 ? 'pos' : 'neg');
+
+      // 檢查是否成功抓到魚
+      const step3 = document.createElement('div');
+      step3.className = 'log-item done';
+
+      if (finalResult === gameState.targetPosition) {
+        // 成功！
+        step3.innerHTML = `🎉 <b>成功吃到魚了！好棒！</b> 你的算式 <b>${face} ( ${step > 0 ? '+' : ''}${step} ) = ${finalResult > 0 ? '+' : ''}${finalResult}</b> 非常正確！`;
+        logPanel.appendChild(step3);
+        
+        triggerBubble("美味的小魚！我抓到了！🐟 Yummy!");
+        
+        // 讓小魚隱藏
+        document.getElementById('fish-target').style.opacity = '0';
+        
+        // 加分與爆特效
+        gameState.score += 10;
+        document.getElementById('game-score').innerText = gameState.score;
+        triggerConfetti();
+
+        // 3 秒後下一題
+        await sleep(3000);
+        nextQuestion();
+      } else {
+        // 失敗！
+        step3.innerHTML = `❌ <b>差一點點！</b> 你算出的位置是 <b>${finalResult > 0 ? '+' : ''}${finalResult}</b>，但魚在 <b>${gameState.targetPosition > 0 ? '+' : ''}${gameState.targetPosition}</b>。再試一次看看吧！`;
+        logPanel.appendChild(step3);
+        triggerBubble("唔... 這裡沒有魚耶？是不是面向或步伐弄錯了呢？");
+      }
+
+      launchBtn.disabled = false;
+    }
+
+    // -------------------------------------------------------------
+    // G. 輔助函式：Sleep 與 本地紙屑動畫 (Confetti)
+    // -------------------------------------------------------------
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // 純 Canvas 紙屑特效，不需依賴外網
+    const canvas = document.getElementById('confetti-canvas');
+    const ctx = canvas.getContext('2d');
+    let confetti = [];
+    let confettiAnimationId = null;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function triggerConfetti() {
+      confetti = [];
+      const colors = ['#f54242', '#42f560', '#426ef5', '#f5cb42', '#c842f5', '#42f5e9'];
+      
+      // 產生 120 顆紙屑
+      for (let i = 0; i < 120; i++) {
+        confetti.push({
+          x: Math.random() * canvas.width,
+          y: -20 - Math.random() * 50,
+          r: Math.random() * 6 + 4,
+          d: Math.random() * canvas.height,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          tilt: Math.random() * 10 - 5,
+          tiltAngleIncremental: Math.random() * 0.07 + 0.02,
+          tiltAngle: 0,
+          velocity: {
+            x: Math.random() * 4 - 2,
+            y: Math.random() * 5 + 5
+          }
+        });
+      }
+
+      if (confettiAnimationId) cancelAnimationFrame(confettiAnimationId);
+      drawConfetti();
+    }
+
+    function drawConfetti() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let activeConfetti = false;
+
+      confetti.forEach((p) => {
+        p.tiltAngle += p.tiltAngleIncremental;
+        p.y += p.velocity.y;
+        p.x += p.velocity.x;
+        p.tilt = Math.sin(p.tiltAngle) * 12;
+
+        if (p.y <= canvas.height) {
+          activeConfetti = true;
+        }
+
+        ctx.beginPath();
+        ctx.lineWidth = p.r;
+        ctx.strokeStyle = p.color;
+        ctx.moveTo(p.x + p.tilt + p.r / 2, p.y);
+        ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 2);
+        ctx.stroke();
+      });
+
+      if (activeConfetti) {
+        confettiAnimationId = requestAnimationFrame(drawConfetti);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    // -------------------------------------------------------------
+    // H. 初始化啟動
+    // -------------------------------------------------------------
+    initNumberLine();
+  </script>
+</body>
+</html>
