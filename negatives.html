@@ -1333,8 +1333,7 @@
         <!-- 算式面板 -->
         <div class="formula-display">
           <span class="f-start" id="game-formula-start" style="color: #f5a623;">0</span>
-          <span style="color: #64748b; font-size: 1.5rem; margin: 0 4px;">+</span>
-          <span class="f-face" id="game-formula-face">+</span>
+          <span class="f-face" id="game-formula-face" style="margin-left: 6px;">+</span>
           <span class="parentheses">(</span>
           <span class="f-step" id="game-formula-step">+2</span>
           <span class="parentheses">)</span>
@@ -1891,7 +1890,7 @@
       const startSign = startPos > 0 ? `+${startPos}` : startPos;
       if (finalResult === gameState.targetPosition) {
         // 成功！
-        step3.innerHTML = `🎉 <b>成功吃到魚了！好棒！</b> 你的算式 <b>${startSign} + ${face} ( ${step > 0 ? '+' : ''}${step} ) = ${finalResult > 0 ? '+' : ''}${finalResult}</b> 非常正確！`;
+        step3.innerHTML = `🎉 <b>成功吃到魚了！好棒！</b> 你的算式 <b>${startSign} ${face} ( ${step > 0 ? '+' : ''}${step} ) = ${finalResult > 0 ? '+' : ''}${finalResult}</b> 非常正確！`;
         logPanel.appendChild(step3);
         
         triggerBubble("美味的小魚！我抓到了！🐟 Yummy!");
