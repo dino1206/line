@@ -1762,6 +1762,12 @@
         document.getElementById('game-score').innerText = 0;
       }
 
+      // 新題目開始時，立刻讓企鵝重置回原點 0，避免玩家誤會要從上一題的位置出發
+      currentPosition = 0;
+      updatePenguinVisualPosition();
+      heroPenguin.classList.remove('facing-left');
+      heroPenguin.classList.remove('show-arrow');
+
       // 隨機產生一個目標點 (-5 到 5，但不等於 0)
       let target;
       do {
