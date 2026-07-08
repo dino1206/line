@@ -1161,8 +1161,8 @@
   </header>
 
   <main>
-    <!-- 分頁導覽 -->
-    <div class="tabs-container">
+    <!-- 分頁導覽 (已隱藏，僅保留單一拯救小魚模式) -->
+    <div class="tabs-container" style="display: none;">
       <button class="tab-btn active" onclick="switchTab('explore')">🔍 數線探索</button>
       <button class="tab-btn" onclick="switchTab('magic')">⚡ 魔法指令發射器</button>
       <button class="tab-btn" onclick="switchTab('game')">🎯 拯救小魚挑戰</button>
@@ -1227,7 +1227,7 @@
     <!-- -------------------------------------------------------------
          單元一：數線探索 (卡片)
          ------------------------------------------------------------- -->
-    <div class="card active" id="card-explore">
+    <div class="card" id="card-explore">
       <h2 class="section-title">點擊數線探險</h2>
       <p class="subtitle" style="font-size: 1rem; margin-top: -15px;">點選下方數線上任何刻度，觀察企鵝的滑行，認識正數與負數的起點！</p>
       
@@ -1316,7 +1316,7 @@
     <!-- -------------------------------------------------------------
          單元三：拯救小魚挑戰 (卡片)
          ------------------------------------------------------------- -->
-    <div class="card" id="game-card">
+    <div class="card active" id="game-card">
       <div class="game-status-board">
         <h2 class="section-title" style="margin: 0;">拯救小魚大挑戰</h2>
         <div class="score-badge">
@@ -1347,16 +1347,19 @@
         <!-- 控制按鈕組 -->
         <div class="control-row">
           <!-- 1. 決定面向 -->
-          <div class="control-group">
-            <span class="group-label">👈 決定面向 👉</span>
+          <div class="control-group" id="game-face-group">
+            <span class="group-label">👈 系統指定面向 👉</span>
             <div class="btn-wrap">
-              <button class="action-btn btn-face-plus active" id="game-btn-face-plus" onclick="setGameFace('+')">
+              <button class="action-btn btn-face-plus active" id="game-btn-face-plus" style="pointer-events: none;" tabindex="-1">
                 ➕ 面向右 (正)
               </button>
-              <button class="action-btn btn-face-minus" id="game-btn-face-minus" onclick="setGameFace('-')">
+              <button class="action-btn btn-face-minus" id="game-btn-face-minus" style="pointer-events: none;" tabindex="-1">
                 ➖ 面向左 (負)
               </button>
             </div>
+            <p style="font-size: 0.85rem; color: #f59e0b; text-align: center; line-height: 1.3; font-weight: 700;">
+              ⚠️ 此面向由系統指定，無法修改！
+            </p>
           </div>
 
           <!-- 2. 決定步伐 -->
@@ -1780,6 +1783,10 @@
 
       gameState.targetPosition = target;
 
+      // 隨機產生一個面向 ('+' 或 '-')
+      const randomFace = Math.random() < 0.5 ? '+' : '-';
+      gameState.face = randomFace;
+
       // 放置小魚
       const fishTarget = document.getElementById('fish-target');
       const percentage = ((target - MIN_VAL) / (MAX_VAL - MIN_VAL)) * 100;
@@ -1787,15 +1794,24 @@
       fishTarget.style.left = `calc(${percentage}% - 22px)`;
       fishTarget.style.opacity = '1';
 
+      // 更新面向按鈕 active 狀態
+      document.getElementById('game-btn-face-plus').classList.toggle('active', randomFace === '+');
+      document.getElementById('game-btn-face-minus').classList.toggle('active', randomFace === '-');
+
       // 提示文字
       const startSign = currentPosition > 0 ? `+${currentPosition}` : currentPosition;
+      const faceText = randomFace === '+' ? '👉 <b>面向右邊 (正方向)</b>' : '👈 <b>面向左邊 (負方向)</b>';
       document.getElementById('game-prompt').innerHTML = `
-        🐟 企鵝在 <b>${startSign}</b>，小魚在 <b>${target > 0 ? '+' : ''}${target}</b>！請發射指令吃魚！
+        🐟 企鵝在 <b>${startSign}</b>，小魚在 <b>${target > 0 ? '+' : ''}${target}</b>！<br>
+        系統指定企鵝要 ${faceText}。請選擇適合的步伐，幫小企鵝出發吃魚吧！
       `;
 
-      // 重設發射器狀態
-      setGameFace('+');
+      // 重設發射器狀態中的步伐為預設步伐 (例如 +2)
       setGameStep(2);
+      
+      // 更新算式顯示
+      updateGameFormulaDisplay();
+      
       document.getElementById('game-step-log-panel').classList.remove('active');
       document.getElementById('game-step-log-panel').innerHTML = '';
       heroPenguin.classList.remove('show-arrow');
@@ -1995,6 +2011,10 @@
     // H. 初始化啟動
     // -------------------------------------------------------------
     initNumberLine();
+    // 預設為遊戲模式，啟動第一題
+    activeTab = 'game';
+    document.getElementById('fish-target').style.display = 'block';
+    nextQuestion(true);
   </script>
 </body>
 </html>
