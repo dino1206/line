@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光學實驗室：搶救視力大作戰</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; background-color: #f8fafc; }
+        .ray-path {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: drawRay 1s forwards ease-out;
+        }
+        @keyframes drawRay {
+            to { stroke-dashoffset: 0; }
+        }
+        .glow {
+            filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.8));
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            // 狀態管理
+            const [eyeState, setEyeState] = useState('myopia'); // 'normal', 'myopia', 'hyperopia'
+            const [lensState, setLensState] = useState('none'); // 'none', 'concave', 'convex'
+
+            // 光學參數設定
+            const EYE_X = 300;
+            const LENS_X = 150;
+            const RETINA_X = 500;
+            
+            // 基礎焦點位置 (根據眼睛狀態)
+            const baseFocus = {
+                normal: 500,    // 正常剛好在視網膜
+                myopia: 420,    // 近視在視網膜前 (眼軸長)
+                hyperopia: 600  // 遠視在視網膜後 (眼軸短)
+            };
+
+            // 鏡片造成的焦點平移量 (凹透鏡延後聚焦，凸透鏡提早聚焦)
+            const lensEffect = {
+                none: 0,
+                concave: 80,    // 發散，焦點往後退
+                convex: -100    // 會聚，焦點往前拉
+            };
+
+            // 鏡片折射點Y軸位置 (控制畫出來的光線折射感)
+            const rayHits = {
+                none: { top: 100, bottom: 200 },
+                concave: { top: 75, bottom: 225 }, // 往外擴(發散)
+                convex: { top: 125, bottom: 175 }  // 往內縮(會聚)
+            };
+
+            // 計算最終焦點
+            const finalFocusX = baseFocus[eyeState] + lensEffect[lensState];
+            const hits = rayHits[lensState];
+
+            // 產生光線路徑的函式
+            const generateRayPath = (startY, hitY) => {
+                // 1. 從最左邊發射到眼鏡鏡片
+                let path = `M 0,${startY} L ${LENS_X},${startY} `;
+                
+                // 2. 從眼鏡鏡片折射到眼睛的水晶體
+                path += `L ${EYE_X},${hitY} `;
+                
+                // 3. 從水晶體穿過，往最終焦點前進，並延伸畫到底
+                const slope = (150 - hitY) / (finalFocusX - EYE_X);
+                const endX = 700; // 畫出畫面外
+                const endY = hitY + slope * (endX - EYE_X);
+                path += `L ${endX},${endY}`;
+                
+                return path;
+            };
+
+            // 評估當前狀態給予文字回饋
+            const getFeedback = () => {
+                if (finalFocusX === RETINA_X) {
+                    return { text: "🌟 完美！光線剛好聚焦在「視網膜」上，視野非常清晰！", color: "bg-green-100 border-green-400 text-green-800" };
+                } else if (finalFocusX < RETINA_X) {
+                    return { text: "🌫️ 哎呀！光線聚焦在視網膜「前方」。這會造成看遠處模糊（近視狀態）。", color: "bg-yellow-100 border-yellow-400 text-yellow-800" };
+                } else {
+                    return { text: "🌫️ 糟糕！光線聚焦在視網膜「後方」。這會造成看近處模糊（遠視狀態）。", color: "bg-orange-100 border-orange-400 text-orange-800" };
+                }
+            };
+
+            const feedback = getFeedback();
+            // 使用 key 強制重新渲染動畫
+            const animationKey = `${eyeState}-${lensState}`;
+
+            return (
+                <div className="min-h-screen p-4 md:p-8 flex flex-col items-center max-w-5xl mx-auto">
+                    
+                    <header className="text-center mb-8">
+                        <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-2">👁️ 光學實驗室：搶救視力大作戰</h1>
+                        <p className="text-slate-600">國中理化 - 光與透鏡的奇妙世界</p>
+                    </header>
+
+                    {/* 互動操作區 */}
+                    <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        {/* 眼睛狀態選擇 */}
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="font-bold text-lg mb-3 text-slate-700 flex items-center">
+                                <span className="bg-blue-100 text-blue-700 w-6 h-6 rounded-full flex justify-center items-center mr-2 text-sm">1</span> 
+                                選擇眼睛狀態
+                            </h2>
+                            <div className="flex gap-2">
+                                <button onClick={() => setEyeState('normal')} className={`flex-1 py-2 rounded-lg font-medium transition ${eyeState === 'normal' ? 'bg-blue-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>正常視力</button>
+                                <button onClick={() => setEyeState('myopia')} className={`flex-1 py-2 rounded-lg font-medium transition ${eyeState === 'myopia' ? 'bg-blue-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>近視</button>
+                                <button onClick={() => setEyeState('hyperopia')} className={`flex-1 py-2 rounded-lg font-medium transition ${eyeState === 'hyperopia' ? 'bg-blue-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>遠視</button>
+                            </div>
+                        </div>
+
+                        {/* 鏡片選擇 */}
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="font-bold text-lg mb-3 text-slate-700 flex items-center">
+                                <span className="bg-amber-100 text-amber-700 w-6 h-6 rounded-full flex justify-center items-center mr-2 text-sm">2</span> 
+                                選擇矯正鏡片
+                            </h2>
+                            <div className="flex gap-2">
+                                <button onClick={() => setLensState('none')} className={`flex-1 py-2 rounded-lg font-medium transition ${lensState === 'none' ? 'bg-amber-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>不戴眼鏡</button>
+                                <button onClick={() => setLensState('concave')} className={`flex-1 py-2 rounded-lg font-medium transition ${lensState === 'concave' ? 'bg-amber-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>凹透鏡 (發散)</button>
+                                <button onClick={() => setLensState('convex')} className={`flex-1 py-2 rounded-lg font-medium transition ${lensState === 'convex' ? 'bg-amber-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>凸透鏡 (會聚)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 視覺化圖形區 */}
+                    <div className="w-full bg-slate-900 rounded-2xl shadow-xl overflow-hidden relative mb-6">
+                        <svg viewBox="0 0 700 300" className="w-full h-auto">
+                            <defs>
+                                {/* 視網膜發光效果 */}
+                                <filter id="glow">
+                                    <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+                                    <feMerge>
+                                        <feMergeNode in="coloredBlur"/>
+                                        <feMergeNode in="SourceGraphic"/>
+                                    </feMerge>
+                                </filter>
+                            </defs>
+
+                            {/* 背景輔助線 */}
+                            <line x1="0" y1="150" x2="700" y2="150" stroke="#334155" strokeWidth="2" strokeDasharray="5,5" />
+                            <text x="10" y="140" fill="#64748b" fontSize="12">平行光</text>
+
+                            {/* 眼球主體 (圓形 + 水晶體) */}
+                            {/* 以 x=400 為中心，半義100。左緣是300，右緣是500(視網膜) */}
+                            <circle cx="400" cy="150" r="100" fill="#0f172a" stroke="#475569" strokeWidth="4" />
+                            
+                            {/* 眼軸過長/過短的虛線標示 (幫助理解成因) */}
+                            {eyeState === 'myopia' && (
+                                <path d="M 400,50 A 100,100 0 0,1 540,150 A 100,100 0 0,1 400,250" stroke="#475569" strokeWidth="2" strokeDasharray="5,5" fill="none" />
+                            )}
+                            {eyeState === 'hyperopia' && (
+                                <path d="M 400,50 A 100,100 0 0,1 460,150 A 100,100 0 0,1 400,250" stroke="#475569" strokeWidth="2" strokeDasharray="5,5" fill="none" />
+                            )}
+
+                            {/* 視網膜 (紅色感光區) */}
+                            <path d="M 450,63.4 A 100,100 0 0,1 450,236.6" stroke="#ef4444" strokeWidth="6" fill="none" />
+                            <text x="510" y="100" fill="#ef4444" fontSize="14" fontWeight="bold">視網膜</text>
+
+                            {/* 水晶體 (眼睛自帶的凸透鏡) */}
+                            <ellipse cx={EYE_X} cy="150" rx="12" ry="50" fill="#93c5fd" opacity="0.8" />
+                            <text x="270" y="90" fill="#93c5fd" fontSize="14">水晶體</text>
+
+                            {/* 外加矯正鏡片 */}
+                            {lensState === 'concave' && (
+                                <g transform={`translate(${LENS_X}, 0)`}>
+                                    <path d="M -15,50 L 15,50 Q 5,150 15,250 L -15,250 Q -5,150 -15,50 Z" fill="#38bdf8" opacity="0.7" />
+                                    <text x="-25" y="40" fill="#38bdf8" fontSize="14" fontWeight="bold">凹透鏡</text>
+                                </g>
+                            )}
+                            {lensState === 'convex' && (
+                                <g transform={`translate(${LENS_X}, 0)`}>
+                                    <path d="M 0,50 Q 20,150 0,250 Q -20,150 0,50 Z" fill="#38bdf8" opacity="0.7" />
+                                    <text x="-25" y="40" fill="#38bdf8" fontSize="14" fontWeight="bold">凸透鏡</text>
+                                </g>
+                            )}
+
+                            {/* 光線繪製 */}
+                            <g key={animationKey}>
+                                {/* 上方光線 */}
+                                <path d={generateRayPath(100, hits.top)} fill="none" stroke="#fbbf24" strokeWidth="3" className="ray-path" />
+                                {/* 下方光線 */}
+                                <path d={generateRayPath(200, hits.bottom)} fill="none" stroke="#fbbf24" strokeWidth="3" className="ray-path" />
+                                {/* 中央光線 (永遠直線通過) */}
+                                <line x1="0" y1="150" x2="700" y2="150" stroke="#fbbf24" strokeWidth="3" className="ray-path" opacity="0.5" />
+                                
+                                {/* 焦點光暈提示 */}
+                                <circle cx={finalFocusX} cy="150" r="8" fill="#fbbf24" className="glow" />
+                            </g>
+                        </svg>
+                    </div>
+
+                    {/* 結果回饋文字區 */}
+                    <div className={`w-full p-4 rounded-xl border-2 font-bold text-lg mb-6 shadow-sm transition-colors duration-300 ${feedback.color}`}>
+                        {feedback.text}
+                    </div>
+
+                    {/* 知識總結區 */}
+                    <div className="w-full bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 className="text-xl font-bold text-slate-800 mb-4 border-b pb-2">📚 國中理化知識重點：</h3>
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="bg-slate-50 p-4 rounded-lg">
+                                <h4 className="font-bold text-blue-700 mb-2">【近視 Myopia】</h4>
+                                <ul className="list-disc list-inside text-slate-700 space-y-1 text-sm md:text-base">
+                                    <li><strong>成因：</strong> 眼球太長（眼軸過長），或水晶體折射力太強。</li>
+                                    <li><strong>現象：</strong> 遠方來的光線過早聚焦，落在視網膜<strong className="text-red-500">前方</strong>。</li>
+                                    <li><strong>矯正：</strong> 使用<strong className="text-blue-600">凹透鏡</strong>。利用其「發散」光線的特性，讓光線延後聚焦至視網膜上。</li>
+                                </ul>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-lg">
+                                <h4 className="font-bold text-blue-700 mb-2">【遠視 Hyperopia】</h4>
+                                <ul className="list-disc list-inside text-slate-700 space-y-1 text-sm md:text-base">
+                                    <li><strong>成因：</strong> 眼球太短（眼軸過短），或水晶體折射力太弱。</li>
+                                    <li><strong>現象：</strong> 遠方來的光線太晚聚焦，落在視網膜<strong className="text-red-500">後方</strong>。</li>
+                                    <li><strong>矯正：</strong> 使用<strong className="text-blue-600">凸透鏡</strong>。利用其「會聚」光線的特性，讓光線提早聚焦至視網膜上。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
