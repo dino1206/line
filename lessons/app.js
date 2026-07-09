@@ -79,7 +79,19 @@
     }
   }
 
-  function updateGlobe(lonA, lonB) {
+  function getCityName(selectEl, suffix) {
+    if (!selectEl) return "";
+    if (selectEl.value !== "custom") {
+      const text = selectEl.options[selectEl.selectedIndex].text;
+      return text.split(" (")[0];
+    } else {
+      const value = Number($(`lon-val-${suffix}`)?.value || 0);
+      const dir = $(`lon-dir-${suffix}`)?.value || "E";
+      return `自訂 (${value}°${dir})`;
+    }
+  }
+
+  function updateGlobe(lonA, lonB, nameA, nameB) {
     const globeEl = $("globeViz");
     if (!globeEl) return;
     if (!window.Globe) {
@@ -92,18 +104,32 @@
         .globeImageUrl("https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
         .bumpImageUrl("https://unpkg.com/three-globe/example/img/earth-topology.png")
         .pointAltitude(0.04)
-        .pointRadius(0.8);
+        .pointRadius(0.8)
+        .labelLat(d => d.lat)
+        .labelLng(d => d.lng)
+        .labelText(d => d.text)
+        .labelColor(d => d.color)
+        .labelSize(3.0)
+        .labelDotRadius(0.4)
+        .labelResolution(2);
     }
     window.learningGlobe.pointsData([
       { lat: 24, lng: lonA, color: "#ff8da1" },
       { lat: -12, lng: lonB, color: "#64b5f6" }
     ]).pointColor("color");
+
+    window.learningGlobe.labelsData([
+      { lat: 24, lng: lonA, text: `基地 A: ${nameA}`, color: "#ff8da1" },
+      { lat: -12, lng: lonB, text: `探險地 B: ${nameB}`, color: "#64b5f6" }
+    ]);
   }
 
   function calculate() {
     if (!timeA || !cityA || !cityB) return;
     const lonA = selectedLongitude(cityA, "a");
     const lonB = selectedLongitude(cityB, "b");
+    const nameA = getCityName(cityA, "a");
+    const nameB = getCityName(cityB, "b");
     const base = new Date(timeA.value || nowLocalDatetime());
     const diffHours = (lonB - lonA) / 15;
     const target = new Date(base.getTime() + diffHours * 60 * 60 * 1000);
@@ -111,7 +137,7 @@
     setClock("b", target);
     updateAxis(lonA, lonB);
     updateSky(lonA, lonB);
-    updateGlobe(lonA, lonB);
+    updateGlobe(lonA, lonB, nameA, nameB);
 
     const diffText = `${diffHours >= 0 ? "+" : ""}${diffHours.toFixed(1)}h`;
     if ($("qr-time-a")) $("qr-time-a").textContent = formatTime(base);
