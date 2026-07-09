@@ -107,19 +107,15 @@
     for (let lat = -90; lat <= 90; lat += 5) {
       coords.push([lat, lng]);
     }
-    let color = "rgba(255, 255, 255, 0.22)";
-    let width = 0.6;
+    let color = "#555555"; // 一般經線（淡灰色）
     if (lng === 0) {
       color = "#ef4444"; // 本初子午線 (紅色)
-      width = 1.8;
     } else if (lng === 180 || lng === -180) {
       color = "#f97316"; // 180度經線 (橘色)
-      width = 1.2;
     }
     longitudePaths.push({
       coords: coords,
-      color: color,
-      width: width
+      color: color
     });
   }
 
@@ -130,49 +126,55 @@
       globeEl.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:white;text-align:center;padding:24px;">3D 地球儀載入中，時差計算可先使用。</div>';
       return;
     }
-    if (!window.learningGlobe) {
-      window.learningGlobe = Globe()(globeEl)
-        .backgroundColor("rgba(0,0,0,0)")
-        .globeImageUrl("https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
-        .bumpImageUrl("https://unpkg.com/three-globe/example/img/earth-topology.png")
-        .pointAltitude(0.04)
-        .pointRadius(0.8)
-        .labelLat(d => d.lat)
-        .labelLng(d => d.lng)
-        .labelText(d => d.text)
-        .labelColor(d => d.color)
-        .labelSize(3.0)
-        .labelDotRadius(0.4)
-        .labelResolution(2)
-        .pathsData(longitudePaths)
-        .pathPoints(d => d.coords)
-        .pathPointLat(p => p[0])
-        .pathPointLng(p => p[1])
-        .pathColor(d => d.color)
-        .pathStroke(d => d.width)
-        .pathAltitude(0.0025);
+    try {
+      if (!window.learningGlobe) {
+        window.learningGlobe = Globe()(globeEl)
+          .backgroundColor("rgba(0,0,0,0)")
+          .globeImageUrl("https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
+          .bumpImageUrl("https://unpkg.com/three-globe/example/img/earth-topology.png")
+          .pointAltitude(0.04)
+          .pointRadius(0.8)
+          .labelLat(d => d.lat)
+          .labelLng(d => d.lng)
+          .labelText(d => d.text)
+          .labelColor(d => d.color)
+          .labelSize(3.0)
+          .labelDotRadius(0.4)
+          .labelResolution(2)
+          .pathsData(longitudePaths)
+          .pathPoints(d => d.coords)
+          .pathPointLat(p => p[0])
+          .pathPointLng(p => p[1])
+          .pathColor(d => d.color)
+          .pathStroke(null)
+          .pathAltitude(0.003);
 
-      const controls = window.learningGlobe.controls();
-      if (controls) {
-        // 限制只能東西向（左右）旋轉，不能上下轉
-        // 設為稍微俯視赤道 (Math.PI / 2 - 0.15 弧度，約 81 度，以看清經線交會)
-        const angle = Math.PI / 2 - 0.15;
-        controls.minPolarAngle = angle;
-        controls.maxPolarAngle = angle;
+        // 鎖定只能東西向旋轉 (固定 polar angle 於赤道)
+        setTimeout(() => {
+          try {
+            const controls = window.learningGlobe.controls();
+            if (controls) {
+              controls.minPolarAngle = Math.PI / 2;
+              controls.maxPolarAngle = Math.PI / 2;
+            }
+          } catch(e) { /* ignore */ }
+        }, 500);
       }
+      window.learningGlobe.pointsData([
+        { lat: 24, lng: lonA, color: "#ff8da1" },
+        { lat: -12, lng: lonB, color: "#64b5f6" }
+      ]).pointColor("color");
+
+      const nameA_en = getENName(nameA);
+      const nameB_en = getENName(nameB);
+
+      window.learningGlobe.labelsData([
+        { lat: 24, lng: lonA, text: `A: ${nameA_en}`, color: "#ff8da1" },
+        { lat: -12, lng: lonB, text: `B: ${nameB_en}`, color: "#64b5f6" }
+      ]);
+    } catch(e) {
+      console.warn("Globe error:", e);
     }
-    window.learningGlobe.pointsData([
-      { lat: 24, lng: lonA, color: "#ff8da1" },
-      { lat: -12, lng: lonB, color: "#64b5f6" }
-    ]).pointColor("color");
-
-    const nameA_en = getENName(nameA);
-    const nameB_en = getENName(nameB);
-
-    window.learningGlobe.labelsData([
-      { lat: 24, lng: lonA, text: `Base A: ${nameA_en}`, color: "#ff8da1" },
-      { lat: -12, lng: lonB, text: `Target B: ${nameB_en}`, color: "#64b5f6" }
-    ]);
   }
 
   function getCityName(selectEl, suffix) {
