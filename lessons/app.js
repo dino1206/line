@@ -134,32 +134,38 @@
           .bumpImageUrl("https://unpkg.com/three-globe/example/img/earth-topology.png")
           .pointAltitude(0.04)
           .pointRadius(0.8)
+          .labelLat(d => d.lat)
+          .labelLng(d => d.lng)
+          .labelText(d => d.text)
+          .labelColor(d => d.color)
+          .labelSize(3.0)
+          .labelDotRadius(0.4)
+          .labelResolution(2)
           .pathsData(longitudePaths)
           .pathPoints(d => d.coords)
           .pathPointLat(p => p[0])
           .pathPointLng(p => p[1])
           .pathColor(d => d.color)
           .pathStroke(null)
-          .pathAltitude(0.003)
-          .htmlElementsData([])
-          .htmlLat(d => d.lat)
-          .htmlLng(d => d.lng)
-          .htmlAltitude(0.05)
-          .htmlElement(d => {
-            const el = document.createElement("div");
-            el.style.cssText = "color:" + d.color + ";font-size:11px;font-weight:bold;text-shadow:0 0 4px #000,0 0 8px #000;white-space:nowrap;pointer-events:none;";
-            el.textContent = d.label;
-            return el;
-          })
-          .onGlobeReady(() => {
-            try {
-              const controls = window.learningGlobe.controls();
-              if (controls) {
-                controls.minPolarAngle = Math.PI / 2;
-                controls.maxPolarAngle = Math.PI / 2;
-              }
-            } catch(e) { /* ignore */ }
-          });
+          .pathAltitude(0.003);
+
+        // 鎖定只能東西向旋轉 (固定 polar angle 於赤道)
+        const controls = window.learningGlobe.controls();
+        if (controls) {
+          // 稍微偏上一點點，讓北半球的城市和路線更容易看見 (大約 85 度)
+          // 限制在同一個角度就可以鎖定上下旋轉
+          const angle = Math.PI / 2 - 0.1;
+          controls.minPolarAngle = angle;
+          controls.maxPolarAngle = angle;
+        }
+      }
+
+      // 每次更新都再次確保鎖定 (防呆)
+      const controls = window.learningGlobe.controls();
+      if (controls) {
+        const angle = Math.PI / 2 - 0.1;
+        controls.minPolarAngle = angle;
+        controls.maxPolarAngle = angle;
       }
 
       // 更新標記點
@@ -168,10 +174,13 @@
         { lat: -12, lng: lonB, color: "#64b5f6" }
       ]).pointColor("color");
 
-      // 更新城市名稱 HTML 標籤
-      window.learningGlobe.htmlElementsData([
-        { lat: 24, lng: lonA, label: "基地A: " + nameA, color: "#ff8da1" },
-        { lat: -12, lng: lonB, label: "探險地B: " + nameB, color: "#64b5f6" }
+      const nameA_en = getENName(nameA);
+      const nameB_en = getENName(nameB);
+
+      // 更新城市名稱
+      window.learningGlobe.labelsData([
+        { lat: 24, lng: lonA, text: `A: ${nameA_en}`, color: "#ff8da1" },
+        { lat: -12, lng: lonB, text: `B: ${nameB_en}`, color: "#64b5f6" }
       ]);
     } catch(e) {
       console.warn("Globe error:", e);
