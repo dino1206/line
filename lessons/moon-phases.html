@@ -133,7 +133,7 @@
             { threshold: 85, name: '眉月 (蛾眉月)', desc: '月球剛過新月，我們從地球上只能看見右側邊緣的一小撮亮面。' },
             { threshold: 95, name: '上弦月', desc: '月球繞行了四分之一圈，從地球看出去，太陽在我們右側，因此看見月球右半邊明亮。' },
             { threshold: 175, name: '盈凸月', desc: '月球亮面越來越大，超過一半但尚未全滿，右側至大半部皆為明亮。' },
-            { threshold: 185, name: '滿月 (望)', desc: '地球位於月球和太陽之間，月球的亮面完全朝向地球，呈現圓滿形狀。' },
+            { threshold: 185, name: '滿月 (望)', desc: '地球位於月球和太陽之間，月球亮面完全朝向地球。<strong>【常見迷思：地球不會擋住光嗎？】</strong>因為月球公轉軌道（白道）與地球公轉軌道（黃道）有約 5 度的夾角，所以月球此時其實在地球陰影的上方或下方，光線不會被地球遮到！只有當三者完全在同一個平面且排成直線時，才會發生「月食」。' },
             { threshold: 265, name: '虧凸月', desc: '滿月過後，亮面開始減少。從地球看出去，左側大部分依然明亮。' },
             { threshold: 275, name: '下弦月', desc: '月球繞行了四分之三圈，太陽此時在我們左側，因此看見月球左半邊明亮。' },
             { threshold: 355, name: '殘月', desc: '即將回到新月，只剩下左側邊緣的一小撮亮面。' },
@@ -329,6 +329,103 @@
             spaceCtx.arc(moonX, moonY, moonRadius + 10, 0, Math.PI*2);
             spaceCtx.fillStyle = state.isDragging ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)';
             spaceCtx.fill();
+
+            // === 繪製左下角的立體關係側視圖解說 ===
+            const sideW = 165;
+            const sideH = 95;
+            const sideX = 12;
+            const sideY = h - sideH - 12;
+
+            // 1. 繪製背景小卡
+            spaceCtx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            spaceCtx.strokeStyle = 'rgba(51, 65, 85, 0.8)';
+            spaceCtx.lineWidth = 1.5;
+            spaceCtx.beginPath();
+            if (spaceCtx.roundRect) {
+                spaceCtx.roundRect(sideX, sideY, sideW, sideH, 8);
+            } else {
+                spaceCtx.rect(sideX, sideY, sideW, sideH);
+            }
+            spaceCtx.fill();
+            spaceCtx.stroke();
+
+            // 2. 標題
+            spaceCtx.fillStyle = '#93c5fd'; // 淡藍色
+            spaceCtx.font = 'bold 10px Noto Sans TC';
+            spaceCtx.textAlign = 'left';
+            spaceCtx.textBaseline = 'top';
+            spaceCtx.fillText('立體空間關係 (側視解說)', sideX + 10, sideY + 10);
+
+            // 3. 定義側視圖的元件中心
+            const sideCx = sideX + 65; // 地球中心
+            const sideCy = sideY + sideH / 2 + 5;
+            
+            // 4. 繪製地球 (側視)
+            spaceCtx.beginPath();
+            spaceCtx.arc(sideCx, sideCy, 8, 0, Math.PI * 2);
+            spaceCtx.fillStyle = '#1e3a8a';
+            spaceCtx.fill();
+            spaceCtx.beginPath();
+            spaceCtx.arc(sideCx, sideCy, 8, -Math.PI/2, Math.PI/2);
+            spaceCtx.fillStyle = '#60a5fa';
+            spaceCtx.fill();
+
+            // 5. 繪製地球陰影 (本影區，灰色漸層往左延伸)
+            const shadowGrad = spaceCtx.createLinearGradient(sideCx - 8, sideCy, sideX + 5, sideCy);
+            shadowGrad.addColorStop(0, 'rgba(71, 85, 105, 0.6)');
+            shadowGrad.addColorStop(1, 'rgba(71, 85, 105, 0)');
+            spaceCtx.fillStyle = shadowGrad;
+            spaceCtx.fillRect(sideX + 5, sideCy - 8, sideCx - 8 - (sideX + 5), 16);
+
+            // 6. 繪製斜斜的月球公轉軌道 (夾角約 15 度，方便視覺觀察)
+            const angleRad = degToRad(15);
+            const orbitLen = 50;
+            const orbitX1 = sideCx - orbitLen * Math.cos(angleRad);
+            const orbitY1 = sideCy - orbitLen * Math.sin(angleRad);
+            const orbitX2 = sideCx + orbitLen * Math.cos(angleRad);
+            const orbitY2 = sideCy + orbitLen * Math.sin(angleRad);
+
+            spaceCtx.beginPath();
+            spaceCtx.moveTo(orbitX1, orbitY1);
+            spaceCtx.lineTo(orbitX2, orbitY2);
+            spaceCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            spaceCtx.setLineDash([2, 2]);
+            spaceCtx.lineWidth = 1;
+            spaceCtx.stroke();
+            spaceCtx.setLineDash([]);
+
+            // 7. 繪製此時側視圖中的月球位置 (連動主圖)
+            const cosVal = Math.cos(degToRad(state.angleDeg));
+            const sideMoonX = sideCx + orbitLen * cosVal * Math.cos(angleRad);
+            const sideMoonY = sideCy + orbitLen * cosVal * Math.sin(angleRad);
+
+            // 繪製陽光 (黃色虛線由右往左，能直接照亮月球)
+            spaceCtx.beginPath();
+            spaceCtx.moveTo(sideX + sideW - 10, sideMoonY);
+            spaceCtx.lineTo(sideMoonX + 5, sideMoonY);
+            spaceCtx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+            spaceCtx.lineWidth = 1;
+            spaceCtx.stroke();
+
+            // 繪製側視月球 (黃色小圓點表示亮面，灰色表示暗面，陽光從右來)
+            spaceCtx.beginPath();
+            spaceCtx.arc(sideMoonX, sideMoonY, 4, 0, Math.PI * 2);
+            spaceCtx.fillStyle = '#334155'; // 暗面底色
+            spaceCtx.fill();
+            spaceCtx.beginPath();
+            spaceCtx.arc(sideMoonX, sideMoonY, 4, -Math.PI/2, Math.PI/2);
+            spaceCtx.fillStyle = '#fbbf24'; // 陽光照亮面
+            spaceCtx.fill();
+
+            // 8. 加上說明文字
+            spaceCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            spaceCtx.font = '8px Noto Sans TC';
+            spaceCtx.textAlign = 'left';
+            spaceCtx.fillText('地球陰影', sideX + 15, sideCy - 10);
+            
+            spaceCtx.fillStyle = '#fef08a';
+            spaceCtx.textAlign = 'right';
+            spaceCtx.fillText('陽光 ➔', sideX + sideW - 10, sideY + sideH - 12);
         }
 
         /**
