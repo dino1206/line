@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>凸透鏡成像互動模擬</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 flex flex-col items-center p-4 md:p-8 font-sans">
+  <div class="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+    <div class="bg-blue-600 text-white p-6">
+      <h1 class="text-2xl md:text-3xl font-bold mb-2">凸透鏡成像互動模擬</h1>
+      <p class="text-blue-100 mb-4">拖曳滑桿或點擊下方按鈕，觀察物體位置如何影響成像性質。</p>
+      <div class="bg-white/20 p-4 rounded-xl backdrop-blur-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <span class="block text-sm text-blue-100 uppercase tracking-wider font-semibold">物體位置 (u)</span>
+          <span class="text-xl font-bold" id="objectText">150 (f=100)</span>
+        </div>
+        <div>
+          <span class="block text-sm text-blue-100 uppercase tracking-wider font-semibold">成像位置 (v)</span>
+          <span class="text-xl font-bold" id="positionText">另一側的兩倍焦距外 (&gt; 2F)</span>
+        </div>
+        <div>
+          <span class="block text-sm text-blue-100 uppercase tracking-wider font-semibold">成像性質</span>
+          <span class="text-xl font-bold" id="propertyText">倒立放大實像</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="w-full overflow-x-auto p-4 flex justify-center bg-gray-50">
+      <svg id="lensSvg" width="800" height="400" class="bg-white border rounded-lg shadow-inner max-w-full h-auto" viewBox="0 0 800 400" aria-label="凸透鏡成像示意圖"></svg>
+    </div>
+
+    <div class="p-6 bg-white border-t border-gray-100">
+      <div class="mb-6">
+        <label class="block text-gray-700 font-bold mb-3" for="distanceSlider">
+          調整物體距離 <span id="sliderLabel">(目前: 150)</span>
+        </label>
+        <input id="distanceSlider" type="range" min="30" max="350" value="150" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+      </div>
+
+      <div class="space-y-2">
+        <p class="text-sm font-semibold text-gray-500 mb-2">快速跳轉情境：</p>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <button data-mode="infinity" class="preset px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors">1. 物體在無窮遠</button>
+          <button data-distance="250" class="preset px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors">2. 物體在 2F 外</button>
+          <button data-distance="200" class="preset px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors">3. 物體在 2F 上</button>
+          <button data-distance="150" class="preset px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors">4. 物體在 F~2F 間</button>
+          <button data-distance="100" class="preset px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors">5. 物體在 F 上</button>
+          <button data-distance="60" class="preset px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors">6. 物體在焦點內</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const f = 100;
+    const ho = 60;
+    const svgWidth = 800;
+    const svgHeight = 400;
+    const cx = svgWidth / 2;
+    const cy = svgHeight / 2;
+    const svg = document.getElementById("lensSvg");
+    const slider = document.getElementById("distanceSlider");
+    const objectText = document.getElementById("objectText");
+    const positionText = document.getElementById("positionText");
+    const propertyText = document.getElementById("propertyText");
+    const sliderLabel = document.getElementById("sliderLabel");
+    let objectDistance = 150;
+    let isInfinity = false;
+
+    const pt = (x, y) => ({ x: cx + x, y: cy - y });
+    const el = (name, attrs = {}, children = []) => {
+      const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+      Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+      children.forEach((child) => node.appendChild(child));
+      return node;
+    };
+    const text = (content, attrs) => {
+      const node = el("text", attrs);
+      node.textContent = content;
+      return node;
+    };
+
+    function situationFor(distance, infinity) {
+      if (infinity) return { di: f, hi: 0, pos: "另一側的焦點上", prop: "一點 (實焦點)" };
+      if (distance === f) return { di: Infinity, hi: NaN, pos: "不成像 (光線平行)", prop: "無" };
+      const di = (distance * f) / (distance - f);
+      const hi = (-di / distance) * ho;
+      if (distance > 2 * f) return { di, hi, pos: "另一側的焦點與兩倍焦距間 (F ~ 2F)", prop: "倒立縮小實像" };
+      if (distance === 2 * f) return { di, hi, pos: "另一側的兩倍焦距上 (2F)", prop: "倒立相等實像" };
+      if (distance > f) return { di, hi, pos: "另一側的兩倍焦距外 (> 2F)", prop: "倒立放大實像" };
+      return { di, hi, pos: "與物體同側 (物後)", prop: "正立放大虛像" };
+    }
+
+    function drawArrow(x, y, virtualLine) {
+      const group = el("g", {
+        stroke: virtualLine ? "#3b82f6" : (x > 0 ? "#ef4444" : "#1f2937"),
+        fill: "none",
+        "stroke-width": "3",
+        "stroke-dasharray": virtualLine ? "5,5" : "none"
+      });
+      const start = pt(x, 0);
+      const end = pt(x, y);
+      if (Math.abs(y) < 1) {
+        group.appendChild(el("circle", { cx: start.x, cy: start.y, r: 4, fill: "red", stroke: "none" }));
+        return group;
+      }
+      const sign = y >= 0 ? 1 : -1;
+      group.appendChild(el("line", { x1: start.x, y1: start.y, x2: end.x, y2: end.y }));
+      group.appendChild(el("polygon", {
+        points: `${end.x},${end.y} ${end.x - 8},${end.y + 8 * sign} ${end.x + 8},${end.y + 8 * sign}`,
+        fill: virtualLine ? "#3b82f6" : (x > 0 ? "#ef4444" : "#1f2937"),
+        stroke: "none"
+      }));
+      return group;
+    }
+
+    function drawRays(info) {
+      const group = el("g", { stroke: "#f59e0b", "stroke-width": "2", fill: "none" });
+      if (isInfinity) {
+        [ho, 0, -ho].forEach((offset) => {
+          group.appendChild(el("line", { x1: 0, y1: cy - offset, x2: cx, y2: cy - offset }));
+          group.appendChild(el("line", { x1: cx, y1: cy - offset, x2: pt(f, 0).x, y2: pt(f, 0).y }));
+          group.appendChild(el("line", { x1: pt(f, 0).x, y1: pt(f, 0).y, x2: svgWidth, y2: cy + offset * ((svgWidth - cx - f) / f), opacity: "0.3" }));
+        });
+        return group;
+      }
+
+      const ray1Start = pt(-objectDistance, ho);
+      const ray1Lens = pt(0, ho);
+      const slope1 = -ho / f;
+      const ray1End = pt(400, ho + slope1 * 400);
+      const ray2Start = pt(-objectDistance, ho);
+      const ray2Lens = pt(0, 0);
+      const slope2 = -ho / objectDistance;
+      const ray2End = pt(400, slope2 * 400);
+      group.appendChild(el("line", { x1: ray1Start.x, y1: ray1Start.y, x2: ray1Lens.x, y2: ray1Lens.y }));
+      group.appendChild(el("line", { x1: ray1Lens.x, y1: ray1Lens.y, x2: ray1End.x, y2: ray1End.y }));
+      group.appendChild(el("line", { x1: ray2Start.x, y1: ray2Start.y, x2: ray2Lens.x, y2: ray2Lens.y }));
+      group.appendChild(el("line", { x1: ray2Lens.x, y1: ray2Lens.y, x2: ray2End.x, y2: ray2End.y }));
+      if (info.di < 0) {
+        group.appendChild(el("line", { x1: ray1Lens.x, y1: ray1Lens.y, x2: pt(info.di, info.hi).x, y2: pt(info.di, info.hi).y, "stroke-dasharray": "5,5", opacity: "0.7" }));
+        group.appendChild(el("line", { x1: ray2Lens.x, y1: ray2Lens.y, x2: pt(info.di, info.hi).x, y2: pt(info.di, info.hi).y, "stroke-dasharray": "5,5", opacity: "0.7" }));
+      }
+      return group;
+    }
+
+    function render() {
+      const info = situationFor(objectDistance, isInfinity);
+      svg.replaceChildren();
+      const defs = el("defs", {}, [
+        el("pattern", { id: "grid", width: 20, height: 20, patternUnits: "userSpaceOnUse" }, [
+          el("path", { d: "M 20 0 L 0 0 0 20", fill: "none", stroke: "#f0f0f0", "stroke-width": "1" })
+        ])
+      ]);
+      svg.appendChild(defs);
+      svg.appendChild(el("rect", { width: svgWidth, height: svgHeight, fill: "url(#grid)" }));
+      svg.appendChild(el("line", { x1: 0, y1: cy, x2: svgWidth, y2: cy, stroke: "#9ca3af", "stroke-width": 2, "stroke-dasharray": "10,5" }));
+      svg.appendChild(el("ellipse", { cx, cy, rx: 15, ry: 120, fill: "#bae6fd", stroke: "#38bdf8", "stroke-width": 2, opacity: "0.6" }));
+      svg.appendChild(el("line", { x1: cx, y1: cy - 130, x2: cx, y2: cy + 130, stroke: "#38bdf8", "stroke-width": 1, "stroke-dasharray": "4,4" }));
+      [{ x: f, label: "F" }, { x: 2 * f, label: "2F" }, { x: -f, label: "F" }, { x: -2 * f, label: "2F" }].forEach((mark) => {
+        svg.appendChild(el("circle", { cx: cx + mark.x, cy, r: 4, fill: "#4b5563" }));
+        svg.appendChild(text(mark.label, { x: cx + mark.x, y: cy + 20, "text-anchor": "middle", fill: "#4b5563", "font-size": 14, "font-weight": "bold" }));
+      });
+      svg.appendChild(drawRays(info));
+      if (!isInfinity) svg.appendChild(drawArrow(-objectDistance, ho, false));
+      if (!isInfinity && Number.isFinite(info.di) && !Number.isNaN(info.hi)) svg.appendChild(drawArrow(info.di, info.hi, info.di < 0));
+      if (isInfinity) svg.appendChild(drawArrow(info.di, info.hi, false));
+
+      objectText.textContent = isInfinity ? "無窮遠" : `${objectDistance} (f=${f})`;
+      positionText.textContent = info.pos;
+      propertyText.textContent = info.prop;
+      sliderLabel.textContent = `(目前: ${isInfinity ? "無窮遠" : objectDistance})`;
+      slider.disabled = isInfinity;
+      slider.classList.toggle("opacity-50", isInfinity);
+    }
+
+    slider.addEventListener("input", (event) => {
+      isInfinity = false;
+      objectDistance = Number(event.target.value);
+      render();
+    });
+
+    document.querySelectorAll(".preset").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.mode === "infinity") {
+          isInfinity = true;
+        } else {
+          isInfinity = false;
+          objectDistance = Number(button.dataset.distance);
+          slider.value = objectDistance;
+        }
+        render();
+      });
+    });
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宏觀視角轉換：月相與日地月相對運動</title>
+    <!-- 使用 Tailwind CSS 進行快速且現代化的 UI 排版 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #0f172a; /* 深邃太空藍 */
+            color: #f8fafc;
+        }
+        /* 隱藏捲軸保持畫面乾淨 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: #000000;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+            border: 1px solid #334155;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fbbf24;
+            cursor: pointer;
+        }
+        .slider-thumb::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fbbf24;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 md:p-8">
+
+    <!-- 頂部標題與說明 -->
+    <header class="max-w-6xl mx-auto w-full mb-6 text-center">
+        <h1 class="text-3xl md:text-4xl font-bold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-yellow-300">
+            地球科學：月相盈虧空間視角轉換器
+        </h1>
+        <p class="text-slate-300 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+            這是一個雙視角連動的幾何模型。請在左側的<strong class="text-blue-300">「上帝視角」</strong>中拖曳月球，右側的<strong class="text-yellow-300">「地球人視角」</strong>將即時為您轉換出對應的真實月相。
+        </p>
+    </header>
+
+    <!-- 核心互動區 -->
+    <main class="max-w-6xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+        
+        <!-- 左側：上帝視角 -->
+        <section class="flex flex-col h-full">
+            <div class="flex justify-between items-end mb-2">
+                <h2 class="text-xl font-semibold text-blue-300 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                    上帝視角 (俯視)
+                </h2>
+                <span class="text-xs text-slate-400">陽光固定從右方照射</span>
+            </div>
+            <div class="canvas-container flex-1 min-h-[400px]">
+                <canvas id="spaceView"></canvas>
+            </div>
+            <div class="mt-4 bg-slate-800 p-4 rounded-xl border border-slate-700">
+                <div class="flex justify-between text-sm text-slate-300 mb-2">
+                    <span>月球公轉角度</span>
+                    <span id="angleValue" class="font-mono text-yellow-400">0°</span>
+                </div>
+                <input type="range" id="angleSlider" min="0" max="360" value="0" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb">
+                <p class="text-xs text-slate-400 mt-2 text-center">提示：可直接拖曳上方畫布中的月球，或滑動此拉桿</p>
+            </div>
+        </section>
+
+        <!-- 右側：地球人視角 -->
+        <section class="flex flex-col h-full">
+            <div class="flex justify-between items-end mb-2">
+                <h2 class="text-xl font-semibold text-yellow-300 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><circle cx="12" cy="12" r="10"/></svg>
+                    地球人視角
+                </h2>
+                <span id="phaseName" class="text-lg font-bold text-white tracking-widest">新月</span>
+            </div>
+            <div class="canvas-container flex-1 min-h-[400px]">
+                <canvas id="phaseView"></canvas>
+            </div>
+            
+            <!-- 教學資訊面板 -->
+            <div class="mt-4 bg-slate-800 p-4 rounded-xl border border-slate-700 flex-1">
+                <h3 class="text-sm font-semibold text-blue-300 mb-2">原理分析面板</h3>
+                <ul class="text-sm text-slate-300 space-y-2 leading-relaxed">
+                    <li><strong class="text-white">空間關係：</strong>月球本身不發光，一半總是被太陽照亮（向陽面）。</li>
+                    <li><strong class="text-white">視角差異：</strong>由於地球人在內部觀察，隨著月球公轉，我們只能看到「被照亮半球」的其中一部分。</li>
+                    <li id="dynamicDescription" class="text-yellow-200 mt-2 font-medium">
+                        <!-- 動態說明會在這裡更新 -->
+                    </li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        /**
+         * 狀態管理與常數定義
+         */
+        const state = {
+            angleDeg: 0, // 0 = 右側(新月), 逆時針遞增: 90=上弦月, 180=滿月, 270=下弦月
+            isDragging: false
+        };
+
+        const PHASE_NAMES = [
+            { threshold: 5, name: '新月 (朔)', desc: '月球位於地球和太陽之間，亮面背對地球，因此我們看不見月亮。' },
+            { threshold: 85, name: '眉月 (蛾眉月)', desc: '月球剛過新月，我們從地球上只能看見右側邊緣的一小撮亮面。' },
+            { threshold: 95, name: '上弦月', desc: '月球繞行了四分之一圈，從地球看出去，太陽在我們右側，因此看見月球右半邊明亮。' },
+            { threshold: 175, name: '盈凸月', desc: '月球亮面越來越大，超過一半但尚未全滿，右側至大半部皆為明亮。' },
+            { threshold: 185, name: '滿月 (望)', desc: '地球位於月球和太陽之間，月球的亮面完全朝向地球，呈現圓滿形狀。' },
+            { threshold: 265, name: '虧凸月', desc: '滿月過後，亮面開始減少。從地球看出去，左側大部分依然明亮。' },
+            { threshold: 275, name: '下弦月', desc: '月球繞行了四分之三圈，太陽此時在我們左側，因此看見月球左半邊明亮。' },
+            { threshold: 355, name: '殘月', desc: '即將回到新月，只剩下左側邊緣的一小撮亮面。' },
+            { threshold: 361, name: '新月 (朔)', desc: '月球位於地球和太陽之間，亮面背對地球，因此我們看不見月亮。' }
+        ];
+
+        /**
+         * DOM 元素綁定
+         */
+        const spaceCanvas = document.getElementById('spaceView');
+        const spaceCtx = spaceCanvas.getContext('2d');
+        const phaseCanvas = document.getElementById('phaseView');
+        const phaseCtx = phaseCanvas.getContext('2d');
+        
+        const slider = document.getElementById('angleSlider');
+        const angleValueDisplay = document.getElementById('angleValue');
+        const phaseNameDisplay = document.getElementById('phaseName');
+        const dynamicDescription = document.getElementById('dynamicDescription');
+
+        // 星空背景快取 (避免每幀重新計算)
+        let starsCache = [];
+
+        /**
+         * 初始化畫布尺寸與高 DPI 處理
+         */
+        function resizeCanvas() {
+            const setSize = (canvas) => {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                canvas.ctx = canvas.getContext('2d');
+                canvas.ctx.scale(dpr, dpr);
+                return { width: rect.width, height: rect.height };
+            };
+
+            const spaceSize = setSize(spaceCanvas);
+            setSize(phaseCanvas);
+            
+            generateStars(spaceSize.width, spaceSize.height);
+            draw();
+        }
+
+        /**
+         * 產生隨機星空背景
+         */
+        function generateStars(w, h) {
+            starsCache = [];
+            for(let i=0; i<150; i++) {
+                starsCache.push({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    r: Math.random() * 1.5,
+                    opacity: Math.random() * 0.8 + 0.2
+                });
+            }
+        }
+
+        /**
+         * 數學工具函式
+         */
+        function degToRad(deg) { return deg * Math.PI / 180; }
+        function radToDeg(rad) { return rad * 180 / Math.PI; }
+
+        /**
+         * 取得目前的月相資訊
+         */
+        function getPhaseInfo(angle) {
+            for (let p of PHASE_NAMES) {
+                if (angle <= p.threshold) return p;
+            }
+            return PHASE_NAMES[PHASE_NAMES.length - 1];
+        }
+
+        /**
+         * 繪製左側上帝視角
+         */
+        function drawSpaceView() {
+            const w = spaceCanvas.width / (window.devicePixelRatio || 1);
+            const h = spaceCanvas.height / (window.devicePixelRatio || 1);
+            const cx = w / 2;
+            const cy = h / 2;
+            const orbitRadius = Math.min(w, h) * 0.35;
+            
+            // 清空畫布與繪製星空
+            spaceCtx.clearRect(0, 0, w, h);
+            starsCache.forEach(star => {
+                spaceCtx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
+                spaceCtx.beginPath();
+                spaceCtx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+                spaceCtx.fill();
+            });
+
+            // 繪製右側太陽光線效果
+            const sunGradient = spaceCtx.createLinearGradient(w - 50, 0, w, 0);
+            sunGradient.addColorStop(0, 'rgba(251, 191, 36, 0)');
+            sunGradient.addColorStop(1, 'rgba(251, 191, 36, 0.4)');
+            spaceCtx.fillStyle = sunGradient;
+            spaceCtx.fillRect(w - 100, 0, 100, h);
+            
+            // 指示光線箭頭
+            spaceCtx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+            spaceCtx.setLineDash([5, 5]);
+            for(let i = 1; i <= 5; i++) {
+                const y = h * (i / 6);
+                spaceCtx.beginPath();
+                spaceCtx.moveTo(w, y);
+                spaceCtx.lineTo(w - 50, y);
+                spaceCtx.stroke();
+                // 箭頭
+                spaceCtx.beginPath();
+                spaceCtx.moveTo(w - 50, y);
+                spaceCtx.lineTo(w - 40, y - 5);
+                spaceCtx.lineTo(w - 40, y + 5);
+                spaceCtx.fillStyle = 'rgba(251, 191, 36, 0.3)';
+                spaceCtx.fill();
+            }
+            spaceCtx.setLineDash([]);
+
+            // 繪製月球軌道
+            spaceCtx.beginPath();
+            spaceCtx.arc(cx, cy, orbitRadius, 0, Math.PI * 2);
+            spaceCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            spaceCtx.setLineDash([4, 4]);
+            spaceCtx.lineWidth = 1;
+            spaceCtx.stroke();
+            spaceCtx.setLineDash([]);
+
+            // 計算月球位置 (角度 0 在右，逆時針旋轉)
+            const rad = degToRad(state.angleDeg);
+            const moonX = cx + orbitRadius * Math.cos(rad);
+            const moonY = cy - orbitRadius * Math.sin(rad); // y 軸反向以符合直覺的逆時針
+
+            // 繪製視線 (地球到月球)
+            spaceCtx.beginPath();
+            spaceCtx.moveTo(cx, cy);
+            spaceCtx.lineTo(moonX, moonY);
+            spaceCtx.strokeStyle = 'rgba(96, 165, 250, 0.4)'; // 淡藍色視線
+            spaceCtx.lineWidth = 2;
+            spaceCtx.stroke();
+
+            // 在視線上加上一個小眼睛圖示(表示地球人視角)
+            const eyeX = cx + (orbitRadius * 0.4) * Math.cos(rad);
+            const eyeY = cy - (orbitRadius * 0.4) * Math.sin(rad);
+            spaceCtx.save();
+            spaceCtx.translate(eyeX, eyeY);
+            spaceCtx.rotate(Math.atan2(moonY - cy, moonX - cx));
+            spaceCtx.font = "16px Arial";
+            spaceCtx.textAlign = "center";
+            spaceCtx.textBaseline = "middle";
+            spaceCtx.fillText("👀", 0, 0);
+            spaceCtx.restore();
+
+            // 繪製地球 (左暗右亮)
+            const earthRadius = 24;
+            spaceCtx.beginPath();
+            spaceCtx.arc(cx, cy, earthRadius, 0, Math.PI * 2);
+            spaceCtx.fillStyle = '#1e3a8a'; // 暗部(夜)
+            spaceCtx.fill();
+            spaceCtx.beginPath();
+            spaceCtx.arc(cx, cy, earthRadius, -Math.PI/2, Math.PI/2);
+            spaceCtx.fillStyle = '#60a5fa'; // 亮部(晝)
+            spaceCtx.fill();
+            
+            // 地球裝飾(極點)
+            spaceCtx.beginPath();
+            spaceCtx.arc(cx, cy, 3, 0, Math.PI * 2);
+            spaceCtx.fillStyle = '#ffffff';
+            spaceCtx.fill();
+            spaceCtx.font = "10px Noto Sans TC";
+            spaceCtx.fillStyle = "rgba(255,255,255,0.7)";
+            spaceCtx.fillText("北極", cx - 12, cy - 30);
+
+            // 繪製月球 (左暗右亮，始終面對右側太陽)
+            const moonRadius = 14;
+            spaceCtx.save();
+            spaceCtx.translate(moonX, moonY);
+            // 由於陰陽半球始終固定(陽光從右來)，不需旋轉畫布
+            // 畫暗面
+            spaceCtx.beginPath();
+            spaceCtx.arc(0, 0, moonRadius, Math.PI/2, Math.PI*1.5);
+            spaceCtx.fillStyle = '#334155';
+            spaceCtx.fill();
+            // 畫亮面
+            spaceCtx.beginPath();
+            spaceCtx.arc(0, 0, moonRadius, -Math.PI/2, Math.PI/2);
+            spaceCtx.fillStyle = '#f8fafc';
+            spaceCtx.fill();
+            spaceCtx.restore();
+            
+            // 繪製可互動的熱區提示圈 (僅在 Hover 或 Drag 時顯示效果更佳，這裡畫個淡底)
+            spaceCtx.beginPath();
+            spaceCtx.arc(moonX, moonY, moonRadius + 10, 0, Math.PI*2);
+            spaceCtx.fillStyle = state.isDragging ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)';
+            spaceCtx.fill();
+        }
+
+        /**
+         * 繪製右側地球人視角 (真實月相渲染)核心演算法
+         */
+        function drawPhaseView() {
+            const w = phaseCanvas.width / (window.devicePixelRatio || 1);
+            const h = phaseCanvas.height / (window.devicePixelRatio || 1);
+            const cx = w / 2;
+            const cy = h / 2;
+            const moonR = Math.min(w, h) * 0.35;
+            
+            phaseCtx.clearRect(0, 0, w, h);
+            
+            // 一樣畫點星空
+            starsCache.slice(0, 50).forEach(star => {
+                phaseCtx.fillStyle = `rgba(255, 255, 255, ${star.opacity * 0.5})`;
+                phaseCtx.beginPath();
+                phaseCtx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+                phaseCtx.fill();
+            });
+
+            // 背景發光暈 (滿月時最亮)
+            const glowDist = Math.abs(180 - state.angleDeg);
+            const glowIntensity = Math.max(0, 1 - glowDist / 180);
+            if (glowIntensity > 0.1) {
+                const gradient = phaseCtx.createRadialGradient(cx, cy, moonR, cx, cy, moonR * 1.5);
+                gradient.addColorStop(0, `rgba(255, 255, 255, ${0.3 * glowIntensity})`);
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                phaseCtx.fillStyle = gradient;
+                phaseCtx.beginPath();
+                phaseCtx.arc(cx, cy, moonR * 1.5, 0, Math.PI * 2);
+                phaseCtx.fill();
+            }
+
+            phaseCtx.save();
+            phaseCtx.translate(cx, cy);
+            
+            // 繪製基礎暗月 (月球本體)
+            phaseCtx.fillStyle = '#1e293b'; // 深灰色模擬暗面
+            phaseCtx.beginPath();
+            phaseCtx.arc(0, 0, moonR, 0, Math.PI * 2);
+            phaseCtx.fill();
+
+            // 將角度轉為 Radians。我們的模型：0=新月, 90=上弦(右亮), 180=滿月, 270=下弦(左亮)
+            const rad = degToRad(state.angleDeg);
+            
+            // 繪製亮面
+            phaseCtx.fillStyle = '#f8fafc';
+            
+            // 判斷月相處於上半個月(漸盈 Waxing)或下半個月(漸虧 Waning)
+            if (state.angleDeg > 0 && state.angleDeg < 180) {
+                // 漸盈 (Waxing)：右半邊必定有亮光
+                phaseCtx.beginPath();
+                phaseCtx.arc(0, 0, moonR, -Math.PI/2, Math.PI/2);
+                phaseCtx.fill();
+            } else if (state.angleDeg > 180 && state.angleDeg < 360) {
+                // 漸虧 (Waning)：左半邊必定有亮光
+                phaseCtx.beginPath();
+                phaseCtx.arc(0, 0, moonR, Math.PI/2, -Math.PI/2);
+                phaseCtx.fill();
+            } else if (state.angleDeg === 180) {
+                // 滿月
+                phaseCtx.beginPath();
+                phaseCtx.arc(0, 0, moonR, 0, Math.PI * 2);
+                phaseCtx.fill();
+            } // angle === 0 或 360 (新月)，不用畫亮面
+            
+            // 繪製覆蓋的橢圓 (產生明暗交界線 Terminator)
+            // Math.cos(rad) 決定了橢圓的寬度比例。
+            const cosVal = Math.cos(rad);
+            const ellipseWidth = moonR * Math.abs(cosVal);
+            
+            if (state.angleDeg !== 0 && state.angleDeg !== 180 && state.angleDeg !== 360) {
+                // 根據角度決定這個橢圓是亮色還是暗色
+                // cos > 0 (0~90, 270~360): 暗色區域正在侵佔基礎亮半圓，故畫暗色
+                // cos < 0 (90~180, 180~270): 亮色區域正在向另一半擴張，故畫亮色
+                phaseCtx.fillStyle = cosVal > 0 ? '#1e293b' : '#f8fafc';
+                
+                phaseCtx.beginPath();
+                // ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle)
+                phaseCtx.ellipse(0, 0, ellipseWidth, moonR, 0, 0, Math.PI * 2);
+                phaseCtx.fill();
+            }
+
+            phaseCtx.restore();
+            
+            // 更新文字與說明
+            updateUI();
+        }
+
+        /**
+         * 統一更新所有畫面與 UI
+         */
+        function draw() {
+            drawSpaceView();
+            drawPhaseView();
+        }
+
+        function updateUI() {
+            // 修正顯示角度 (讓 360 顯示為 0)
+            const displayDeg = state.angleDeg === 360 ? 0 : Math.round(state.angleDeg);
+            angleValueDisplay.innerText = `${displayDeg}°`;
+            slider.value = state.angleDeg;
+
+            const phaseInfo = getPhaseInfo(state.angleDeg);
+            phaseNameDisplay.innerText = phaseInfo.name;
+            dynamicDescription.innerHTML = `💡 ${phaseInfo.desc}`;
+        }
+
+        /**
+         * 互動邏輯：滑鼠/觸控拖曳計算角度
+         */
+        function handleInteraction(e) {
+            e.preventDefault(); // 防止手機滾動
+            const canvasRect = spaceCanvas.getBoundingClientRect();
+            // 支援滑鼠或觸控
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            // 轉換為 Canvas 內部邏輯座標 (未考慮 dpr 的原始像素)
+            const x = clientX - canvasRect.left;
+            const y = clientY - canvasRect.top;
+            
+            const cx = canvasRect.width / 2;
+            const cy = canvasRect.height / 2;
+
+            // 計算角度 (atan2)
+            // 注意：Canvas Y 軸朝下，而我們希望逆時針為正向
+            // 故使用 Math.atan2(cy - y, x - cx)
+            let rad = Math.atan2(cy - y, x - cx);
+            if (rad < 0) rad += 2 * Math.PI; // 保持在 0 ~ 2PI 之間
+            
+            let deg = radToDeg(rad);
+            state.angleDeg = deg;
+            
+            draw();
+        }
+
+        // 綁定 Slider 事件
+        slider.addEventListener('input', (e) => {
+            state.angleDeg = parseFloat(e.target.value);
+            draw();
+        });
+
+        // 綁定 Canvas 事件 (上帝視角拖曳)
+        spaceCanvas.addEventListener('mousedown', (e) => {
+            state.isDragging = true;
+            handleInteraction(e);
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (state.isDragging) handleInteraction(e);
+        });
+        window.addEventListener('mouseup', () => {
+            state.isDragging = false;
+        });
+
+        // 觸控支援
+        spaceCanvas.addEventListener('touchstart', (e) => {
+            state.isDragging = true;
+            handleInteraction(e);
+        }, { passive: false });
+        window.addEventListener('touchmove', (e) => {
+            if (state.isDragging) handleInteraction(e);
+        }, { passive: false });
+        window.addEventListener('touchend', () => {
+            state.isDragging = false;
+        });
+
+        // RWD 縮放監聽
+        window.addEventListener('resize', resizeCanvas);
+
+        // 初始化啟動
+        resizeCanvas();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>等高線與地形剖面圖互動教學</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+        p.desc {
+            color: #666;
+            margin-bottom: 20px;
+            text-align: center;
+            max-width: 600px;
+        }
+        .canvas-container {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 640px;
+            box-sizing: border-box;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: crosshair;
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        .label {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>等高線地形剖面分析</h1>
+    <p class="desc">請在上方的等高線圖上「點擊並拖曳」畫出一條剖面線，下方將即時生成對應的立體剖面圖。</p>
+
+    <div class="canvas-container">
+        <div>
+            <div class="label">平面等高線圖 (俯視)</div>
+            <!-- 地圖畫布：內部解析度固定，CSS控制顯示比例 -->
+            <canvas id="mapCanvas" width="600" height="400"></canvas>
+        </div>
+        <div>
+            <div class="label">地形剖面圖 (側視)</div>
+            <!-- 剖面圖畫布：內部解析度固定 -->
+            <canvas id="profileCanvas" width="600" height="200"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // 取得畫布與 Context
+        const mapCanvas = document.getElementById('mapCanvas');
+        const ctxMap = mapCanvas.getContext('2d', { willReadFrequently: true });
+        const profileCanvas = document.getElementById('profileCanvas');
+        const ctxProfile = profileCanvas.getContext('2d');
+
+        const width = mapCanvas.width;
+        const height = mapCanvas.height;
+
+        // 定義地形特徵 (兩座山丘)
+        const hills = [
+            { cx: 200, cy: 200, h: 400, spread: 15000 }, // 左側較高較陡的山
+            { cx: 420, cy: 250, h: 300, spread: 12000 }  // 右側較矮較緩的山
+        ];
+
+        // 計算特定座標 (x, y) 的海拔高度
+        function getElevation(x, y) {
+            let z = 0;
+            for (let hill of hills) {
+                // 使用高斯分布公式生成平滑山丘: Z = H * exp(-(dx^2 + dy^2) / spread)
+                const distSq = Math.pow(x - hill.cx, 2) + Math.pow(y - hill.cy, 2);
+                z += hill.h * Math.exp(-distSq / hill.spread);
+            }
+            return z;
+        }
+
+        // 繪製初始等高線圖並儲存影像資料，以利後續疊加畫線
+        let baseMapImageData;
+        function renderBaseMap() {
+            const imgData = ctxMap.createImageData(width, height);
+            const data = imgData.data;
+            const contourStep = 40; // 等高線間距(公尺)
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const z = getElevation(x, y);
+                    const idx = (y * width + x) * 4;
+                    const remainder = z % contourStep;
+                    
+                    // 根據高度設定底色 (低海拔綠色 -> 高海拔棕色)
+                    let r = Math.min(255, 120 + z * 0.4);
+                    let g = Math.max(100, 200 - z * 0.3);
+                    let b = 100;
+
+                    // 畫出等高線 (當數值接近間距的倍數時)
+                    if (remainder < 2 || remainder > contourStep - 2) {
+                        r = 40; g = 40; b = 40; // 深灰色線條
+                    }
+
+                    data[idx] = r;
+                    data[idx + 1] = g;
+                    data[idx + 2] = b;
+                    data[idx + 3] = 255; // Alpha
+                }
+            }
+            ctxMap.putImageData(imgData, 0, 0);
+            baseMapImageData = ctxMap.getImageData(0, 0, width, height);
+        }
+
+        // 互動狀態變數
+        let isDrawing = false;
+        let startP = { x: 0, y: 0 };
+        let endP = { x: 0, y: 0 };
+
+        // 綁定滑鼠與觸控事件，支援 RWD 縮放後的座標轉換
+        function getPointerPos(e) {
+            const rect = mapCanvas.getBoundingClientRect();
+            const scaleX = mapCanvas.width / rect.width;
+            const scaleY = mapCanvas.height / rect.height;
+            
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function startInteraction(e) {
+            e.preventDefault();
+            isDrawing = true;
+            startP = getPointerPos(e);
+            endP = startP;
+            updateCanvas();
+        }
+
+        function moveInteraction(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            endP = getPointerPos(e);
+            updateCanvas();
+        }
+
+        function endInteraction(e) {
+            if (!isDrawing) return;
+            // e.preventDefault(); // 註解掉以免影響全域點擊
+            isDrawing = false;
+        }
+
+        mapCanvas.addEventListener('mousedown', startInteraction);
+        mapCanvas.addEventListener('mousemove', moveInteraction);
+        window.addEventListener('mouseup', endInteraction);
+        
+        // 支援手機與 PWA 觸控
+        mapCanvas.addEventListener('touchstart', startInteraction, { passive: false });
+        mapCanvas.addEventListener('touchmove', moveInteraction, { passive: false });
+        window.addEventListener('touchend', endInteraction);
+
+        // 更新畫面：重繪地圖上的線段與下方剖面圖
+        function updateCanvas() {
+            // 1. 還原地圖底圖
+            ctxMap.putImageData(baseMapImageData, 0, 0);
+
+            // 2. 畫上使用者的剖面線 (A -> B)
+            ctxMap.beginPath();
+            ctxMap.moveTo(startP.x, startP.y);
+            ctxMap.lineTo(endP.x, endP.y);
+            ctxMap.strokeStyle = '#e74c3c';
+            ctxMap.lineWidth = 3;
+            ctxMap.stroke();
+
+            // 標示 A 點與 B 點
+            ctxMap.fillStyle = 'black';
+            ctxMap.font = 'bold 18px Arial';
+            ctxMap.fillText('A', startP.x - 20, startP.y - 10);
+            ctxMap.fillText('B', endP.x + 10, endP.y - 10);
+
+            // 3. 更新剖面圖
+            drawProfile();
+        }
+
+        function drawProfile() {
+            // 清空剖面畫布
+            ctxProfile.clearRect(0, 0, profileCanvas.width, profileCanvas.height);
+            
+            // 計算線段總長度與採樣點
+            const dx = endP.x - startP.x;
+            const dy = endP.y - startP.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance === 0) return;
+
+            const samplePoints = 150;
+            const profileData = [];
+            let maxZ = 500; // 剖面圖 Y 軸最高代表 500 公尺
+
+            // 對線段進行均勻採樣，取得高度
+            for (let i = 0; i <= samplePoints; i++) {
+                const t = i / samplePoints;
+                const px = startP.x + dx * t;
+                const py = startP.y + dy * t;
+                profileData.push(getElevation(px, py));
+            }
+
+            // 繪製網格底圖 (美化與對齊用)
+            ctxProfile.strokeStyle = '#e0e0e0';
+            ctxProfile.lineWidth = 1;
+            for(let i=1; i<=5; i++){
+                let y = profileCanvas.height - (i * 100 / maxZ * profileCanvas.height);
+                ctxProfile.beginPath();
+                ctxProfile.moveTo(0, y);
+                ctxProfile.lineTo(profileCanvas.width, y);
+                ctxProfile.stroke();
+                
+                // 高度標示
+                ctxProfile.fillStyle = '#999';
+                ctxProfile.font = '12px Arial';
+                ctxProfile.fillText(i * 100 + 'm', 5, y - 5);
+            }
+
+            // 開始繪製剖面起伏
+            ctxProfile.beginPath();
+            ctxProfile.moveTo(0, profileCanvas.height); // 起點在左下角
+
+            for (let i = 0; i <= samplePoints; i++) {
+                const z = profileData[i];
+                const x = (i / samplePoints) * profileCanvas.width;
+                // 將高度映射到畫布的 Y 軸 (Y軸方向向下，需反轉)
+                const y = profileCanvas.height - (z / maxZ) * profileCanvas.height;
+                ctxProfile.lineTo(x, y);
+            }
+
+            ctxProfile.lineTo(profileCanvas.width, profileCanvas.height); // 終點回右下角
+            ctxProfile.closePath();
+
+            // 填滿剖面顏色並加上深色邊緣
+            ctxProfile.fillStyle = 'rgba(139, 69, 19, 0.4)'; // 半透明棕色
+            ctxProfile.fill();
+            ctxProfile.strokeStyle = '#5c4033';
+            ctxProfile.lineWidth = 3;
+            ctxProfile.stroke();
+            
+            // 補上文字標籤 A 與 B
+            ctxProfile.fillStyle = 'black';
+            ctxProfile.font = 'bold 16px Arial';
+            ctxProfile.fillText('A (起點)', 10, profileCanvas.height - 10);
+            ctxProfile.fillText('B (終點)', profileCanvas.width - 80, profileCanvas.height - 10);
+        }
+
+        // 系統啟動：先算好底圖，然後畫一個預設的畫面
+        window.onload = () => {
+            renderBaseMap();
+            // 預設畫一條線讓使用者一進來就知道長什麼樣子
+            startP = { x: 80, y: 280 };
+            endP = { x: 520, y: 150 };
+            updateCanvas();
+        };
+
+    </script>
+</body>
+</html>
