@@ -100,6 +100,29 @@
     }
   }
 
+  // 產生 24 條經度線 (每 15 度一條)
+  const longitudePaths = [];
+  for (let lng = -180; lng < 180; lng += 15) {
+    const coords = [];
+    for (let lat = -90; lat <= 90; lat += 5) {
+      coords.push([lat, lng]);
+    }
+    let color = "rgba(255, 255, 255, 0.22)";
+    let width = 0.6;
+    if (lng === 0) {
+      color = "#ef4444"; // 本初子午線 (紅色)
+      width = 1.8;
+    } else if (lng === 180 || lng === -180) {
+      color = "#f97316"; // 180度經線 (橘色)
+      width = 1.2;
+    }
+    longitudePaths.push({
+      coords: coords,
+      color: color,
+      width: width
+    });
+  }
+
   function updateGlobe(lonA, lonB, nameA, nameB) {
     const globeEl = $("globeViz");
     if (!globeEl) return;
@@ -120,7 +143,23 @@
         .labelColor(d => d.color)
         .labelSize(3.0)
         .labelDotRadius(0.4)
-        .labelResolution(2);
+        .labelResolution(2)
+        .pathsData(longitudePaths)
+        .pathPoints(d => d.coords)
+        .pathPointLat(p => p[0])
+        .pathPointLng(p => p[1])
+        .pathColor(d => d.color)
+        .pathStroke(d => d.width)
+        .pathAltitude(0.0025);
+
+      const controls = window.learningGlobe.controls();
+      if (controls) {
+        // 限制只能東西向（左右）旋轉，不能上下轉
+        // 設為稍微俯視赤道 (Math.PI / 2 - 0.15 弧度，約 81 度，以看清經線交會)
+        const angle = Math.PI / 2 - 0.15;
+        controls.minPolarAngle = angle;
+        controls.maxPolarAngle = angle;
+      }
     }
     window.learningGlobe.pointsData([
       { lat: 24, lng: lonA, color: "#ff8da1" },
