@@ -161,13 +161,7 @@
                             {/* 以 x=400 為中心，半徑100。左緣是300，右緣是500(視網膜) */}
                             <circle cx="400" cy="150" r="100" fill="#0f172a" stroke="#475569" strokeWidth="4" />
                             
-                            {/* 眼軸過長/過短的虛線標示 (幫助理解成因) */}
-                            {eyeState === 'myopia' && (
-                                <path d="M 400,50 A 100,100 0 0,1 540,150 A 100,100 0 0,1 400,250" stroke="#475569" strokeWidth="2" strokeDasharray="5,5" fill="none" />
-                            )}
-                            {eyeState === 'hyperopia' && (
-                                <path d="M 400,50 A 100,100 0 0,1 460,150 A 100,100 0 0,1 400,250" stroke="#475569" strokeWidth="2" strokeDasharray="5,5" fill="none" />
-                            )}
+
 
                             {/* 視網膜 (紅色感光區) */}
                             <path d="M 450,63.4 A 100,100 0 0,1 450,236.6" stroke="#ef4444" strokeWidth="6" fill="none" />
