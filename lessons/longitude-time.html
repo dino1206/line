@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -2134,775 +2133,1396 @@ body {
 
   <!-- 引入主要的 JS 邏輯 -->
   <script>
-(function () {
-  const $ = (id) => document.getElementById(id);
-  const cityA = $("city-select-a");
-  const cityB = $("city-select-b");
-  const timeA = $("time-input-a");
-  const calcSteps = $("calc-steps");
-  const tabs = document.querySelectorAll(".nav-tab");
-  const panes = document.querySelectorAll(".tab-pane");
+/* ==========================================================================
+   經緯度時間換算學習器 - 核心邏輯與互動引擎 (app.js)
+   ========================================================================== */
 
-  const pad = (value) => String(value).padStart(2, "0");
-  const lonToOffset = (lon) => Number(lon) / 15;
+// --- 預設城市與徽章資料庫 ---
+const CITIES = {
+  "120": { name: "台北", lon: 120, dir: "E", tzName: "GMT+8", lat: 25, y: 38 },
+  "0": { name: "倫敦", lon: 0, dir: "E", tzName: "GMT+0", lat: 51.5, y: 26 },
+  "139.7": { name: "東京", lon: 139.7, dir: "E", tzName: "GMT+9", lat: 35.6, y: 32 },
+  "151.2": { name: "雪梨", lon: 151.2, dir: "E", tzName: "GMT+10", lat: -33.8, y: 64 },
+  "-74": { name: "紐約", lon: 74, dir: "W", tzName: "GMT-5", lat: 40.7, y: 30 },
+  "-122.4": { name: "舊金山", lon: 122.4, dir: "W", tzName: "GMT-8", lat: 37.7, y: 31 },
+  "31.2": { name: "開羅", lon: 31.2, dir: "E", tzName: "GMT+2", lat: 30.0, y: 35 }
+};
 
-  // --- 城市英文對照表以解決 3D 地球儀中文亂碼問題 ---
-  const CITY_EN = {
-    "台北": "Taipei",
-    "倫敦": "London",
-    "東京": "Tokyo",
-    "雪梨": "Sydney",
-    "紐約": "New York",
-    "舊金山": "San Francisco",
-    "開羅": "Cairo"
-  };
+const BADGES = [
+  { id: "london", name: "倫敦大笨鐘", emoji: "🕰️", cost: 10, lon: "0°", tz: "GMT+0", fact: "大笨鐘位於英國倫敦，是格林威治標準時間(GMT)的起點！世界時區都以這裡作為 0 度基準來做加減喔！" },
+  { id: "cairo", name: "開羅金字塔", emoji: "🔺", cost: 20, lon: "31.2°E", tz: "GMT+2", fact: "埃及開羅位於東經 31.2 度。古埃及人可是發明一年 365 天與太陽曆的先驅，對時間的觀念非常歷史悠久呢！" },
+  { id: "india", name: "印度泰姬瑪哈陵", emoji: "🕌", cost: 30, lon: "77.2°E", tz: "GMT+5.5", fact: "印度使用的是一個非常特別的「半小時時區」！他們的標準時間是 GMT+5:30，不是整數小時，計算時要格外小心喔！" },
+  { id: "taipei", name: "台北101", emoji: "🏢", cost: 40, lon: "120°E", tz: "GMT+8", fact: "台北位於東經 120 度，屬於國家標準時間(GMT+8)。因為 120 除以 15 剛好整除，所以我們的時間比倫敦快整整 8 小時！" },
+  { id: "tokyo", name: "東京富士山", emoji: "🌸", cost: 50, lon: "139.7°E", tz: "GMT+9", fact: "東京比台北更靠東邊，經度約為東經 135 度(時區基準線)，所以日本的時間比台灣還要快 1 小時，他們會更早迎來元旦日出！" },
+  { id: "sydney", name: "雪梨歌劇院", emoji: "⛵", cost: 60, lon: "151.2°E", tz: "GMT+10", fact: "雪梨位於澳洲東岸。在南半球夏天時，他們會實施「夏令時間」把時鐘撥快一小時，這時候就會跟台灣差到 3 小時喔！" },
+  { id: "hawaii", name: "夏威夷草裙", emoji: "🌺", cost: 70, lon: "157.8°W", tz: "GMT-10", fact: "夏威夷位於西經 157.8 度，屬於 GMT-10 時區。因為跨越了很遠的西半球，他們的時間比台灣慢了整整 18 個小時！" },
+  { id: "newyork", name: "紐約自由女神", emoji: "🗽", cost: 80, lon: "74°W", tz: "GMT-5", fact: "紐約在西經 74 度。當台北的學生在吃中午 12:00 的午餐時，紐約此時是前一天的深夜 23:00，大家正準備進入夢鄉呢！" }
+];
 
-  function getENName(chName) {
-    if (CITY_EN[chName]) {
-      return CITY_EN[chName];
-    }
-    if (chName && chName.startsWith("自訂")) {
-      return chName.replace("自訂", "Custom");
-    }
-    return chName || "";
-  }
+// --- 遊戲狀態 ---
+let gameState = {
+  stars: 0,
+  unlockedBadges: []
+};
 
-  function nowLocalDatetime() {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    return now.toISOString().slice(0, 16);
-  }
+// --- 初始化加載 ---
+document.addEventListener("DOMContentLoaded", () => {
+  loadProgress();
+  initTabs();
+  initExploreMode();
+  initQuizMode();
+  renderBadges();
+  
+  // 綁定重設按鈕
+  document.getElementById("btn-reset").addEventListener("click", resetProgress);
+  
+  // 初始化畫布大小
+  resizeConfettiCanvas();
+  window.addEventListener("resize", resizeConfettiCanvas);
 
-  function selectedLongitude(selectEl, suffix) {
-    if (!selectEl) return 0;
-    if (selectEl.value !== "custom") return Number(selectEl.value);
-    const value = Number($(`lon-val-${suffix}`)?.value || 0);
-    const dir = $(`lon-dir-${suffix}`)?.value || "E";
-    return dir === "W" ? -Math.abs(value) : Math.abs(value);
-  }
-
-  function setCustomRow(selectEl, suffix) {
-    const row = $(`custom-longitude-${suffix}-row`);
-    if (row) row.style.display = selectEl?.value === "custom" ? "block" : "none";
-  }
-
-  function formatDate(date) {
-    return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())}`;
-  }
-
-  function formatTime(date) {
-    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  }
-
-  function setClock(prefix, date) {
-    const digital = $(`digital-${prefix}`);
-    const dateEl = $(`date-${prefix}`);
-    const hour = $(`hour-${prefix}`);
-    const minute = $(`minute-${prefix}`);
-    if (digital) digital.textContent = formatTime(date);
-    if (dateEl) dateEl.textContent = formatDate(date);
-    if (hour) hour.style.transform = `translateX(-50%) rotate(${(date.getHours() % 12) * 30 + date.getMinutes() * 0.5}deg)`;
-    if (minute) minute.style.transform = `translateX(-50%) rotate(${date.getMinutes() * 6}deg)`;
-  }
-
-  function lonToPercent(lon) {
-    return ((Number(lon) + 180) / 360) * 100;
-  }
-
-  function updateAxis(lonA, lonB) {
-    const markerA = $("axis-marker-a");
-    const markerB = $("axis-marker-b");
-    if (markerA) markerA.style.left = `${lonToPercent(lonA)}%`;
-    if (markerB) markerB.style.left = `${lonToPercent(lonB)}%`;
-  }
-
-  function updateSky(lonA, lonB) {
-    const sky = $("sky-bg");
-    const sun = $("sun-body");
-    const moon = $("moon-body");
-    const aLocalHour = (new Date(timeA.value || nowLocalDatetime()).getHours() + lonToOffset(lonA)) % 24;
-    if (sky) {
-      sky.style.background = aLocalHour >= 6 && aLocalHour < 18
-        ? "linear-gradient(to bottom, #83c5ff 0%, #f7d774 100%)"
-        : "linear-gradient(to bottom, #172554 0%, #020617 100%)";
-    }
-    if (sun) {
-      sun.style.left = `${Math.max(8, Math.min(82, lonToPercent(lonA)))}%`;
-      sun.style.top = aLocalHour >= 6 && aLocalHour < 18 ? "18%" : "80%";
-    }
-    if (moon) {
-      moon.style.left = `${Math.max(8, Math.min(82, lonToPercent(lonB)))}%`;
-      moon.style.top = aLocalHour >= 6 && aLocalHour < 18 ? "72%" : "18%";
-    }
-  }
-
-  // 產生 24 條經度線 (每 15 度一條)
-  const longitudePaths = [];
-  for (let lng = -180; lng < 180; lng += 15) {
-    const coords = [];
-    for (let lat = -90; lat <= 90; lat += 5) {
-      coords.push([lat, lng]);
-    }
-    let color = "#555555"; // 一般經線（淡灰色）
-    if (lng === 0) {
-      color = "#ef4444"; // 本初子午線 (紅色)
-    } else if (lng === 180 || lng === -180) {
-      color = "#f97316"; // 180度經線 (橘色)
-    }
-    longitudePaths.push({
-      coords: coords,
-      color: color
-    });
-  }
-
-  function updateGlobe(lonA, lonB, nameA, nameB) {
-    const globeEl = $("globeViz");
-    if (!globeEl) return;
-    if (!window.Globe) {
-      globeEl.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:white;text-align:center;padding:24px;">3D 地球儀載入中，時差計算可先使用。</div>';
+  // 綁定鍵盤左右鍵事件 (往東、西移動 B 15度)
+  document.addEventListener("keydown", (e) => {
+    // 只有在非輸入框 (input/select/textarea) 聚焦時才觸發，避免打字干擾
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "SELECT" || activeEl.tagName === "TEXTAREA")) {
       return;
     }
+    
+    if (e.key === "ArrowLeft") {
+      // 往西移動 B
+      adjustBLongitude(-15);
+      e.preventDefault(); // 阻擋預設滾動
+    } else if (e.key === "ArrowRight") {
+      // 往東移動 B
+      adjustBLongitude(15);
+      e.preventDefault();
+    }
+  });
+});
+
+// --- LocalStorage 進度儲存與讀取 ---
+function saveProgress() {
+  localStorage.setItem("earth_explorer_progress", JSON.stringify(gameState));
+  document.getElementById("star-count").innerText = gameState.stars;
+}
+
+function loadProgress() {
+  const saved = localStorage.getItem("earth_explorer_progress");
+  if (saved) {
     try {
-      if (!window.learningGlobe) {
-        window.learningGlobe = Globe()(globeEl)
-          .backgroundColor("rgba(0,0,0,0)")
-          .globeImageUrl("https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
-          .bumpImageUrl("https://unpkg.com/three-globe/example/img/earth-topology.png")
-          .pointAltitude(0.04)
-          .pointRadius(0.8)
-          .labelLat(d => d.lat)
-          .labelLng(d => d.lng)
-          .labelText(d => d.text)
-          .labelColor(d => d.color)
-          .labelSize(3.0)
-          .labelDotRadius(0.4)
-          .labelResolution(2)
-          .pathsData(longitudePaths)
-          .pathPoints(d => d.coords)
-          .pathPointLat(p => p[0])
-          .pathPointLng(p => p[1])
-          .pathColor(d => d.color)
-          .pathStroke(null)
-          .pathAltitude(0.003);
-
-        // 鎖定只能東西向旋轉 (固定 polar angle 於赤道)
-        const controls = window.learningGlobe.controls();
-        if (controls) {
-          // 稍微偏上一點點，讓北半球的城市和路線更容易看見 (大約 85 度)
-          // 限制在同一個角度就可以鎖定上下旋轉
-          const angle = Math.PI / 2 - 0.1;
-          controls.minPolarAngle = angle;
-          controls.maxPolarAngle = angle;
-        }
-      }
-
-      // 每次更新都再次確保鎖定 (防呆)
-      const controls = window.learningGlobe.controls();
-      if (controls) {
-        const angle = Math.PI / 2 - 0.1;
-        controls.minPolarAngle = angle;
-        controls.maxPolarAngle = angle;
-      }
-
-      // 更新標記點
-      window.learningGlobe.pointsData([
-        { lat: 24, lng: lonA, color: "#ff8da1" },
-        { lat: -12, lng: lonB, color: "#64b5f6" }
-      ]).pointColor("color");
-
-      const nameA_en = getENName(nameA);
-      const nameB_en = getENName(nameB);
-
-      // 更新城市名稱
-      window.learningGlobe.labelsData([
-        { lat: 24, lng: lonA, text: `A: ${nameA_en}`, color: "#ff8da1" },
-        { lat: -12, lng: lonB, text: `B: ${nameB_en}`, color: "#64b5f6" }
-      ]);
-    } catch(e) {
-      console.warn("Globe error:", e);
+      gameState = JSON.parse(saved);
+      if (!gameState.unlockedBadges) gameState.unlockedBadges = [];
+    } catch (e) {
+      console.error("進度讀取失敗，使用預設值", e);
     }
   }
+  document.getElementById("star-count").innerText = gameState.stars;
+}
 
-  function getCityName(selectEl, suffix) {
-    if (!selectEl) return "";
-    if (selectEl.value !== "custom") {
-      const text = selectEl.options[selectEl.selectedIndex].text;
-      return text.split(" (")[0];
+function resetProgress() {
+  if (confirm("夥伴，確定要重設你的時空探險進度嗎？這會清除所有的星之碎片和解鎖的徽章喔！")) {
+    gameState = { stars: 0, unlockedBadges: [] };
+    saveProgress();
+    renderBadges();
+    initExploreMode(); // 重新整理探險模式
+    alert("進度已歸零！我們重新開始冒險吧！🐱");
+    lunaSpeak("時光倒流！我們的碎片和徽章都重設了，再跟我一起重新學習吧！");
+  }
+}
+
+// --- Tab 頁籤切換邏輯 ---
+function initTabs() {
+  const tabs = document.querySelectorAll(".nav-tab");
+  const panes = document.querySelectorAll(".tab-pane");
+  
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("active"));
+      panes.forEach(p => p.classList.remove("active"));
+      
+      tab.classList.add("active");
+      const targetId = tab.getAttribute("data-tab");
+      const activePane = document.getElementById(targetId);
+      activePane.classList.add("active");
+      
+      // 吉祥物露娜根據不同 Tab 給予特定台詞
+      if (targetId === "tab-explore") {
+        lunaSpeak("任意調整 A、B 兩地經度，觀察太陽位置與下方時鐘，一起發掘時差的秘密吧！🧭");
+      } else if (targetId === "tab-quiz") {
+        lunaSpeak("來接受我的挑戰！答對拿星之碎片，解鎖更多景點徽章喔！✏️");
+      } else if (targetId === "tab-badges") {
+        lunaSpeak("這是你的旅行手札！收集碎片解鎖徽章，點擊還能看小知識！🏆");
+      } else if (targetId === "tab-handbook") {
+        lunaSpeak("換算很難嗎？別怕，『東加西減』和『15度=1小時』口訣都在這！📖");
+      }
+    });
+  });
+}
+
+// --- 吉祥物露娜發聲與動畫效果 ---
+function lunaSpeak(text) {
+  const bubble = document.getElementById("luna-bubble-text");
+  bubble.style.opacity = 0;
+  setTimeout(() => {
+    bubble.innerText = text;
+    bubble.style.opacity = 1;
+  }, 200);
+  
+  // 露娜輕微跳動一下
+  const character = document.getElementById("luna-character");
+  character.style.animation = "none";
+  // 強制重繪
+  void character.offsetWidth;
+  character.style.animation = "breathe 3s ease-in-out infinite, bounceLuna 0.5s ease-out";
+}
+
+// 露娜跳動動畫的 CSS 會在 app 加載時動態加入，或在 CSS 中已有
+// 這裡我們直接加入臨時跳動 keyframes
+const styleSheet = document.createElement("style");
+styleSheet.innerText = `
+@keyframes bounceLuna {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-12px) scale(1.05); }
+  100% { transform: translateY(0); }
+}
+`;
+document.head.appendChild(styleSheet);
+
+
+// ==========================================================================
+// 🧭 頁籤 1：時空探險模式 邏輯
+// ==========================================================================
+
+let lonA = 120; // 台北
+let lonB = 0;   // 倫敦
+let timeA = new Date();
+let timeB = new Date();
+
+// 地球儀動畫用的「目前畫面上顯示的經度」，會以緩動方式追向真實的 lonA / lonB，製造滑動轉場感
+let displayLonA = lonA;
+let displayLonB = lonB;
+let globeAnimId = null;
+
+function initExploreMode() {
+  const citySelectA = document.getElementById("city-select-a");
+  const citySelectB = document.getElementById("city-select-b");
+  const lonValA = document.getElementById("lon-val-a");
+  const lonDirA = document.getElementById("lon-dir-a");
+  const lonValB = document.getElementById("lon-val-b");
+  const lonDirB = document.getElementById("lon-dir-b");
+  const timeInputA = document.getElementById("time-input-a");
+  
+  // 設定當前本機時間為預設時間
+  const localIsoString = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  timeInputA.value = localIsoString;
+  timeA = new Date(timeInputA.value);
+
+  // 初始化 WebGL 地球儀
+  initGlobe();
+
+  // 初次執行渲染
+  // calculateTimeAndRender 會在稍後被呼叫
+
+  // 監聽 A 城市選擇
+  citySelectA.addEventListener("change", () => {
+    const val = citySelectA.value;
+    const customRow = document.getElementById("custom-longitude-a-row");
+    if (val === "custom") {
+      customRow.style.display = "flex";
+      updateLonAFromCustom();
     } else {
-      const value = Number($(`lon-val-${suffix}`)?.value || 0);
-      const dir = $(`lon-dir-${suffix}`)?.value || "E";
-      return `自訂 (${value}°${dir})`;
+      customRow.style.display = "none";
+      lonA = parseFloat(val);
+      syncInputsAFromLon(lonA);
+    }
+    calculateTimeAndRender();
+  });
+
+  // 監聽 B 城市選擇
+  citySelectB.addEventListener("change", () => {
+    const val = citySelectB.value;
+    const customRow = document.getElementById("custom-longitude-b-row");
+    if (val === "custom") {
+      customRow.style.display = "flex";
+      updateLonBFromCustom();
+    } else {
+      customRow.style.display = "none";
+      lonB = parseFloat(val);
+      syncInputsBFromLon(lonB);
+    }
+    calculateTimeAndRender();
+  });
+
+  // 監聽對調按鈕
+  document.getElementById("btn-swap-locations").addEventListener("click", () => {
+    // 1. 對調下拉選單的值
+    const tempSelect = citySelectA.value;
+    citySelectA.value = citySelectB.value;
+    citySelectB.value = tempSelect;
+    
+    // 2. 對調自訂經度的輸入值
+    const tempVal = lonValA.value;
+    lonValA.value = lonValB.value;
+    lonValB.value = tempVal;
+    
+    const tempDir = lonDirA.value;
+    lonDirA.value = lonDirB.value;
+    lonDirB.value = tempDir;
+
+    // 3. 更新自訂經度列的顯示狀態
+    const customRowA = document.getElementById("custom-longitude-a-row");
+    const customRowB = document.getElementById("custom-longitude-b-row");
+    customRowA.style.display = citySelectA.value === "custom" ? "flex" : "none";
+    customRowB.style.display = citySelectB.value === "custom" ? "flex" : "none";
+
+    // 4. 更新內部狀態 lonA 與 lonB
+    if (citySelectA.value === "custom") {
+      updateLonAFromCustom();
+    } else {
+      lonA = parseFloat(citySelectA.value);
+    }
+    
+    if (citySelectB.value === "custom") {
+      updateLonBFromCustom();
+    } else {
+      lonB = parseFloat(citySelectB.value);
+    }
+
+    // 5. 重新計算並渲染畫面
+    calculateTimeAndRender();
+  });
+
+  // 監聽自訂 A 經度輸入
+  lonValA.addEventListener("input", () => {
+    limitInputValue(lonValA, 0, 180);
+    updateLonAFromCustom();
+    calculateTimeAndRender();
+  });
+  lonDirA.addEventListener("change", () => {
+    updateLonAFromCustom();
+    calculateTimeAndRender();
+  });
+
+  // 監聽自訂 B 經度輸入
+  lonValB.addEventListener("input", () => {
+    limitInputValue(lonValB, 0, 180);
+    updateLonBFromCustom();
+    calculateTimeAndRender();
+  });
+  lonDirB.addEventListener("change", () => {
+    updateLonBFromCustom();
+    calculateTimeAndRender();
+  });
+
+  // 監聽 A 時間變更
+  timeInputA.addEventListener("input", () => {
+    if (timeInputA.value) {
+      timeA = new Date(timeInputA.value);
+      calculateTimeAndRender();
+    }
+  });
+
+
+
+  // 東西向快速按鈕
+  document.getElementById("btn-move-west").addEventListener("click", () => {
+    adjustBLongitude(-15);
+  });
+  document.getElementById("btn-move-east").addEventListener("click", () => {
+    adjustBLongitude(15);
+  });
+
+  // 初次更新
+  syncInputsAFromLon(lonA);
+  syncInputsBFromLon(lonB);
+  calculateTimeAndRender();
+}
+
+function limitInputValue(inputEl, min, max) {
+  let val = parseFloat(inputEl.value);
+  if (isNaN(val)) val = 0;
+  if (val < min) inputEl.value = min;
+  if (val > max) inputEl.value = max;
+}
+
+function updateLonAFromCustom() {
+  const val = parseFloat(document.getElementById("lon-val-a").value) || 0;
+  const dir = document.getElementById("lon-dir-a").value;
+  lonA = dir === "E" ? val : -val;
+}
+
+function updateLonBFromCustom() {
+  const val = parseFloat(document.getElementById("lon-val-b").value) || 0;
+  const dir = document.getElementById("lon-dir-b").value;
+  lonB = dir === "E" ? val : -val;
+}
+
+function syncInputsAFromLon(lon) {
+  const val = Math.abs(lon);
+  const dir = lon >= 0 ? "E" : "W";
+  document.getElementById("lon-val-a").value = val;
+  document.getElementById("lon-dir-a").value = dir;
+}
+
+function syncInputsBFromLon(lon) {
+  const val = Math.abs(lon);
+  const dir = lon >= 0 ? "E" : "W";
+  document.getElementById("lon-val-b").value = val;
+  document.getElementById("lon-dir-b").value = dir;
+}
+
+function adjustBLongitude(offset) {
+  lonB += offset;
+  // 限制在 -180 ~ 180 之間
+  if (lonB > 180) lonB -= 360;
+  if (lonB < -180) lonB += 360;
+  
+  // 更新 UI 控制器
+  const citySelectB = document.getElementById("city-select-b");
+  
+  // 檢查是否符合預設城市
+  let foundCity = false;
+  for (let key in CITIES) {
+    if (Math.abs(CITIES[key].lon * (CITIES[key].dir === "E" ? 1 : -1) - lonB) < 0.1) {
+      citySelectB.value = key;
+      document.getElementById("custom-longitude-b-row").style.display = "none";
+      foundCity = true;
+      break;
     }
   }
+  
+  if (!foundCity) {
+    citySelectB.value = "custom";
+    document.getElementById("custom-longitude-b-row").style.display = "flex";
+    syncInputsBFromLon(lonB);
+  }
+  
+  calculateTimeAndRender();
+  showLonToast(`${offset > 0 ? '+' : ''}${offset}°`);
+  lunaSpeak(`已將探險地 B 往${offset > 0 ? '東' : '西'}移動了 ${Math.abs(offset)}°，注意到時間的變化了嗎？🚀`);
+}
 
-  function calculate() {
-    if (!timeA || !cityA || !cityB) return;
-    const lonA = selectedLongitude(cityA, "a");
-    const lonB = selectedLongitude(cityB, "b");
-    const nameA = getCityName(cityA, "a");
-    const nameB = getCityName(cityB, "b");
-    const base = new Date(timeA.value || nowLocalDatetime());
-    const diffHours = (lonB - lonA) / 15;
-    const target = new Date(base.getTime() + diffHours * 60 * 60 * 1000);
-    setClock("a", base);
-    setClock("b", target);
-    updateAxis(lonA, lonB);
-    updateSky(lonA, lonB);
-    updateGlobe(lonA, lonB, nameA, nameB);
+// --- 核心計算與渲染連動邏輯 ---
+function calculateTimeAndRender() {
+  // 1. 計算時差
+  // 東西經經度為正負值。時差為 (lonB - lonA) * 4 分鐘
+  const diffLon = lonB - lonA;
+  const diffMinutes = Math.round(diffLon * 4);
+  
+  // 2. 利用 Date 計算目標時間（考慮跨日與日期）
+  timeB = new Date(timeA.getTime() + diffMinutes * 60 * 1000);
+  
+  // 3. 更新數值時鐘顯示
+  document.getElementById("digital-a").innerText = formatTime(timeA);
+  document.getElementById("date-a").innerText = formatDate(timeA);
+  
+  document.getElementById("digital-b").innerText = formatTime(timeB);
+  document.getElementById("date-b").innerText = formatDate(timeB);
+  
+  // 4. 更新指針時鐘
+  updateAnalogClock("clock-a", timeA);
+  updateAnalogClock("clock-b", timeB);
+  
+  // 5. 以動畫方式將地球儀滑動到新的經度位置 (取代直接重繪，讓 A/B 位置變化肉眼可見)
+  animateGlobeTo(lonA, lonB);
+  
+  // 5.5 更新頁面頂部的「即時結果」Sticky Bar (窄螢幕捲動時仍能看到結果)
+  const qrTimeA = document.getElementById("qr-time-a");
+  const qrTimeB = document.getElementById("qr-time-b");
+  const qrDiff = document.getElementById("qr-diff");
+  if (qrTimeA && qrTimeB && qrDiff) {
+    qrTimeA.innerText = formatTime(timeA);
+    qrTimeB.innerText = formatTime(timeB);
+    const diffH = diffMinutes / 60;
+    const sign = diffH >= 0 ? "+" : "";
+    const diffHDisplay = Number.isInteger(diffH) ? diffH : diffH.toFixed(1);
+    qrDiff.innerText = `${sign}${diffHDisplay}h`;
+  }
+  
+  // 同步橫軸座標 A 點與 B 點
+  const markerA = document.getElementById("axis-marker-a");
+  const markerB = document.getElementById("axis-marker-b");
+  if (markerA && markerB) {
+    const posA = ((lonA + 180) / 360) * 100;
+    const posB = ((lonB + 180) / 360) * 100;
+    markerA.style.left = `${posA}%`;
+    markerB.style.left = `${posB}%`;
+    
 
-    const diffText = `${diffHours >= 0 ? "+" : ""}${diffHours.toFixed(1)}h`;
-    if ($("qr-time-a")) $("qr-time-a").textContent = formatTime(base);
-    if ($("qr-time-b")) $("qr-time-b").textContent = formatTime(target);
-    if ($("qr-diff")) $("qr-diff").textContent = diffText;
-    if (calcSteps) {
-      const direction = diffHours >= 0 ? "東邊，時間加上去" : "西邊，時間減下來";
-      calcSteps.innerHTML = `
-        <p>1. A 地經度：${lonA.toFixed(1)}°，B 地經度：${lonB.toFixed(1)}°。</p>
-        <p>2. 經度差：${(lonB - lonA).toFixed(1)}°，換算時差為 ${diffText}。</p>
-        <p>3. B 地在 A 地的${direction}，所以 B 地時間是 ${formatDate(target)} ${formatTime(target)}。</p>
+
+    // 更新梅莉號的朝向 (在 A 點始終面向 B 點)
+    const merryShip = document.getElementById("merry-ship");
+    if (merryShip) {
+      if (posA < posB) {
+        // B 在 A 的右邊，船朝右 (水平翻轉 SVG)
+        merryShip.style.transform = "scaleX(-1)";
+      } else if (posA > posB) {
+        // B 在 A 的左邊，船朝左 (SVG 原本繪製方向)
+        merryShip.style.transform = "scaleX(1)";
+      }
+    }
+  }
+  
+  // 6. 更新天空背景與太陽月亮位置（依目標 B 的時間）
+  updateSkyViewport(timeB);
+  
+  // 7. 更新露娜的計算步驟筆記
+  renderCalculationSteps(lonA, lonB, timeA, timeB, diffLon, diffMinutes);
+}
+
+// ==========================================================================
+// 🌍 WebGL 3D 地球儀渲染引擎 (Globe.gl)
+// ==========================================================================
+let myGlobe;
+
+// 產生自訂經緯網格 (經線每 15 度一條，對應一小時時差)
+function generateGraticules() {
+  const paths = [];
+  // 緯線 (-60 到 60，每 30 度)
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const path = [];
+    for (let lng = -180; lng <= 180; lng += 5) {
+      path.push({ lat, lng });
+    }
+    paths.push({ points: path, type: 'lat', val: lat });
+  }
+  // 經線 (-180 到 180，每 15 度)
+  for (let lng = -180; lng <= 180; lng += 15) {
+    const path = [];
+    for (let lat = -89; lat <= 89; lat += 5) {
+      path.push({ lat, lng });
+    }
+    paths.push({ points: path, type: 'lng', val: lng });
+  }
+  return paths;
+}
+
+function initGlobe() {
+  const container = document.getElementById("globeViz");
+  if (!container) return;
+
+  myGlobe = Globe()(container)
+    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+    .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+    .backgroundColor('rgba(0,0,0,0)') // 讓外層 CSS 背景透出來
+    .width(500)
+    .height(460)
+    .showAtmosphere(true)
+    .atmosphereColor('#64b5f6')
+    .atmosphereAltitude(0.15)
+    .pathsData(generateGraticules())
+    .pathPoints('points')
+    .pathPointLat(p => p.lat)
+    .pathPointLng(p => p.lng)
+    .pathColor(d => {
+       if (d.type === 'lng' && d.val === 0) return 'rgba(255, 215, 0, 0.7)'; // 本初子午線 (金)
+       if (d.type === 'lng' && Math.abs(d.val) === 180) return 'rgba(255, 100, 100, 0.7)'; // 國際換日線 (紅)
+       return 'rgba(255, 255, 255, 0.2)'; // 其他經緯線 (半透明白)
+    })
+    .pathDashLength(d => d.type === 'lat' ? 0.05 : 1) // 緯線以虛線表示
+    .pathDashGap(d => d.type === 'lat' ? 0.05 : 0)
+    .pathStroke(1.5)
+    .htmlElementsData([])
+    .htmlElement(d => {
+      const el = document.createElement('div');
+      el.innerHTML = `
+        <div style="background: rgba(0,0,0,0.65); border: 1.5px solid ${d.color}; border-radius: 8px; padding: 6px 10px; color: white; font-family: 'Noto Sans TC'; font-size: 13px; font-weight: bold; text-align: center; white-space: nowrap; transform: translate(-50%, -100%); margin-top: -12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+          ${d.label}
+        </div>
+        <div style="width: 16px; height: 16px; background: ${d.color}; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 15px ${d.color}; transform: translate(-50%, -50%);"></div>
       `;
-    }
-  }
+      el.style.pointerEvents = 'none';
+      return el;
+    });
 
-  function shiftA(degrees) {
-    if (!cityA) return;
-    cityA.value = "custom";
-    setCustomRow(cityA, "a");
-    const current = selectedLongitude(cityA, "a");
-    const next = Math.max(-180, Math.min(180, current + degrees));
-    if ($("lon-val-a")) $("lon-val-a").value = Math.abs(next);
-    if ($("lon-dir-a")) $("lon-dir-a").value = next < 0 ? "W" : "E";
-    const toast = $("lon-toast");
-    if (toast) {
-      toast.textContent = `${degrees > 0 ? "+" : ""}${degrees}°`;
-      toast.classList.add("show");
-      setTimeout(() => toast.classList.remove("show"), 700);
-    }
-    calculate();
-  }
+  // 設定控制器參數
+  const controls = myGlobe.controls();
+  controls.enableZoom = true;
+  controls.autoRotate = false;
+  controls.minDistance = 150;
+  controls.maxDistance = 400;
+  controls.minPolarAngle = Math.PI / 2.2; // 鎖定垂直 Y 軸視角
+  controls.maxPolarAngle = Math.PI / 2.2; // 只能橫向滾動 (X軸)
+}
 
-  // --- 挑戰賽題庫定義 ---
-  const QUIZ_QUESTIONS = {
-    easy: [
-      {
-        question: "台北位於東經 120°，倫敦位於經度 0°（本初子午線）。台北與倫敦的時差是多少小時？",
-        options: ["6小時", "8小時", "10小時", "12小時"],
-        correct: 1,
-        desc: "經度每相差 15 度差 1 小時。台北 120°E，倫敦 0°，相差 120 度。120 ÷ 15 = 8 小時。"
-      },
-      {
-        question: "東京位於東經 135°，台北位於東經 120°。當台北時間是早上 9:00 時，東京時間是幾點？",
-        options: ["早上 8:00", "早上 10:00", "早上 11:00", "下午 1:00"],
-        correct: 1,
-        desc: "東京與台北相差 135° - 120° = 15°，時差為 1 小時。東京在台北的東邊，所以時間比較快（早一小時），即早上 10:00。"
-      },
-      {
-        question: "開羅位於東經 30°。當倫敦 (0°) 時間是中午 12:00 時，開羅時間是幾點？",
-        options: ["上午 10:00", "下午 1:00", "下午 2:00", "下午 3:00"],
-        correct: 2,
-        desc: "開羅與倫敦相差 30°，時差為 30 ÷ 15 = 2 小時。開羅在東經，時間較快，12:00 + 2 = 14:00 (下午 2:00)。"
-      },
-      {
-        question: "如果 A 地在東經 120°，B 地在東經 60°。兩地相差幾小時？",
-        options: ["2小時", "4小時", "6小時", "8小時"],
-        correct: 1,
-        desc: "兩地同在東半球，經度差為 120° - 60° = 60°。時差為 60 ÷ 15 = 4 小時。"
-      },
-      {
-        question: "雪梨位於東經 150°，台北位於東經 120°。當雪梨時間是下午 2:00 時，台北時間是幾點？",
-        options: ["中午 12:00", "上午 10:00", "下午 3:00", "下午 4:00"],
-        correct: 0,
-        desc: "雪梨與台北相差 150° - 120° = 30°，時差 2 小時。台北在西邊（相對雪梨而言），時間較慢，下午 2:00 - 2 小時 = 中午 12:00。"
-      }
-    ],
-    medium: [
-      {
-        question: "倫敦位於 0° 經線，紐約位於西經 75°。當倫敦時間是下午 3:00 時，紐約時間是幾點？",
-        options: ["上午 9:00", "上午 10:00", "下午 5:00", "下午 8:00"],
-        correct: 1,
-        desc: "一東一西（或跨 0 度），經度差為 75°。時差為 75 ÷ 15 = 5 小時。紐約在西經，時間較慢，15:00 - 5 = 10:00 (上午 10:00)。"
-      },
-      {
-        question: "台北位於東經 120°，紐約位於西經 75°。兩地的時差為多少小時？",
-        options: ["3小時", "11小時", "13小時", "15小時"],
-        correct: 2,
-        desc: "一東一西經度差相加：120° + 75° = 195°。時差為 195 ÷ 15 = 13 小時。"
-      },
-      {
-        question: "開羅位於東經 30°，巴西利亞位於西經 45°。當開羅是晚上 8:00，巴西利亞是幾點？",
-        options: ["下午 2:00", "下午 3:00", "晚上 11:00", "凌晨 1:00"],
-        correct: 1,
-        desc: "經度差為 30° + 45° = 75°。時差為 75 ÷ 15 = 5 小時。巴西利亞在西邊，時間較慢，20:00 - 5 = 15:00 (下午 3:00)。"
-      },
-      {
-        question: "舊金山位於西經 120°，倫敦為 0°。當舊金山是早上 6:00 時，倫敦是幾點？",
-        options: ["上午 10:00", "下午 2:00", "下午 4:00", "晚上 10:00"],
-        correct: 1,
-        desc: "經度差 120°，時差 120 ÷ 15 = 8 小時。倫敦在舊金山東邊，時間較快，6:00 + 8 = 14:00 (下午 2:00)。"
-      },
-      {
-        question: "東京位於東經 135°，舊金山位於西經 120°。兩地相差多少小時？",
-        options: ["1小時", "15小時", "17小時", "19小時"],
-        correct: 2,
-        desc: "一東一西經度差相加：135° + 120° = 255°。時差為 255 ÷ 15 = 17 小時。"
-      }
-    ],
-    hard: [
-      {
-        question: "台北為東經 120°，舊金山為西經 120°。當台北時間是 10 月 2 日凌晨 1:00 時，舊金山是幾點？",
-        options: ["10 月 1 日下午 5:00", "10 月 1 日早上 9:00", "10 月 2 日早上 9:00", "10 月 2 日下午 5:00"],
-        correct: 1,
-        desc: "經度差 120° + 120° = 240°，時差 16 小時。舊金山在西邊時間較慢，10 月 2 日 1:00 減去 16 小時為 10 月 1 日早上 9:00。"
-      },
-      {
-        question: "倫敦 (0°) 當地時間是 12 月 31 日晚上 10:00。此時東京 (135°E) 的日期與時間是？",
-        options: ["12 月 31 日下午 1:00", "1 月 1 日凌晨 1:00", "1 月 1 日早上 7:00", "1 月 1 日早上 9:00"],
-        correct: 2,
-        desc: "東京與倫敦時差為 135 ÷ 15 = 9 小時。東京在東邊較快，12 月 31 日 22:00 + 9 小時 = 跨年 1 月 1 日早上 7:00。"
-      },
-      {
-        question: "紐約 (75°W) 時間是 6 月 1 日下午 8:00，此時台北 (120°E) 的日期與時間是？",
-        options: ["6 月 1 日上午 7:00", "6 月 2 日上午 7:00", "6 月 2 日上午 9:00", "5 月 31 日下午 7:00"],
-        correct: 2,
-        desc: "時差為 13 小時。台北在東邊時間較快，6 月 1 日 20:00 + 13 小時 = 跨日 6 月 2 日上午 9:00。"
-      },
-      {
-        question: "一艘船從西半球跨越 180° 國際日期變更線進入東半球。關於日期的調整，下列何者正確？",
-        options: ["日期要加一天", "日期要減一天", "日期不變，時間加一小時", "日期不變，時間減一小時"],
-        correct: 0,
-        desc: "180° 線西側（東半球）時間最快，東側（西半球）時間最慢。從西半球跨入東半球是進入較快時間區，因此日期需「加一天」。"
-      },
-      {
-        question: "雪梨 (150°E) 時間是 5 月 5 日早上 5:00，此時倫敦 (0°) 的日期與時間是？",
-        options: ["5 月 4 日晚上 7:00", "5 月 4 日晚上 8:00", "5 月 5 日下午 3:00", "5 月 5 日下午 5:00"],
-        correct: 0,
-        desc: "時差 10 小時。倫敦在雪梨西邊時間較慢，5 月 5 日 5:00 減去 10 小時為 5 月 4 日晚上 7:00。"
-      }
-    ]
+// 計算兩個經度之間「最短路徑」的差值
+function shortestDelta(from, to) {
+  let d = to - from;
+  while (d > 180) d -= 360;
+  while (d < -180) d += 360;
+  return d;
+}
+
+// 獲取當前選取城市的緯度
+function getSelectedLat(which) {
+  const sel = document.getElementById(`city-select-${which}`);
+  if (!sel || sel.value === "custom") return which === "a" ? 25 : 10;
+  const city = CITIES[sel.value];
+  return city ? city.lat : (which === "a" ? 25 : 10);
+}
+
+// 讓地球儀滑動到目標經度
+function animateGlobeTo(targetA, targetB) {
+  displayLonA = targetA;
+  displayLonB = targetB;
+  
+  if (!myGlobe) return;
+
+  const latA = getSelectedLat("a");
+  const latB = getSelectedLat("b");
+  const dirA = targetA >= 0 ? "E" : "W";
+  const dirB = targetB >= 0 ? "E" : "W";
+  const labelA = `${getLocationName("a")} (A) ${Math.abs(targetA)}°${dirA} | ${formatTime(timeA)}`;
+  const labelB = `${getLocationName("b")} (B) ${Math.abs(targetB)}°${dirB} | ${formatTime(timeB)}`;
+
+  // 更新標記點
+  const markerData = [
+    { lat: latA, lng: targetA, label: labelA, color: "#ff8da1" },
+    { lat: latB, lng: targetB, label: labelB, color: "#64b5f6" }
+  ];
+  myGlobe.htmlElementsData(markerData);
+
+  // 尋找兩個點的中點 (相機注視點)
+  let d = shortestDelta(targetA, targetB);
+  let midLng = targetA + d / 2;
+  while (midLng > 180) midLng -= 360;
+  while (midLng < -180) midLng += 360;
+  
+  // 將視角移動到中點
+  myGlobe.pointOfView({ lat: 15, lng: midLng, altitude: 1.8 }, 800);
+}
+
+// 經度調整浮動提示文字
+function showLonToast(text) {
+  const toast = document.getElementById("lon-toast");
+  if (!toast) return;
+  toast.innerText = text;
+  toast.classList.remove("show");
+  void toast.offsetWidth;
+  toast.classList.add("show");
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 900);
+}
+function formatTime(date) {
+  const h = String(date.getHours()).padStart(2, "0");
+  const m = String(date.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+function formatDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}/${m}/${d}`;
+}
+
+function updateAnalogClock(clockId, date) {
+  const hour = date.getHours();
+  const minute = date.getMinutes();
+  
+  // 分針旋轉角度 (360度 / 60分 = 6度/分)
+  const minAngle = minute * 6;
+  // 時針旋轉角度 (360度 / 12時 = 30度/時；加上分針的微調 30度/60分 = 0.5度/分)
+  const hourAngle = (hour % 12) * 30 + minute * 0.5;
+  
+  document.querySelector(`#${clockId} .hand.hour`).style.transform = `translateX(-50%) rotate(${hourAngle}deg)`;
+  document.querySelector(`#${clockId} .hand.minute`).style.transform = `translateX(-50%) rotate(${minAngle}deg)`;
+}
+
+// 根據目標 B 當地時間，動態變更觀測鏡的天空與天體位置
+function updateSkyViewport(date) {
+  const hours = date.getHours() + date.getMinutes() / 60;
+  const skyBg = document.getElementById("sky-bg");
+  const sun = document.getElementById("sun-body");
+  const moon = document.getElementById("moon-body");
+  
+  // 1. 設定漸層色 (0~24小時對應天空顏色變換)
+  let skyGradient = "";
+  if (hours >= 5 && hours < 7) {
+    // 清晨 (5:00 - 7:00)：紫色到橘黃漸層
+    skyGradient = "linear-gradient(to bottom, #7579ff 0%, #12c2e9 50%, #f7797d 100%)";
+  } else if (hours >= 7 && hours < 16) {
+    // 白天 (7:00 - 16:00)：晴空藍色
+    skyGradient = "linear-gradient(to bottom, #2193b0 0%, #6dd5ed 100%)";
+  } else if (hours >= 16 && hours < 18) {
+    // 黃昏 (16:00 - 18:00)：暖橘粉紅
+    skyGradient = "linear-gradient(to bottom, #e65c00 0%, #F9D423 100%)";
+  } else if (hours >= 18 && hours < 19.5) {
+    // 暮色 (18:00 - 19:30)：晚霞深紫
+    skyGradient = "linear-gradient(to bottom, #2c3e50 0%, #3498db 50%, #e74c3c 100%)";
+  } else {
+    // 黑夜 (19:30 - 05:00)：深夜星空
+    skyGradient = "linear-gradient(to bottom, #0f2027 0%, #203a43 50%, #2c5364 100%)";
+  }
+  skyBg.style.background = skyGradient;
+  
+  // 2. 太陽與月亮的圓弧移動
+  // 假設觀測鏡寬度為 W。太陽在 6~18 點由左至右移動；月亮在 18~6 點由左至右移動
+  const widthPct = 100;
+  
+  // 太陽位置
+  if (hours >= 6 && hours <= 18) {
+    const sunRatio = (hours - 6) / 12; // 0 ~ 1
+    const sunX = sunRatio * 80 + 10;   // 10% ~ 90%
+    const sunY = 15 + Math.pow(sunRatio - 0.5, 2) * -120; // 拋物線高度
+    sun.style.left = `${sunX}%`;
+    sun.style.top = `${25 - sunY}px`;
+    sun.style.opacity = 1;
+  } else {
+    sun.style.opacity = 0;
+  }
+  
+  // 月亮位置
+  if (hours > 18 || hours < 6) {
+    let moonHours = hours > 18 ? hours - 18 : hours + 6;
+    const moonRatio = moonHours / 12; // 0 ~ 1
+    const moonX = moonRatio * 80 + 10;
+    const moonY = 15 + Math.pow(moonRatio - 0.5, 2) * -120;
+    moon.style.left = `${moonX}%`;
+    moon.style.top = `${25 - moonY}px`;
+    moon.style.opacity = 1;
+  } else {
+    moon.style.opacity = 0;
+  }
+}
+
+// 繪製一步步的教學計算看板
+function renderCalculationSteps(lonA, lonB, dateA, dateB, diffLon, diffMinutes) {
+  const stepsContainer = document.getElementById("calc-steps");
+  stepsContainer.innerHTML = "";
+  
+  // 格式化經度名稱
+  const formatLon = (lon) => {
+    const val = Math.abs(lon);
+    return lon > 0 ? `東經 ${val}° (E)` : lon < 0 ? `西經 ${val}° (W)` : `0° 經線`;
+  };
+  
+  // 步驟一：標記兩地經度
+  const step1 = document.createElement("div");
+  step1.className = "calc-step-row";
+  step1.innerHTML = `出發點為 <span class="calc-highlight">${formatLon(lonA)}</span>，探險目標地為 <span class="calc-highlight-b">${formatLon(lonB)}</span>。`;
+  stepsContainer.appendChild(step1);
+  
+  // 步驟二：計算經度差
+  const step2 = document.createElement("div");
+  step2.className = "calc-step-row";
+  
+  let diffCalcText = "";
+  if ((lonA >= 0 && lonB >= 0) || (lonA <= 0 && lonB <= 0)) {
+    // 同側相減
+    diffCalcText = `因為兩地都在同一個半球，經度直接相減：|${Math.abs(lonA)}° - ${Math.abs(lonB)}°| = ${Math.abs(diffLon)}°。`;
+  } else {
+    // 異側相加
+    diffCalcText = `因為兩地跨越了本初子午線 (一東一西)，經度要相加：${Math.abs(lonA)}° (東) + ${Math.abs(lonB)}° (西) = ${Math.abs(diffLon)}°。`;
+  }
+  step2.innerHTML = `<strong>計算經度差：</strong>${diffCalcText} 得到經度相差 <span class="calc-highlight">${Math.abs(diffLon)}°</span>。`;
+  stepsContainer.appendChild(step2);
+  
+  // 步驟三：經度換算時差 (每 15 度 1 小時)
+  const step3 = document.createElement("div");
+  step3.className = "calc-step-row";
+  const hoursDiff = Math.abs(diffLon) / 15;
+  let tzText = "";
+  if (Math.abs(diffLon) % 15 === 0) {
+    tzText = `經度差 ${Math.abs(diffLon)}° ÷ 15 = ${hoursDiff} 小時。`;
+  } else {
+    const totalMinutes = Math.abs(diffMinutes);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    tzText = `因為經度沒有整除，我們用更細的公式計算：${Math.abs(diffLon)}° × 4分鐘 = ${totalMinutes} 分鐘 (即 <span class="calc-highlight">${h} 小時 ${m} 分鐘</span>)。`;
+  }
+  step3.innerHTML = `<strong>計算時間差：</strong>${tzText}`;
+  stepsContainer.appendChild(step3);
+  
+  // 步驟四：東加西減判斷
+  const step4 = document.createElement("div");
+  step4.className = "calc-step-row";
+  const dirText = lonB > lonA ? "東邊 (東加) ➔ 加上時差" : "西邊 (西減) ➔ 減去時差";
+  step4.innerHTML = `<strong>東加西減判斷：</strong>探險地 B 位在基地 A 的 <span class="calc-highlight">${dirText}</span>。`;
+  stepsContainer.appendChild(step4);
+  
+  // 步驟五：跨日判斷與最終時間
+  const step5 = document.createElement("div");
+  step5.className = "calc-step-row";
+  
+  // 判斷是否跨日
+  let crossDayText = "";
+  const d1 = dateA.getDate();
+  const d2 = dateB.getDate();
+  if (d2 > d1) {
+    crossDayText = " (時間加超過 24 點，進入<strong>隔一天</strong> ➔ 日期加一天)";
+  } else if (d2 < d1) {
+    crossDayText = " (時間減到小於 0 點，退回<strong>前一天</strong> ➔ 日期減一天)";
+  } else {
+    crossDayText = " (在同一天之內)";
+  }
+  
+  step5.innerHTML = `<strong>最終時間：</strong>目標時間為 <span class="calc-highlight-b">${formatDate(dateB)} ${formatTime(dateB)}</span>${crossDayText}。`;
+  stepsContainer.appendChild(step5);
+}
+
+
+// ==========================================================================
+// ✏️ 頁籤 2：時空挑戰賽 邏輯 (隨機測驗)
+// ==========================================================================
+
+let quizDifficulty = "easy";
+let quizQuestions = [];
+let currentQuestionIndex = 0;
+let correctCount = 0;
+let quizReward = 0;
+
+function initQuizMode() {
+  // 難度選擇監聽
+  const diffButtons = document.querySelectorAll(".btn-diff");
+  diffButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      diffButtons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      quizDifficulty = btn.getAttribute("data-level");
+    });
+  });
+
+  // 開始按鈕監聽
+  document.getElementById("btn-start-quiz").addEventListener("click", startQuiz);
+  
+  // 下一題按鈕監聽
+  document.getElementById("btn-next-question").addEventListener("click", nextQuestion);
+  
+  // 重新挑戰按鈕
+  document.getElementById("btn-restart-quiz").addEventListener("click", () => {
+    document.getElementById("quiz-result-screen").style.display = "none";
+    document.getElementById("quiz-start-screen").style.display = "block";
+    lunaSpeak("準備好接受新的挑戰了嗎？選個難度，我們隨時可以出發！🚀");
+  });
+  
+  // 前往徽章牆按鈕
+  document.getElementById("btn-go-badges").addEventListener("click", () => {
+    // 模擬點擊徽章 Tab
+    document.querySelector('.nav-tab[data-tab="tab-badges"]').click();
+    document.getElementById("quiz-result-screen").style.display = "none";
+    document.getElementById("quiz-start-screen").style.display = "block";
+  });
+}
+
+function startQuiz() {
+  document.getElementById("quiz-start-screen").style.display = "none";
+  document.getElementById("quiz-active-screen").style.display = "block";
+  document.getElementById("quiz-result-screen").style.display = "none";
+  
+  // 1. 產生 5 題題目
+  quizQuestions = generateQuizQuestions(quizDifficulty, 5);
+  currentQuestionIndex = 0;
+  correctCount = 0;
+  quizReward = 0;
+  
+  showQuestion(currentQuestionIndex);
+  lunaSpeak(`第 1 題開始囉！仔細算算看，如果忘記公式可以去『旅行秘笈』看口訣喔！🐱`);
+}
+
+function showQuestion(index) {
+  const q = quizQuestions[index];
+  
+  // 更新進度條
+  const progressPct = ((index + 1) / quizQuestions.length) * 100;
+  document.getElementById("quiz-progress-bar").style.width = `${progressPct}%`;
+  
+  // 更新題頭資訊
+  document.getElementById("quiz-q-num").innerText = `第 ${index + 1} 題 / 共 ${quizQuestions.length} 題`;
+  
+  const diffNames = { "easy": "簡單 ⭐", "medium": "中等 ⭐⭐", "hard": "困難 ⭐⭐⭐" };
+  document.getElementById("quiz-q-diff").innerText = `難度：${diffNames[quizDifficulty]}`;
+  
+  // 顯示題目內文
+  document.getElementById("quiz-q-text").innerText = q.questionText;
+  
+  // 渲染選項
+  const optionsGrid = document.getElementById("quiz-options-container");
+  optionsGrid.innerHTML = "";
+  
+  q.options.forEach((opt, idx) => {
+    const btn = document.createElement("button");
+    btn.className = "btn-option";
+    btn.innerText = opt;
+    btn.addEventListener("click", () => selectOption(idx));
+    optionsGrid.appendChild(btn);
+  });
+  
+  // 隱藏回饋區
+  document.getElementById("quiz-feedback").style.display = "none";
+}
+
+function selectOption(selectedIdx) {
+  const q = quizQuestions[currentQuestionIndex];
+  const optionsGrid = document.getElementById("quiz-options-container");
+  const optionsButtons = optionsGrid.querySelectorAll(".btn-option");
+  
+  // 禁用所有選項
+  optionsButtons.forEach(btn => btn.classList.add("disabled"));
+  
+  const feedbackArea = document.getElementById("quiz-feedback");
+  const feedbackIcon = document.getElementById("feedback-icon");
+  const feedbackTitle = document.getElementById("feedback-title");
+  const feedbackDesc = document.getElementById("feedback-desc");
+  
+  feedbackArea.style.display = "flex";
+  
+  if (selectedIdx === q.correctAnswerIndex) {
+    // 答對了！
+    correctCount++;
+    const rewardForThis = quizDifficulty === "easy" ? 10 : quizDifficulty === "medium" ? 15 : 25;
+    quizReward += rewardForThis;
+    
+    optionsButtons[selectedIdx].classList.add("correct-choice");
+    
+    feedbackIcon.innerText = "🎉";
+    feedbackTitle.innerText = "答對了！太棒了！";
+    feedbackTitle.style.color = "var(--color-success)";
+    
+    // 播放答對音效與灑花
+    playToneCorrect();
+    triggerConfetti();
+    
+    lunaSpeak(`答對了！你好厲害！獲得了 ${rewardForThis} 個星之碎片。🌟`);
+  } else {
+    // 答錯了
+    optionsButtons[selectedIdx].classList.add("incorrect-choice");
+    // 標示出正確答案
+    optionsButtons[q.correctAnswerIndex].classList.add("correct-choice");
+    
+    feedbackIcon.innerText = "😢";
+    feedbackTitle.innerText = "哎呀，答錯了！別灰心！";
+    feedbackTitle.style.color = "var(--color-error)";
+    
+    // 播放答錯音效
+    playToneIncorrect();
+    
+    lunaSpeak(`沒關係，我們看看解說，下一題再拿回來！💪`);
+  }
+  
+  feedbackDesc.innerHTML = `<strong>解析說明：</strong>${q.explanation}`;
+}
+
+function nextQuestion() {
+  currentQuestionIndex++;
+  if (currentQuestionIndex < quizQuestions.length) {
+    showQuestion(currentQuestionIndex);
+  } else {
+    showQuizResults();
+  }
+}
+
+function showQuizResults() {
+  document.getElementById("quiz-active-screen").style.display = "none";
+  document.getElementById("quiz-result-screen").style.display = "block";
+  
+  document.getElementById("result-correct-count").innerText = `${correctCount}/5`;
+  document.getElementById("result-reward-shards").innerText = `+${quizReward}`;
+  
+  // 累加碎片到全域狀態
+  gameState.stars += quizReward;
+  saveProgress();
+  
+  // 給予相應的露娜評語
+  let evalText = "";
+  if (correctCount === 5) {
+    evalText = "天啊！你全部答對了！你簡直是時空大師，露娜太崇拜你了！快去徽章牆解鎖你喜歡的景點吧！🏆😺";
+    triggerConfetti();
+  } else if (correctCount >= 3) {
+    evalText = "做得太棒了！你已經掌握了大部分的時差計算，繼續保持，多挑戰幾次就可以成為時空旅行專家喔！🌟";
+  } else {
+    evalText = "很不錯的嘗試！時差計算一開始確實有點繞，露娜建議你可以去『旅行秘笈』複習口訣，再試一次看看喔！加油！❤️";
+  }
+  
+  document.getElementById("result-eval-text").innerText = evalText;
+  lunaSpeak(`挑戰結束！你一共答對了 ${correctCount} 題，獲得了 ${quizReward} 個碎片，我們到徽章牆看看能解鎖什麼吧！`);
+}
+
+// --- 隨機測驗題目引擎 (Quiz Questions Generator) ---
+function generateQuizQuestions(level, count) {
+  const questions = [];
+  
+  // 隨機從預設城市取出兩個（不重複）
+  const getTwoRandomCities = () => {
+    const keys = Object.keys(CITIES);
+    const idx1 = Math.floor(Math.random() * keys.length);
+    let idx2 = Math.floor(Math.random() * keys.length);
+    while (idx1 === idx2) {
+      idx2 = Math.floor(Math.random() * keys.length);
+    }
+    return [CITIES[keys[idx1]], CITIES[keys[idx2]]];
   };
 
-  // --- 徽章資料定義 ---
-  const BADGES = [
-    {
-      id: "taipei_101",
-      name: "台北 101 徽章",
-      icon: "🗼",
-      cost: 5,
-      lat: "25.0°N",
-      timezone: "東八區 (GMT+8)",
-      desc: "台北是台灣的首都，標準時間使用 GMT+8 國家標準時間，每天清晨與台北 101 一起迎接第一道曙光！"
-    },
-    {
-      id: "big_ben",
-      name: "大笨鐘徽章 (倫敦)",
-      icon: "🇬🇧",
-      cost: 10,
-      lat: "51.5°N",
-      timezone: "零時區 (GMT+0)",
-      desc: "倫敦是格林威治標準時間 (GMT) 的起點，本初子午線貫穿此處，也是世界劃分時區的基準線喔！"
-    },
-    {
-      id: "fuji_mountain",
-      name: "富士山徽章 (東京)",
-      icon: "🗻",
-      cost: 15,
-      lat: "35.6°N",
-      timezone: "東九區 (GMT+9)",
-      desc: "日本屬於 GMT+9 時區，比台灣快一小時。富士山不僅是日本最高峰，也是日出迷人的象徵！"
-    },
-    {
-      id: "statue_of_liberty",
-      name: "自由女神徽章 (紐約)",
-      icon: "🗽",
-      cost: 20,
-      lat: "40.7°N",
-      timezone: "西五區 (GMT-5)",
-      desc: "紐約位於西五區 (GMT-5)，比台灣慢 13 小時。這座自由女神像是世界和平與自由著名的地標。"
-    },
-    {
-      id: "sydney_opera",
-      name: "雪梨歌劇院徽章",
-      icon: "🐚",
-      cost: 25,
-      lat: "33.9°S",
-      timezone: "東十區 (GMT+10)",
-      desc: "雪梨位於東十區，比台灣快 2 小時。雪梨歌劇院是跨年倒數全球最早迎接新年的地標之一！"
-    },
-    {
-      id: "pyramids",
-      name: "金字塔徽章 (開羅)",
-      icon: "🏜️",
-      cost: 30,
-      lat: "30.0°N",
-      timezone: "東二區 (GMT+2)",
-      desc: "埃及開羅位於 GMT+2 時區，這裡有古老神祕的吉薩金字塔群，見證了幾千年的時空與歷史變遷。"
-    },
-    {
-      id: "golden_gate",
-      name: "金門大橋徽章 (舊金山)",
-      icon: "🌉",
-      cost: 35,
-      lat: "37.8°N",
-      timezone: "西八區 (GMT-8)",
-      desc: "舊金山位於美國太平洋時區 (GMT-8)，著名的金門大橋常年被濃霧籠罩，展現獨特美麗的灣區風情。"
+  // 隨機經度生成
+  const randomLongitude = (dir) => {
+    // 0~180 的隨機經度，偏好 15 度的倍數
+    const mul = Math.floor(Math.random() * 12) + 1; // 1~12
+    const val = mul * 15;
+    return dir === "E" ? val : -val;
+  };
+
+  for (let i = 0; i < count; i++) {
+    let cityA, cityB;
+    let lonValA, lonValB;
+    let tzA, tzB;
+    let nameA, nameB;
+    
+    // 隨機挑選基礎時間 (固定整點)
+    const baseHour = Math.floor(Math.random() * 24);
+    const dateA = new Date(2026, 6, 3, baseHour, 0); // 7月3日
+
+    if (level === "easy") {
+      // 簡單模式：同為東經或同為西經，不跨日，整除
+      const isEast = Math.random() > 0.5;
+      const dir = isEast ? "E" : "W";
+      
+      const v1 = (Math.floor(Math.random() * 6) + 2) * 15; // 30~105
+      let v2 = (Math.floor(Math.random() * 6) + 2) * 15;
+      while (v1 === v2) {
+        v2 = (Math.floor(Math.random() * 6) + 2) * 15;
+      }
+      
+      lonValA = isEast ? v1 : -v1;
+      lonValB = isEast ? v2 : -v2;
+      
+      nameA = `甲地 (${Math.abs(lonValA)}°${dir})`;
+      nameB = `乙地 (${Math.abs(lonValB)}°${dir})`;
+    } 
+    else if (level === "medium") {
+      // 中等模式：一東一西，或使用預設名勝城市，可能跨越子午線 (0度)
+      const c = getTwoRandomCities();
+      cityA = c[0];
+      cityB = c[1];
+      
+      // 計算實際經度
+      lonValA = cityA.lon * (cityA.dir === "E" ? 1 : -1);
+      lonValB = cityB.lon * (cityB.dir === "E" ? 1 : -1);
+      
+      nameA = `${cityA.name} (${Math.abs(cityA.lon)}°${cityA.dir})`;
+      nameB = `${cityB.name} (${Math.abs(cityB.lon)}°${cityB.dir})`;
+    } 
+    else {
+      // 困難模式：強制產生跨日判定、跨 180度國際日期變更線挑戰
+      const isDateLineChallenge = Math.random() > 0.5;
+      
+      if (isDateLineChallenge) {
+        // 跨越 180 度的題型
+        // 比如 A 在 170°W (-170)，B 在 170°E (170)
+        lonValA = -170;
+        lonValB = 170;
+        nameA = `西太平洋觀測島 A (170°W)`;
+        nameB = `東太平洋探險船 B (170°E)`;
+      } else {
+        // 一般跨日題型：經度差很大，故意選在午夜附近的時間
+        const c = getTwoRandomCities();
+        cityA = c[0];
+        cityB = c[1];
+        lonValA = cityA.lon * (cityA.dir === "E" ? 1 : -1);
+        lonValB = cityB.lon * (cityB.dir === "E" ? 1 : -1);
+        nameA = `${cityA.name} (${Math.abs(cityA.lon)}°${cityA.dir})`;
+        nameB = `${cityB.name} (${Math.abs(cityB.lon)}°${cityB.dir})`;
+      }
     }
-  ];
 
-  // --- 狀態管理與儲存 ---
-  let quizDifficulty = "easy";
-  let quizQuestions = [];
-  let currentQIndex = 0;
-  let quizScore = 0;
-  let selectedOptIdx = null;
-
-  function getStars() {
-    return parseInt(localStorage.getItem("learning-stars") || "0", 10);
-  }
-
-  function saveStars(count) {
-    localStorage.setItem("learning-stars", count);
-    const starCountEl = $("star-count");
-    if (starCountEl) starCountEl.textContent = count;
-  }
-
-  function getUnlockedBadges() {
-    return JSON.parse(localStorage.getItem("learning-unlocked-badges") || "[]");
-  }
-
-  function unlockBadgeId(id) {
-    const list = getUnlockedBadges();
-    if (!list.includes(id)) {
-      list.push(id);
-      localStorage.setItem("learning-unlocked-badges", JSON.stringify(list));
+    // 計算時差分鐘與日期
+    const diffLon = lonValB - lonValA;
+    const diffMinutes = Math.round(diffLon * 4);
+    const dateB = new Date(dateA.getTime() + diffMinutes * 60 * 1000);
+    
+    // 題目文字生成
+    const timeStrA = `${formatTime(dateA)}`;
+    const dateStrA = "7月3日";
+    
+    let questionText = "";
+    if (level === "easy") {
+      questionText = `已知 ${nameA} 的時間是 ${dateStrA} ${timeStrA}。請問，位於同側的 ${nameB} 此時的時間是幾點？`;
+    } else if (level === "medium") {
+      questionText = `小華在 ${nameA} 於 ${dateStrA} ${timeStrA} 打電話給位在 ${nameB} 的露娜。請問露娜接起電話時，當地的日期與時間是？`;
+    } else {
+      questionText = `時空船在 ${nameA} 當地時間為 ${dateStrA} ${timeStrA} 時起飛，瞬間傳送到 ${nameB}。請問抵達時，當地的日期與時間是多少？`;
     }
+
+    // 正確答案
+    const correctDateStr = dateB.getDate() === 3 ? "7月3日" : dateB.getDate() === 4 ? "7月4日" : "7月2日";
+    const correctTimeStr = formatTime(dateB);
+    const correctAnswerText = `${correctDateStr} ${correctTimeStr}`;
+
+    // 生成干擾選項
+    const optionsSet = new Set();
+    optionsSet.add(correctAnswerText);
+    
+    // 干擾1：加減反向 (東加西減搞反)
+    const dateB_wrong1 = new Date(dateA.getTime() - diffMinutes * 60 * 1000);
+    const dateStr_wrong1 = dateB_wrong1.getDate() === 3 ? "7月3日" : dateB_wrong1.getDate() === 4 ? "7月4日" : "7月2日";
+    optionsSet.add(`${dateStr_wrong1} ${formatTime(dateB_wrong1)}`);
+    
+    // 干擾2：忘記跨日（日期沒變，只有時間對）
+    optionsSet.add(`7月3日 ${correctTimeStr}`);
+    
+    // 干擾3：時差算錯（隨機加減 1~3 小時）
+    const randomOffsetHours = (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 2) + 1); // +1, -1, +2, -2
+    const dateB_wrong3 = new Date(dateB.getTime() + randomOffsetHours * 60 * 60 * 1000);
+    const dateStr_wrong3 = dateB_wrong3.getDate() === 3 ? "7月3日" : dateB_wrong3.getDate() === 4 ? "7月4日" : "7月2日";
+    optionsSet.add(`${dateStr_wrong3} ${formatTime(dateB_wrong3)}`);
+    
+    // 如果選項數量不足 4 個，補足隨機時間
+    while (optionsSet.size < 4) {
+      const h_rand = String(Math.floor(Math.random() * 24)).padStart(2, "0");
+      const d_rand = Math.random() > 0.5 ? "7月3日" : (Math.random() > 0.5 ? "7月4日" : "7月2日");
+      optionsSet.add(`${d_rand} ${h_rand}:00`);
+    }
+
+    // 將 Set 轉換為 Array 並打亂
+    const optionsArray = Array.from(optionsSet);
+    shuffleArray(optionsArray);
+
+    const corrIdx = optionsArray.indexOf(correctAnswerText);
+    
+    // 寫詳細解析
+    const absDiff = Math.abs(diffLon);
+    const tzDiffHours = absDiff / 15;
+    const dirText = lonValB > lonValA ? "東邊" : "西邊";
+    const opText = lonValB > lonValA ? "加上" : "減去";
+    
+    let explanation = "";
+    if (Math.abs(diffLon) % 15 === 0) {
+      explanation = `${nameA} 在 ${Math.abs(lonValA)}°，${nameB} 在 ${Math.abs(lonValB)}°。經度差為 ${absDiff}°。時差為 ${absDiff}° ÷ 15 = ${tzDiffHours} 小時。由於目標地在${dirText}，時間要${opText} ${tzDiffHours} 小時。`;
+    } else {
+      const totMin = absDiff * 4;
+      const h = Math.floor(totMin / 60);
+      const m = totMin % 60;
+      explanation = `${nameA} 在 ${Math.abs(lonValA)}°，${nameB} 在 ${Math.abs(lonValB)}°。經度差為 ${absDiff}°。時差為 ${absDiff}° × 4 分鐘 = ${totMin} 分鐘 (即 ${h} 小時 ${m} 分鐘)。由於目標地在${dirText}，時間要${opText}。`;
+    }
+    
+    if (dateB.getDate() > dateA.getDate()) {
+      explanation += ` 計算後時間超過 24 點，進入隔天的 ${correctTimeStr}，故日期變為 ${correctDateStr}。`;
+    } else if (dateB.getDate() < dateA.getDate()) {
+      explanation += ` 計算後時間小於 0 點，退回前一天的 ${correctTimeStr}，故日期變為 ${correctDateStr}。`;
+    } else {
+      explanation += ` 計算後仍在同一天，時間為 ${correctTimeStr}。`;
+    }
+
+    questions.push({
+      questionText: questionText,
+      options: optionsArray,
+      correctAnswerIndex: corrIdx,
+      explanation: explanation
+    });
   }
+  
+  return questions;
+}
 
-  // --- 挑戰賽函式 ---
-  function initQuizUI() {
-    const startScreen = $("quiz-start-screen");
-    const activeScreen = $("quiz-active-screen");
-    const resultScreen = $("quiz-result-screen");
+// 隨機打亂陣列
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[array[j]]] = [array[j], array[i]];
+  }
+}
 
-    if (startScreen) startScreen.style.display = "block";
-    if (activeScreen) activeScreen.style.display = "none";
-    if (resultScreen) resultScreen.style.display = "none";
 
-    // 難度按鈕切換
-    const diffButtons = document.querySelectorAll(".btn-diff");
-    diffButtons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        diffButtons.forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        quizDifficulty = btn.dataset.level || "easy";
-      });
-    });
+// ==========================================================================
+// 🏆 頁籤 3：奇幻徽章牆 邏輯
+// ==========================================================================
 
-    // 開始挑戰按鈕
-    $("btn-start-quiz")?.addEventListener("click", startQuiz);
-
-    // 下一題按鈕
-    $("btn-next-question")?.addEventListener("click", nextQuestion);
-
-    // 重新挑戰按鈕
-    $("btn-restart-quiz")?.addEventListener("click", () => {
-      if (startScreen) startScreen.style.display = "block";
-      if (resultScreen) resultScreen.style.display = "none";
-    });
-
-    // 去徽章牆按鈕
-    $("btn-go-badges")?.addEventListener("click", () => {
-      const badgeTabBtn = document.querySelector('.nav-tab[data-tab="tab-badges"]');
-      if (badgeTabBtn) {
-        badgeTabBtn.click();
+function renderBadges() {
+  const container = document.getElementById("badges-grid-container");
+  container.innerHTML = "";
+  
+  BADGES.forEach(b => {
+    const isUnlocked = gameState.unlockedBadges.includes(b.id);
+    
+    const card = document.createElement("div");
+    card.className = `glass-panel badge-card ${isUnlocked ? 'unlocked' : 'locked'}`;
+    
+    // 鎖定遮罩
+    let lockOverlay = "";
+    if (!isUnlocked) {
+      lockOverlay = `<div class="badge-card-lock-overlay">🔒</div>`;
+    }
+    
+    card.innerHTML = `
+      <div class="badge-card-icon-container">
+        <div class="badge-card-icon">${b.emoji}</div>
+        ${lockOverlay}
+      </div>
+      <div class="badge-card-info">
+        <h4>${b.name}</h4>
+        <p>${b.lon} ｜ ${b.tz}</p>
+      </div>
+      <button class="badge-unlock-btn" data-id="${b.id}">
+        ✨ ${b.cost} 解鎖
+      </button>
+    `;
+    
+    // 綁定點擊事件
+    card.addEventListener("click", (e) => {
+      // 如果點擊的是解鎖按鈕，則處理解鎖
+      if (e.target.classList.contains("badge-unlock-btn")) {
+        unlockBadge(b);
+      } else {
+        // 如果已解鎖，顯示詳情
+        if (isUnlocked) {
+          showBadgeDetail(b);
+        } else {
+          lunaSpeak(`這座 ${b.name} 徽章目前還是鎖定狀態。點擊卡片底部的按鈕，花費 ${b.cost} 個碎片就能解鎖它喔！🔒`);
+        }
       }
     });
-  }
-
-  function startQuiz() {
-    quizQuestions = QUIZ_QUESTIONS[quizDifficulty] || QUIZ_QUESTIONS.easy;
-    currentQIndex = 0;
-    quizScore = 0;
     
-    $("quiz-start-screen").style.display = "none";
-    $("quiz-active-screen").style.display = "block";
-    $("quiz-result-screen").style.display = "none";
+    container.appendChild(card);
+  });
+}
 
-    loadQuestion();
-  }
-
-  function loadQuestion() {
-    selectedOptIdx = null;
-    const q = quizQuestions[currentQIndex];
-    
-    // 更新進度與難度
-    const progressPercent = (currentQIndex / quizQuestions.length) * 100;
-    $("quiz-progress-bar").style.width = `${progressPercent}%`;
-    $("quiz-q-num").textContent = `第 ${currentQIndex + 1} 題 / 共 ${quizQuestions.length} 題`;
-    
-    const diffText = {
-      easy: "難度：簡單",
-      medium: "難度：中等",
-      hard: "難度：困難"
-    };
-    $("quiz-q-diff").textContent = diffText[quizDifficulty] || "難度：簡單";
-    
-    $("quiz-q-text").textContent = q.question;
-
-    const container = $("quiz-options-container");
-    container.innerHTML = "";
-    q.options.forEach((opt, idx) => {
-      const btn = document.createElement("button");
-      btn.className = "btn-option";
-      btn.innerHTML = `<span class="option-letter">${String.fromCharCode(65 + idx)}</span>${opt}`;
-      btn.addEventListener("click", () => {
-        if (selectedOptIdx !== null) return;
-        selectOption(idx);
-      });
-      container.appendChild(btn);
-    });
-
-    $("quiz-feedback").style.display = "none";
-  }
-
-  function selectOption(idx) {
-    selectedOptIdx = idx;
-    const q = quizQuestions[currentQIndex];
-    const isCorrect = idx === q.correct;
-    
-    if (isCorrect) {
-      quizScore++;
-    }
-
-    const optionButtons = document.querySelectorAll(".btn-option");
-    optionButtons.forEach((btn, bIdx) => {
-      btn.classList.add("disabled");
-      if (bIdx === q.correct) {
-        btn.classList.add("correct-choice");
-      } else if (bIdx === selectedOptIdx) {
-        btn.classList.add("incorrect-choice");
-      }
-    });
-
-    const feedback = $("quiz-feedback");
-    const icon = $("feedback-icon");
-    const title = $("feedback-title");
-    const desc = $("feedback-desc");
-
-    if (isCorrect) {
-      icon.textContent = "🎉";
-      title.textContent = "答對了！";
-      title.style.color = "var(--color-success)";
-    } else {
-      icon.textContent = "😢";
-      title.textContent = "答錯了！";
-      title.style.color = "var(--color-error)";
-    }
-
-    desc.textContent = q.desc;
-    feedback.style.display = "flex";
-    feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  function nextQuestion() {
-    currentQIndex++;
-    if (currentQIndex < quizQuestions.length) {
-      loadQuestion();
-    } else {
-      showResult();
-    }
-  }
-
-  function showResult() {
-    $("quiz-active-screen").style.display = "none";
-    $("quiz-result-screen").style.display = "block";
-    $("quiz-progress-bar").style.width = "100%";
-
-    $("result-correct-count").textContent = `${quizScore}/${quizQuestions.length}`;
-
-    const rewardMultiplier = {
-      easy: 2,
-      medium: 3,
-      hard: 4
-    };
-    const factor = rewardMultiplier[quizDifficulty] || 2;
-    const rewardShards = quizScore * factor;
-
-    $("result-reward-shards").textContent = `+${rewardShards}`;
-
-    let evalText = "做得好！繼續加油！";
-    if (quizScore === quizQuestions.length) {
-      evalText = "👑 太厲害了！你已經是個時空大師了！";
-    } else if (quizScore >= 3) {
-      evalText = "🌟 表現優異！快去解鎖你的時空徽章吧！";
-    }
-    $("result-eval-text").textContent = evalText;
-
-    const currentStars = getStars();
-    saveStars(currentStars + rewardShards);
-
+function unlockBadge(badge) {
+  if (gameState.unlockedBadges.includes(badge.id)) return;
+  
+  if (gameState.stars >= badge.cost) {
+    gameState.stars -= badge.cost;
+    gameState.unlockedBadges.push(badge.id);
+    saveProgress();
     renderBadges();
+    
+    playToneCorrect();
+    triggerConfetti();
+    
+    lunaSpeak(`太棒了！你解鎖了【${badge.name}】徽章！獲得了前往該時區的新知識喔！🏰😺`);
+  } else {
+    playToneIncorrect();
+    lunaSpeak(`哎呀，你的星之碎片不夠解鎖【${badge.name}】耶。它需要 ${badge.cost} 個碎片，你現在只有 ${gameState.stars} 個。快去『時空挑戰賽』答題賺取碎片吧！⭐`);
   }
+}
 
-  // --- 徽章詳情彈窗 ---
-  function showBadgeDetail(badge) {
-    let overlay = $("badge-modal-overlay");
-    if (overlay) overlay.remove();
-
+// 景點徽章詳細彈窗
+function showBadgeDetail(badge) {
+  // 建立 modal DOM (如果沒有的話)
+  let overlay = document.getElementById("badge-detail-overlay");
+  if (!overlay) {
     overlay = document.createElement("div");
-    overlay.id = "badge-modal-overlay";
     overlay.className = "badge-modal-overlay";
+    overlay.id = "badge-detail-overlay";
     overlay.innerHTML = `
       <div class="badge-modal">
-        <div class="badge-modal-icon">${badge.icon}</div>
-        <h3>${badge.name}</h3>
-        <span class="badge-modal-meta">${badge.lat} | ${badge.timezone}</span>
-        <p class="badge-modal-desc">${badge.desc}</p>
-        <button class="btn-close-modal" id="btn-close-badge-modal">關閉手札</button>
+        <div class="badge-modal-icon" id="modal-badge-emoji">🧭</div>
+        <h3 id="modal-badge-name">景點名稱</h3>
+        <span class="badge-modal-meta" id="modal-badge-meta">經度與時區</span>
+        <p class="badge-modal-desc" id="modal-badge-desc">景點小知識...</p>
+        <button class="btn-close-modal" id="modal-btn-close">關閉手札</button>
       </div>
     `;
     document.body.appendChild(overlay);
-
-    setTimeout(() => overlay.classList.add("active"), 10);
-
-    const closeBtn = $("btn-close-badge-modal");
-    closeBtn?.addEventListener("click", () => {
+    
+    // 綁定關閉
+    document.getElementById("modal-btn-close").addEventListener("click", () => {
       overlay.classList.remove("active");
-      setTimeout(() => overlay.remove(), 300);
     });
-
     overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) {
-        overlay.classList.remove("active");
-        setTimeout(() => overlay.remove(), 300);
-      }
+      if (e.target === overlay) overlay.classList.remove("active");
     });
   }
+  
+  // 更新 Modal 內容
+  document.getElementById("modal-badge-emoji").innerText = badge.emoji;
+  document.getElementById("modal-badge-name").innerText = badge.name;
+  document.getElementById("modal-badge-meta").innerText = `${badge.lon} ｜ 時區：${badge.tz}`;
+  document.getElementById("modal-badge-desc").innerText = badge.fact;
+  
+  // 顯示 Modal
+  overlay.classList.add("active");
+  
+  lunaSpeak(`正在閱讀【${badge.name}】的時空旅行小知識。原來它是這樣啊！🌍`);
+}
 
-  // --- 徽章牆渲染與解鎖 ---
-  function renderBadges() {
-    const container = $("badges-grid-container");
-    if (!container) return;
 
-    const unlocked = getUnlockedBadges();
-    const stars = getStars();
+// ==========================================================================
+// 🎵 Web Audio API 音效合成器
+// ==========================================================================
 
-    container.innerHTML = "";
-
-    BADGES.forEach((badge) => {
-      const isUnlocked = unlocked.includes(badge.id);
-      const card = document.createElement("div");
-      card.className = `badge-card ${isUnlocked ? "unlocked" : "locked"}`;
-      card.dataset.id = badge.id;
-
-      let iconHtml = `<div class="badge-card-icon">${badge.icon}</div>`;
-      if (!isUnlocked) {
-        iconHtml += `<div class="badge-card-lock-overlay">🔒</div>`;
-      }
-
-      card.innerHTML = `
-        <div class="badge-card-icon-container">
-          ${iconHtml}
-        </div>
-        <div class="badge-card-info">
-          <h4>${badge.name}</h4>
-          <p>${badge.timezone}</p>
-        </div>
-        <button class="badge-unlock-btn" data-id="${badge.id}" data-cost="${badge.cost}">
-          ✨ 解鎖 (${badge.cost})
-        </button>
-      `;
-
-      card.addEventListener("click", (e) => {
-        if (e.target.classList.contains("badge-unlock-btn") || e.target.closest(".badge-unlock-btn")) {
-          return;
-        }
-
-        if (isUnlocked) {
-          showBadgeDetail(badge);
-        } else {
-          alert(`此徽章尚未解鎖，請點選下方解鎖按鈕！(解鎖需要 ${badge.cost} 個星之碎片)`);
-        }
-      });
-
-      const unlockBtn = card.querySelector(".badge-unlock-btn");
-      if (unlockBtn) {
-        unlockBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (isUnlocked) return;
-
-          const currentStars = getStars();
-          if (currentStars >= badge.cost) {
-            const newStars = currentStars - badge.cost;
-            saveStars(newStars);
-            unlockBadgeId(badge.id);
-            alert(`🎉 恭喜！您已成功解鎖了「${badge.name}」！`);
-            renderBadges();
-          } else {
-            alert(`😢 星之碎片不足！解鎖此徽章需要 ${badge.cost} 個碎片，您目前只有 ${currentStars} 個。快去挑戰賽答題賺取碎片吧！`);
-          }
-        });
-      }
-
-      container.appendChild(card);
-    });
+function playToneCorrect() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = "sine";
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    // 叮咚~ 上升音
+    const now = ctx.currentTime;
+    osc.frequency.setValueAtTime(523.25, now); // C5
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    
+    osc.start(now);
+    osc.stop(now + 0.35);
+    
+    setTimeout(() => {
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = "sine";
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      
+      const now2 = ctx.currentTime;
+      osc2.frequency.setValueAtTime(659.25, now2); // E5
+      gain2.gain.setValueAtTime(0.1, now2);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now2 + 0.4);
+      
+      osc2.start(now2);
+      osc2.stop(now2 + 0.4);
+    }, 120);
+  } catch (e) {
+    console.warn("無法播聲音", e);
   }
+}
 
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const target = tab.dataset.tab;
-      tabs.forEach((item) => item.classList.toggle("active", item === tab));
-      panes.forEach((pane) => pane.classList.toggle("active", pane.id === target));
-      if (target === "tab-badges") {
-        renderBadges();
-      }
-    });
-  });
-
-  [cityA, cityB].forEach((selectEl, index) => {
-    if (!selectEl) return;
-    const suffix = index === 0 ? "a" : "b";
-    selectEl.addEventListener("change", () => {
-      setCustomRow(selectEl, suffix);
-      calculate();
-    });
-  });
-
-  ["lon-val-a", "lon-dir-a", "lon-val-b", "lon-dir-b"].forEach((id) => {
-    const node = $(id);
-    if (node) node.addEventListener("input", calculate);
-    if (node) node.addEventListener("change", calculate);
-  });
-
-  if (timeA) {
-    timeA.value = nowLocalDatetime();
-    timeA.addEventListener("input", calculate);
+function playToneIncorrect() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = "triangle";
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    // 咚咚~ 下降低音
+    const now = ctx.currentTime;
+    osc.frequency.setValueAtTime(220.00, now); // A3
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    
+    osc.start(now);
+    osc.stop(now + 0.4);
+    
+    setTimeout(() => {
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = "triangle";
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      
+      const now2 = ctx.currentTime;
+      osc2.frequency.setValueAtTime(174.61, now2); // F3
+      gain2.gain.setValueAtTime(0.12, now2);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now2 + 0.5);
+      
+      osc2.start(now2);
+      osc2.stop(now2 + 0.5);
+    }, 180);
+  } catch (e) {
+    console.warn("無法播放聲音", e);
   }
-  $("btn-swap-locations")?.addEventListener("click", () => {
-    const a = cityA.value;
-    cityA.value = cityB.value;
-    cityB.value = a;
-    setCustomRow(cityA, "a");
-    setCustomRow(cityB, "b");
-    calculate();
-  });
-  $("btn-move-west")?.addEventListener("click", () => shiftA(-15));
-  $("btn-move-east")?.addEventListener("click", () => shiftA(15));
-  $("btn-reset")?.addEventListener("click", () => {
-    localStorage.removeItem("learning-stars");
-    localStorage.removeItem("learning-unlocked-badges");
-    if ($("star-count")) $("star-count").textContent = "0";
-    renderBadges();
-  });
+}
 
-  if ($("star-count")) $("star-count").textContent = getStars();
-  setCustomRow(cityA, "a");
-  setCustomRow(cityB, "b");
-  calculate();
 
-  // --- 初始化挑戰與徽章牆 ---
-  initQuizUI();
-  renderBadges();
-})();
+// ==========================================================================
+// 🎉 Canvas Confetti (紙花特效引擎)
+// ==========================================================================
+
+const confettiCanvas = document.getElementById("confetti-canvas");
+const confettiCtx = confettiCanvas.getContext("2d");
+let confettiParticles = [];
+let confettiAnimationId = null;
+
+function resizeConfettiCanvas() {
+  confettiCanvas.width = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+}
+
+class ConfettiParticle {
+  constructor() {
+    this.x = Math.random() * confettiCanvas.width;
+    this.y = Math.random() * -100 - 20; // 從頂部上方隨機高度掉落
+    this.size = Math.random() * 8 + 6;
+    this.color = `hsl(${Math.random() * 360}, 90%, 65%)`;
+    this.speedX = Math.random() * 4 - 2;
+    this.speedY = Math.random() * 5 + 4;
+    this.rotation = Math.random() * 360;
+    this.rotationSpeed = Math.random() * 4 - 2;
+    this.opacity = 1;
+  }
+  
+  update() {
+    this.x += this.speedX;
+    this.y += this.speedY;
+    this.rotation += this.rotationSpeed;
+    
+    // 如果快落到地面或已到地面，降低透明度
+    if (this.y > confettiCanvas.height * 0.8) {
+      this.opacity -= 0.02;
+    }
+  }
+  
+  draw() {
+    confettiCtx.save();
+    confettiCtx.translate(this.x, this.y);
+    confettiCtx.rotate((this.rotation * Math.PI) / 180);
+    confettiCtx.fillStyle = this.color;
+    confettiCtx.globalAlpha = Math.max(0, this.opacity);
+    
+    // 繪製一個彩色方塊或圓形
+    confettiCtx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+    
+    confettiCtx.restore();
+  }
+}
+
+function triggerConfetti() {
+  // 取消先前的動畫
+  if (confettiAnimationId) {
+    cancelAnimationFrame(confettiAnimationId);
+  }
+  
+  confettiParticles = [];
+  // 產生 120 顆碎屑
+  for (let i = 0; i < 120; i++) {
+    confettiParticles.push(new ConfettiParticle());
+  }
+  
+  animateConfetti();
+}
+
+function animateConfetti() {
+  confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  
+  let aliveParticles = false;
+  
+  confettiParticles.forEach(p => {
+    p.update();
+    p.draw();
+    if (p.opacity > 0 && p.y < confettiCanvas.height) {
+      aliveParticles = true;
+    }
+  });
+  
+  if (aliveParticles) {
+    confettiAnimationId = requestAnimationFrame(animateConfetti);
+  } else {
+    confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  }
+}
+
+// 獲取當前所選的城市名或自訂經度字串，用於地球儀標籤
+function getLocationName(type) {
+  const selectId = `city-select-${type}`;
+  const selectEl = document.getElementById(selectId);
+  if (!selectEl) return type === "a" ? "基地 A" : "探險地 B";
+  
+  if (selectEl.value === "custom") {
+    const val = document.getElementById(`lon-val-${type}`).value;
+    const dir = document.getElementById(`lon-dir-${type}`).value;
+    return `自訂 (${val}°${dir})`;
+  }
+  
+  const text = selectEl.options[selectEl.selectedIndex].text;
+  // 取得第一個空格前的城市名，例如 "台北 (120°E, GMT+8)" -> "台北"
+  return text.split(" ")[0];
+}
 
 </script>
 </body>
