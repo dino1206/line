@@ -68,7 +68,7 @@
 
     .tabs {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       gap: 10px;
       margin-bottom: 18px;
     }
@@ -220,6 +220,7 @@
       <button class="tab-button" type="button" data-target="lens">凸透鏡成像</button>
       <button class="tab-button" type="button" data-target="time">經緯度時間</button>
       <button class="tab-button" type="button" data-target="optics">光學實驗室</button>
+      <button class="tab-button" type="button" data-target="light">光學原理</button>
     </nav>
 
     <section class="lesson-panel active" id="moon" aria-labelledby="moon-title">
@@ -278,6 +279,18 @@
         <p>互動模擬近視與遠視的成因，並動態搭配凹透鏡或凸透鏡進行視力矯正，加強理化光學與透鏡觀念。</p>
         <div class="actions">
           <a class="open-link" href="lessons/optics-lab.html">進入學習頁</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="lesson-panel" id="light" aria-labelledby="light-title">
+      <div class="preview"><iframe title="光學原理預覽" src="lessons/light-principles.html"></iframe></div>
+      <div class="copy">
+        <p class="subject amber">自然光學</p>
+        <h2 id="light-title">光的魔法實驗室：反射、折射與色散</h2>
+        <p>提供三個互動實驗桌，幫助學生透過手動調整雷射光入射角，直觀理解光的反射定律、折射偏向以及三稜鏡色散現象。</p>
+        <div class="actions">
+          <a class="open-link" href="lessons/light-principles.html">進入學習頁</a>
         </div>
       </div>
     </section>
