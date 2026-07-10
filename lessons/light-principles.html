@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光的魔法實驗室：反射、折射與色散</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; background-color: #f8fafc; }
+        .ray-path {
+            stroke-dasharray: 2000;
+            stroke-dashoffset: 2000;
+            animation: drawRay 1.5s forwards ease-out;
+        }
+        @keyframes drawRay {
+            to { stroke-dashoffset: 0; }
+        }
+        .glow-filter {
+            filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.8));
+        }
+        .glow-red { filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8)); }
+        .glow-orange { filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.8)); }
+        .glow-yellow { filter: drop-shadow(0 0 6px rgba(234, 179, 8, 0.8)); }
+        .glow-green { filter: drop-shadow(0 0 6px rgba(34, 197, 94, 0.8)); }
+        .glow-blue { filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.8)); }
+        .glow-indigo { filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.8)); }
+        .glow-violet { filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.8)); }
+        
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // 共用參數
+        const CENTER_X = 350;
+        const CENTER_Y = 200;
+        const RAY_LENGTH = 300;
+
+        // 度數轉弧度
+        const rad = (deg) => deg * Math.PI / 180;
+        // 根據角度與長度算座標
+        const getEndPt = (x, y, angle, len) => ({
+            x: x + len * Math.sin(rad(angle)),
+            y: y - len * Math.cos(rad(angle)) // SVG 的 Y 軸向下
+        });
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('reflection');
+
+            return (
+                <div className="min-h-screen p-4 md:p-8 flex flex-col items-center max-w-5xl mx-auto">
+                    <header className="text-center mb-8">
+                        <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-2">✨ 光的魔法實驗室</h1>
+                        <p className="text-slate-600">基礎光學原理：反射、折射與色散</p>
+                    </header>
+
+                    {/* 頁籤切換 */}
+                    <div className="flex bg-white rounded-xl shadow-sm border border-slate-200 p-1 mb-6 w-full max-w-3xl">
+                        <button onClick={() => setActiveTab('reflection')} className={`flex-1 py-3 rounded-lg font-bold text-lg transition ${activeTab === 'reflection' ? 'bg-amber-100 text-amber-700 shadow' : 'text-slate-500 hover:bg-slate-50'}`}>🪞 光的反射</button>
+                        <button onClick={() => setActiveTab('refraction')} className={`flex-1 py-3 rounded-lg font-bold text-lg transition ${activeTab === 'refraction' ? 'bg-blue-100 text-blue-700 shadow' : 'text-slate-500 hover:bg-slate-50'}`}>💧 光的折射</button>
+                        <button onClick={() => setActiveTab('dispersion')} className={`flex-1 py-3 rounded-lg font-bold text-lg transition ${activeTab === 'dispersion' ? 'bg-purple-100 text-purple-700 shadow' : 'text-slate-500 hover:bg-slate-50'}`}>🌈 光的色散</button>
+                    </div>
+
+                    <div className="w-full">
+                        {activeTab === 'reflection' && <ReflectionLab />}
+                        {activeTab === 'refraction' && <RefractionLab />}
+                        {activeTab === 'dispersion' && <DispersionLab />}
+                    </div>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 實驗 1：反射
+        // ==========================================
+        function ReflectionLab() {
+            const [angle, setAngle] = useState(45); // 入射角 0~90
+
+            // SVG 座標計算
+            // 法線是 y 軸 (x=CENTER_X), 鏡面是 x 軸 (y=CENTER_Y)
+            // 入射光從左上方來，角度 angle 是與法線的夾角
+            // 所以入射光的方向是 180 + angle (從下方往上看)，起點是：
+            const startPt = getEndPt(CENTER_X, CENTER_Y, -angle, -RAY_LENGTH);
+            // 反射光往右上方去，角度 angle
+            const refPt = getEndPt(CENTER_X, CENTER_Y, angle, -RAY_LENGTH);
+
+            return (
+                <div className="flex flex-col md:flex-row gap-6">
+                    {/* 左側控制 */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 w-full md:w-1/3">
+                        <h2 className="text-xl font-bold text-slate-800 mb-4">🪞 控制面板</h2>
+                        <div className="mb-6">
+                            <label className="block text-slate-700 font-bold mb-2">
+                                調整入射角：<span className="text-amber-600 text-xl">{angle}°</span>
+                            </label>
+                            <input 
+                                type="range" 
+                                min="0" max="85" 
+                                value={angle} 
+                                onChange={(e) => setAngle(Number(e.target.value))} 
+                            />
+                            <div className="flex justify-between text-xs text-slate-400 mt-1">
+                                <span>0° (垂直入射)</span>
+                                <span>85° (接近平行)</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                            <h3 className="font-bold text-amber-800 mb-2">📜 反射定律</h3>
+                            <ul className="list-disc list-inside text-sm text-amber-900 space-y-1">
+                                <li>入射線、反射線與法線在<strong className="text-amber-600">同一平面</strong>上。</li>
+                                <li>入射線與反射線在法線的<strong className="text-amber-600">兩側</strong>。</li>
+                                <li><strong>入射角 = 反射角</strong>。目前兩者皆為 {angle}°！</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* 右側畫布 */}
+                    <div className="bg-slate-900 p-2 rounded-xl shadow-xl w-full md:w-2/3 relative overflow-hidden">
+                        <svg viewBox="0 0 700 400" className="w-full h-auto">
+                            {/* 背景網格 */}
+                            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
+                            </pattern>
+                            <rect width="100%" height="100%" fill="url(#grid)" />
+
+                            {/* 鏡面 */}
+                            <rect x="50" y={CENTER_Y} width="600" height="20" fill="#cbd5e1" rx="2" />
+                            <rect x="50" y={CENTER_Y+20} width="600" height="4" fill="#94a3b8" />
+                            <text x="60" y={CENTER_Y+45} fill="#94a3b8" fontSize="14" fontWeight="bold">平面鏡</text>
+
+                            {/* 法線 */}
+                            <line x1={CENTER_X} y1="50" x2={CENTER_X} y2={CENTER_Y} stroke="#94a3b8" strokeWidth="2" strokeDasharray="6,6" />
+                            <text x={CENTER_X - 15} y="40" fill="#94a3b8" fontSize="14" fontWeight="bold">法線</text>
+
+                            {/* 入射角與反射角圓弧 (如果角度>0) */}
+                            {angle > 5 && (
+                                <g>
+                                    <path d={`M ${CENTER_X},${CENTER_Y-40} A 40,40 0 0,0 ${CENTER_X - 40*Math.sin(rad(angle))},${CENTER_Y - 40*Math.cos(rad(angle))}`} fill="none" stroke="#fcd34d" strokeWidth="2" />
+                                    <text x={CENTER_X - 25*Math.sin(rad(angle/2)) - 20} y={CENTER_Y - 25*Math.cos(rad(angle/2)) - 10} fill="#fcd34d" fontSize="12">{angle}°</text>
+
+                                    <path d={`M ${CENTER_X},${CENTER_Y-40} A 40,40 0 0,1 ${CENTER_X + 40*Math.sin(rad(angle))},${CENTER_Y - 40*Math.cos(rad(angle))}`} fill="none" stroke="#6ee7b7" strokeWidth="2" />
+                                    <text x={CENTER_X + 25*Math.sin(rad(angle/2)) + 5} y={CENTER_Y - 25*Math.cos(rad(angle/2)) - 10} fill="#6ee7b7" fontSize="12">{angle}°</text>
+                                </g>
+                            )}
+
+                            {/* 雷射筆 (發射端) */}
+                            <g transform={`translate(${startPt.x}, ${startPt.y}) rotate(${90-angle})`}>
+                                <rect x="-10" y="-15" width="40" height="10" fill="#475569" rx="3" />
+                                <rect x="30" y="-13" width="5" height="6" fill="#ef4444" />
+                            </g>
+
+                            {/* 入射光線 */}
+                            <line x1={startPt.x} y1={startPt.y} x2={CENTER_X} y2={CENTER_Y} stroke="#f59e0b" strokeWidth="4" className="glow-filter" />
+                            
+                            {/* 反射光線 */}
+                            <line x1={CENTER_X} y1={CENTER_Y} x2={refPt.x} y2={refPt.y} stroke="#10b981" strokeWidth="4" className="glow-green" />
+
+                            {/* 箭頭 */}
+                            <polygon points={`${(startPt.x+CENTER_X)/2},${(startPt.y+CENTER_Y)/2 - 5} ${(startPt.x+CENTER_X)/2 + 10},${(startPt.y+CENTER_Y)/2} ${(startPt.x+CENTER_X)/2},${(startPt.y+CENTER_Y)/2 + 5}`} fill="#f59e0b" transform={`rotate(${90-angle}, ${(startPt.x+CENTER_X)/2}, ${(startPt.y+CENTER_Y)/2})`} />
+                            <polygon points={`${(CENTER_X+refPt.x)/2},${(CENTER_Y+refPt.y)/2 - 5} ${(CENTER_X+refPt.x)/2 + 10},${(CENTER_Y+refPt.y)/2} ${(CENTER_X+refPt.x)/2},${(CENTER_Y+refPt.y)/2 + 5}`} fill="#10b981" transform={`rotate(${angle-90}, ${(CENTER_X+refPt.x)/2}, ${(CENTER_Y+refPt.y)/2})`} />
+
+                        </svg>
+                    </div>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 實驗 2：折射
+        // ==========================================
+        function RefractionLab() {
+            const [angle, setAngle] = useState(45); // 入射角
+            const [mode, setMode] = useState('airToWater'); // airToWater 或 waterToAir
+            const [animKey, setAnimKey] = useState(0);
+
+            // N值 (折射率)
+            const nAir = 1.0;
+            const nWater = 1.33;
+            
+            const n1 = mode === 'airToWater' ? nAir : nWater;
+            const n2 = mode === 'airToWater' ? nWater : nAir;
+
+            // Snell's Law: n1 * sin(θ1) = n2 * sin(θ2)
+            // sin(θ2) = (n1/n2) * sin(θ1)
+            const sinTheta2 = (n1 / n2) * Math.sin(rad(angle));
+            let theta2 = 0;
+            let isTIR = false; // 判斷是否全反射 (Total Internal Reflection)
+
+            if (sinTheta2 > 1) {
+                isTIR = true; // 全反射！
+                theta2 = angle; // 反射角等於入射角
+            } else {
+                theta2 = Math.asin(sinTheta2) * 180 / Math.PI;
+            }
+
+            // 座標計算
+            // 上半部 y < CENTER_Y，下半部 y > CENTER_Y
+            // 入射光起點 (如果是 airToWater，從上往下射；如果是 waterToAir，從下往上射)
+            let startYDir = mode === 'airToWater' ? -1 : 1;
+            const startPt = getEndPt(CENTER_X, CENTER_Y, -angle, startYDir * RAY_LENGTH);
+            
+            // 折射或反射終點
+            let endPt;
+            if (isTIR) {
+                // 全反射，光線彈回去 (同側)
+                endPt = getEndPt(CENTER_X, CENTER_Y, angle, startYDir * RAY_LENGTH);
+            } else {
+                // 折射，穿透到另一側
+                endPt = getEndPt(CENTER_X, CENTER_Y, angle, -startYDir * RAY_LENGTH);
+            }
+
+            // 當模式改變時重新觸發光線動畫
+            useEffect(() => {
+                setAnimKey(prev => prev + 1);
+            }, [mode]);
+
+            return (
+                <div className="flex flex-col md:flex-row gap-6">
+                    {/* 左側控制 */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 w-full md:w-1/3">
+                        <h2 className="text-xl font-bold text-slate-800 mb-4">💧 控制面板</h2>
+                        
+                        <div className="mb-6">
+                            <label className="block text-slate-700 font-bold mb-2">雷射筆位置：</label>
+                            <div className="flex gap-2">
+                                <button onClick={() => setMode('airToWater')} className={`flex-1 py-2 rounded font-medium border ${mode === 'airToWater' ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300'}`}>由 空氣 射入 水</button>
+                                <button onClick={() => setMode('waterToAir')} className={`flex-1 py-2 rounded font-medium border ${mode === 'waterToAir' ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300'}`}>由 水 射入 空氣</button>
+                            </div>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-slate-700 font-bold mb-2">
+                                調整入射角：<span className="text-blue-600 text-xl">{angle}°</span>
+                            </label>
+                            <input 
+                                type="range" 
+                                min="0" max="85" 
+                                value={angle} 
+                                onChange={(e) => setAngle(Number(e.target.value))} 
+                            />
+                        </div>
+
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <h3 className="font-bold text-blue-800 mb-2">📜 司乃耳定律 (Snell's Law)</h3>
+                            <p className="text-sm text-blue-900 mb-2">
+                                當光從一種介質進入另一種介質時，速度會改變，導致方向偏折。
+                            </p>
+                            {!isTIR ? (
+                                <ul className="list-disc list-inside text-sm text-blue-900 space-y-1">
+                                    <li>入射角：{angle}°</li>
+                                    <li>折射角：<strong className="text-blue-700">{theta2.toFixed(1)}°</strong></li>
+                                    {mode === 'airToWater' ? (
+                                        <li>光進入水變慢，折射線<strong>偏向</strong>法線 (折射角 &lt; 入射角)。</li>
+                                    ) : (
+                                        <li>光進入空氣變快，折射線<strong>偏離</strong>法線 (折射角 &gt; 入射角)。</li>
+                                    )}
+                                </ul>
+                            ) : (
+                                <div className="p-2 bg-red-100 rounded border border-red-300 text-red-800 font-bold mt-2">
+                                    🚨 發生「全反射」！<br/>
+                                    <span className="text-xs font-normal">入射角大於臨界角，光線無法穿透，全部反射回原介質！</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 右側畫布 */}
+                    <div className="bg-slate-900 p-2 rounded-xl shadow-xl w-full md:w-2/3 relative overflow-hidden">
+                        <svg viewBox="0 0 700 400" className="w-full h-auto">
+                            {/* 空氣背景 (上) */}
+                            <rect x="0" y="0" width="700" height={CENTER_Y} fill="#0f172a" />
+                            <text x="20" y="30" fill="#94a3b8" fontSize="16" fontWeight="bold">空氣 (介質較疏，光速較快)</text>
+
+                            {/* 水背景 (下) */}
+                            <rect x="0" y={CENTER_Y} width="700" height={400-CENTER_Y} fill="#1e3a8a" opacity="0.8" />
+                            <text x="20" y={CENTER_Y + 30} fill="#60a5fa" fontSize="16" fontWeight="bold">水 (介質較密，光速較慢)</text>
+                            
+                            {/* 水波紋裝飾 */}
+                            <path d="M 0,200 Q 30,195 60,200 T 120,200 T 180,200 T 240,200 T 300,200 T 360,200 T 420,200 T 480,200 T 540,200 T 600,200 T 660,200 T 700,200" fill="none" stroke="#3b82f6" strokeWidth="2" opacity="0.5" />
+
+                            {/* 法線 */}
+                            <line x1={CENTER_X} y1="50" x2={CENTER_X} y2="350" stroke="#94a3b8" strokeWidth="2" strokeDasharray="6,6" />
+
+                            {/* 雷射筆 (發射端) */}
+                            <g transform={`translate(${startPt.x}, ${startPt.y}) rotate(${startYDir === -1 ? 90-angle : 270-angle})`}>
+                                <rect x="-10" y="-15" width="40" height="10" fill="#475569" rx="3" />
+                                <rect x="30" y="-13" width="5" height="6" fill="#ef4444" />
+                            </g>
+
+                            {/* 光線群組 (加上 key 以便切換介質時重播動畫) */}
+                            <g key={animKey}>
+                                {/* 入射光線 */}
+                                <line x1={startPt.x} y1={startPt.y} x2={CENTER_X} y2={CENTER_Y} stroke="#f59e0b" strokeWidth="4" className="glow-filter" />
+                                
+                                {/* 折射/全反射光線 */}
+                                <line x1={CENTER_X} y1={CENTER_Y} x2={endPt.x} y2={endPt.y} stroke={isTIR ? "#10b981" : "#ec4899"} strokeWidth="4" className={isTIR ? "glow-green" : "glow-red"} />
+                            </g>
+
+                            {/* 角度標示圓弧 */}
+                            {angle > 5 && (
+                                <g>
+                                    {/* 入射角 */}
+                                    <path d={`M ${CENTER_X},${CENTER_Y + startYDir*40} A 40,40 0 0,${startYDir===-1?0:1} ${CENTER_X - 40*Math.sin(rad(angle))},${CENTER_Y + startYDir*40*Math.cos(rad(angle))}`} fill="none" stroke="#fcd34d" strokeWidth="2" />
+                                    <text x={CENTER_X - 25*Math.sin(rad(angle/2)) - 25} y={CENTER_Y + startYDir*25*Math.cos(rad(angle/2)) + (startYDir===-1?-5:15)} fill="#fcd34d" fontSize="12">{angle}°</text>
+
+                                    {/* 折射角/反射角 */}
+                                    <path d={`M ${CENTER_X},${CENTER_Y + (isTIR ? startYDir : -startYDir)*40} A 40,40 0 0,${isTIR?(startYDir===-1?1:0):(startYDir===-1?0:1)} ${CENTER_X + 40*Math.sin(rad(theta2))},${CENTER_Y + (isTIR ? startYDir : -startYDir)*40*Math.cos(rad(theta2))}`} fill="none" stroke={isTIR?"#6ee7b7":"#f472b6"} strokeWidth="2" />
+                                    <text x={CENTER_X + 25*Math.sin(rad(theta2/2)) + 5} y={CENTER_Y + (isTIR ? startYDir : -startYDir)*25*Math.cos(rad(theta2/2)) + ((isTIR ? startYDir : -startYDir)===-1?-5:15)} fill={isTIR?"#6ee7b7":"#f472b6"} fontSize="12">{theta2.toFixed(1)}°</text>
+                                </g>
+                            )}
+
+                        </svg>
+                    </div>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 實驗 3：色散
+        // ==========================================
+        function DispersionLab() {
+            const [trigger, setTrigger] = useState(0);
+
+            // 當點擊「發射白光」時，改變 trigger 狀態來重播動畫
+            const fireLight = () => {
+                setTrigger(prev => prev + 1);
+            };
+
+            return (
+                <div className="flex flex-col md:flex-row gap-6">
+                    {/* 左側控制 */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 w-full md:w-1/3">
+                        <h2 className="text-xl font-bold text-slate-800 mb-4">🌈 控制面板</h2>
+                        
+                        <div className="mb-6 flex justify-center">
+                            <button 
+                                onClick={fireLight}
+                                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-4 rounded-xl shadow-lg transition transform hover:scale-105"
+                            >
+                                ⚡ 發射白光！
+                            </button>
+                        </div>
+
+                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                            <h3 className="font-bold text-purple-800 mb-2">📜 光的色散 (Dispersion)</h3>
+                            <p className="text-sm text-purple-900 mb-2">
+                                陽光或日光燈發出的白光，其實是由各種顏色的光混合而成的。
+                            </p>
+                            <ul className="list-disc list-inside text-sm text-purple-900 space-y-1">
+                                <li>當光通過三稜鏡時，不同顏色的光「**折射率不同**」。</li>
+                                <li><strong className="text-red-500">紅光</strong>波長最長，折射角度最小 (偏折最少)。</li>
+                                <li><strong className="text-purple-600">紫光</strong>波長最短，折射角度最大 (偏折最多)。</li>
+                                <li>因此光線被「分散」成七彩的彩虹！</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* 右側畫布 */}
+                    <div className="bg-slate-900 p-2 rounded-xl shadow-xl w-full md:w-2/3 relative overflow-hidden">
+                        <svg viewBox="0 0 700 400" className="w-full h-auto">
+                            {/* 背景網格 */}
+                            <pattern id="grid3" width="20" height="20" patternUnits="userSpaceOnUse">
+                                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.02)" strokeWidth="1"/>
+                            </pattern>
+                            <rect width="100%" height="100%" fill="url(#grid3)" />
+
+                            {/* 雷射筆 (發射端) */}
+                            <g transform="translate(50, 250) rotate(-15)">
+                                <rect x="-10" y="-15" width="40" height="10" fill="#475569" rx="3" />
+                                <rect x="30" y="-13" width="5" height="6" fill="#ef4444" />
+                            </g>
+
+                            {/* 三稜鏡 */}
+                            <polygon points="350,100 250,300 450,300" fill="rgba(255,255,255,0.15)" stroke="#e2e8f0" strokeWidth="2" />
+                            <text x="320" y="280" fill="#cbd5e1" fontSize="16" fontWeight="bold">三稜鏡</text>
+
+                            <g key={trigger}>
+                                {/* 入射白光 */}
+                                <line x1="50" y1="250" x2="283" y2="233" stroke="#ffffff" strokeWidth="6" className="ray-path glow-filter" />
+                                
+                                {/* 稜鏡內部折射 (白色散開一點點) */}
+                                <polygon points="283,233 390,180 415,230" fill="url(#prismGrad)" opacity="0.8" className="ray-path" style={{animationDelay: '1.5s'}} />
+                                
+                                <defs>
+                                    <linearGradient id="prismGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor="#ffffff"/>
+                                        <stop offset="100%" stopColor="rgba(255,255,255,0)"/>
+                                    </linearGradient>
+                                </defs>
+
+                                {/* 射出的七彩光譜 */}
+                                {/* 紅 */}
+                                <line x1="395" y1="190" x2="650" y2="130" stroke="#ef4444" strokeWidth="4" className="ray-path glow-red" style={{animationDelay: '0.8s'}} />
+                                <text x="660" y="135" fill="#ef4444" className="ray-path" style={{animationDelay: '1.8s', opacity: 0, animation: 'fadeIn 0.5s forwards 1.8s'}}>紅</text>
+                                
+                                {/* 橙 */}
+                                <line x1="398" y1="198" x2="650" y2="155" stroke="#f97316" strokeWidth="4" className="ray-path glow-orange" style={{animationDelay: '0.8s'}} />
+                                
+                                {/* 黃 */}
+                                <line x1="401" y1="206" x2="650" y2="180" stroke="#eab308" strokeWidth="4" className="ray-path glow-yellow" style={{animationDelay: '0.8s'}} />
+                                
+                                {/* 綠 */}
+                                <line x1="404" y1="214" x2="650" y2="205" stroke="#22c55e" strokeWidth="4" className="ray-path glow-green" style={{animationDelay: '0.8s'}} />
+                                
+                                {/* 藍 */}
+                                <line x1="407" y1="222" x2="650" y2="230" stroke="#3b82f6" strokeWidth="4" className="ray-path glow-blue" style={{animationDelay: '0.8s'}} />
+                                
+                                {/* 靛 */}
+                                <line x1="410" y1="230" x2="650" y2="255" stroke="#6366f1" strokeWidth="4" className="ray-path glow-indigo" style={{animationDelay: '0.8s'}} />
+                                
+                                {/* 紫 */}
+                                <line x1="413" y1="238" x2="650" y2="280" stroke="#a855f7" strokeWidth="4" className="ray-path glow-violet" style={{animationDelay: '0.8s'}} />
+                                <text x="660" y="285" fill="#a855f7" className="ray-path" style={{animationDelay: '1.8s', opacity: 0, animation: 'fadeIn 0.5s forwards 1.8s'}}>紫</text>
+                            </g>
+                        </svg>
+                        <style>
+                            {`
+                            @keyframes fadeIn {
+                                to { opacity: 1; }
+                            }
+                            `}
+                        </style>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
