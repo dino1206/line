@@ -72,6 +72,20 @@
             y: y - len * Math.cos(rad(angle)) // SVG 的 Y 軸向下
         });
 
+        // 繪製箭頭元件 (放在線段中間)
+        const Arrow = ({ start, end, color }) => {
+            const midX = (start.x + end.x) / 2;
+            const midY = (start.y + end.y) / 2;
+            const angle = Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI;
+            return (
+                <polygon 
+                    points={`${midX-12},${midY-10} ${midX+12},${midY} ${midX-12},${midY+10}`} 
+                    fill={color} 
+                    transform={`rotate(${angle}, ${midX}, ${midY})`} 
+                />
+            );
+        };
+
         function App() {
             const [activeTab, setActiveTab] = useState('reflection');
 
@@ -178,15 +192,13 @@
                                 <rect x="30" y="-13" width="5" height="6" fill="#ef4444" />
                             </g>
 
-                            {/* 入射光線 */}
+                            {/* 入射光線與箭頭 */}
                             <line x1={startPt.x} y1={startPt.y} x2={CENTER_X} y2={CENTER_Y} stroke="#f59e0b" strokeWidth="4" className="glow-filter" />
+                            <Arrow start={startPt} end={{x: CENTER_X, y: CENTER_Y}} color="#f59e0b" />
                             
-                            {/* 反射光線 */}
+                            {/* 反射光線與箭頭 */}
                             <line x1={CENTER_X} y1={CENTER_Y} x2={refPt.x} y2={refPt.y} stroke="#10b981" strokeWidth="4" className="glow-green" />
-
-                            {/* 箭頭 */}
-                            <polygon points={`${(startPt.x+CENTER_X)/2},${(startPt.y+CENTER_Y)/2 - 5} ${(startPt.x+CENTER_X)/2 + 10},${(startPt.y+CENTER_Y)/2} ${(startPt.x+CENTER_X)/2},${(startPt.y+CENTER_Y)/2 + 5}`} fill="#f59e0b" transform={`rotate(${90-angle}, ${(startPt.x+CENTER_X)/2}, ${(startPt.y+CENTER_Y)/2})`} />
-                            <polygon points={`${(CENTER_X+refPt.x)/2},${(CENTER_Y+refPt.y)/2 - 5} ${(CENTER_X+refPt.x)/2 + 10},${(CENTER_Y+refPt.y)/2} ${(CENTER_X+refPt.x)/2},${(CENTER_Y+refPt.y)/2 + 5}`} fill="#10b981" transform={`rotate(${angle-90}, ${(CENTER_X+refPt.x)/2}, ${(CENTER_Y+refPt.y)/2})`} />
+                            <Arrow start={{x: CENTER_X, y: CENTER_Y}} end={refPt} color="#10b981" />
 
                         </svg>
                     </div>
@@ -318,11 +330,13 @@
 
                             {/* 光線群組 (加上 key 以便切換介質時重播動畫) */}
                             <g key={animKey}>
-                                {/* 入射光線 */}
+                                {/* 入射光線與箭頭 */}
                                 <line x1={startPt.x} y1={startPt.y} x2={CENTER_X} y2={CENTER_Y} stroke="#f59e0b" strokeWidth="4" className="glow-filter" />
+                                <Arrow start={startPt} end={{x: CENTER_X, y: CENTER_Y}} color="#f59e0b" />
                                 
-                                {/* 折射/全反射光線 */}
+                                {/* 折射/全反射光線與箭頭 */}
                                 <line x1={CENTER_X} y1={CENTER_Y} x2={endPt.x} y2={endPt.y} stroke={isTIR ? "#10b981" : "#ec4899"} strokeWidth="4" className={isTIR ? "glow-green" : "glow-red"} />
+                                <Arrow start={{x: CENTER_X, y: CENTER_Y}} end={endPt} color={isTIR ? "#10b981" : "#ec4899"} />
                             </g>
 
                             {/* 角度標示圓弧 */}
