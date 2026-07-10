@@ -122,9 +122,9 @@
             // 法線是 y 軸 (x=CENTER_X), 鏡面是 x 軸 (y=CENTER_Y)
             // 入射光從左上方來，角度 angle 是與法線的夾角
             // 所以入射光的方向是 180 + angle (從下方往上看)，起點是：
-            const startPt = getEndPt(CENTER_X, CENTER_Y, -angle, -RAY_LENGTH);
+            const startPt = getEndPt(CENTER_X, CENTER_Y, -angle, RAY_LENGTH);
             // 反射光往右上方去，角度 angle
-            const refPt = getEndPt(CENTER_X, CENTER_Y, angle, -RAY_LENGTH);
+            const refPt = getEndPt(CENTER_X, CENTER_Y, angle, RAY_LENGTH);
 
             return (
                 <div className="flex flex-col md:flex-row gap-6">
@@ -235,20 +235,35 @@
             }
 
             // 座標計算
-            // 上半部 y < CENTER_Y，下半部 y > CENTER_Y
-            // 入射光起點 (如果是 airToWater，從上往下射；如果是 waterToAir，從下往上射)
-            let startYDir = mode === 'airToWater' ? -1 : 1;
-            const startPt = getEndPt(CENTER_X, CENTER_Y, -angle, startYDir * RAY_LENGTH);
-            
-            // 折射或反射終點
+            let startPt;
             let endPt;
-            if (isTIR) {
-                // 全反射，光線彈回去 (同側)
-                endPt = getEndPt(CENTER_X, CENTER_Y, angle, startYDir * RAY_LENGTH);
+
+            if (mode === 'airToWater') {
+                // 從空氣(上)射入水(下)
+                // 入射從左上來
+                startPt = getEndPt(CENTER_X, CENTER_Y, -angle, RAY_LENGTH);
+                if (isTIR) {
+                    // 全反射回空氣(上右)
+                    endPt = getEndPt(CENTER_X, CENTER_Y, theta2, RAY_LENGTH);
+                } else {
+                    // 折射進入水(下右)
+                    endPt = getEndPt(CENTER_X, CENTER_Y, 180 - theta2, RAY_LENGTH);
+                }
             } else {
-                // 折射，穿透到另一側
-                endPt = getEndPt(CENTER_X, CENTER_Y, angle, -startYDir * RAY_LENGTH);
+                // 從水(下)射入空氣(上)
+                // 入射從左下來
+                startPt = getEndPt(CENTER_X, CENTER_Y, 180 + angle, RAY_LENGTH);
+                if (isTIR) {
+                    // 全反射回水(下右)
+                    endPt = getEndPt(CENTER_X, CENTER_Y, 180 - theta2, RAY_LENGTH);
+                } else {
+                    // 折射進入空氣(上右)
+                    endPt = getEndPt(CENTER_X, CENTER_Y, theta2, RAY_LENGTH);
+                }
             }
+
+            const startYDir = mode === 'airToWater' ? -1 : 1;
+            const laserRotation = mode === 'airToWater' ? 90 - angle : angle - 90;
 
             // 當模式改變時重新觸發光線動畫
             useEffect(() => {
@@ -323,7 +338,7 @@
                             <line x1={CENTER_X} y1="50" x2={CENTER_X} y2="350" stroke="#94a3b8" strokeWidth="2" strokeDasharray="6,6" />
 
                             {/* 雷射筆 (發射端) */}
-                            <g transform={`translate(${startPt.x}, ${startPt.y}) rotate(${startYDir === -1 ? 90-angle : 270-angle})`}>
+                            <g transform={`translate(${startPt.x}, ${startPt.y}) rotate(${laserRotation})`}>
                                 <rect x="-10" y="-15" width="40" height="10" fill="#475569" rx="3" />
                                 <rect x="30" y="-13" width="5" height="6" fill="#ef4444" />
                             </g>
