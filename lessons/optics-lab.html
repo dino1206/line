@@ -145,6 +145,12 @@
                                         <feMergeNode in="SourceGraphic"/>
                                     </feMerge>
                                 </filter>
+                                {/* 水晶體漸層效果 */}
+                                <linearGradient id="lens-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stopColor="#93c5fd" stopOpacity="0.6"/>
+                                    <stop offset="50%" stopColor="#eff6ff" stopOpacity="0.9"/>
+                                    <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.6"/>
+                                </linearGradient>
                             </defs>
 
                             {/* 背景輔助線 */}
@@ -168,8 +174,18 @@
                             <text x="510" y="100" fill="#ef4444" fontSize="14" fontWeight="bold">視網膜</text>
 
                             {/* 水晶體 (眼睛自帶的凸透鏡) */}
-                            <ellipse cx={EYE_X} cy="150" rx="12" ry="50" fill="#93c5fd" opacity="0.8" />
-                            <text x="270" y="90" fill="#93c5fd" fontSize="14">水晶體</text>
+                            <ellipse 
+                                cx={EYE_X} 
+                                cy="150" 
+                                rx={eyeState === 'myopia' ? 18 : eyeState === 'hyperopia' ? 6 : 12} 
+                                ry="50" 
+                                fill="url(#lens-gradient)" 
+                                opacity="0.9"
+                                style={{ transition: 'rx 0.5s ease-in-out' }}
+                            />
+                            <text x="250" y="90" fill="#93c5fd" fontSize="14">
+                                水晶體 {eyeState === 'myopia' ? '(過厚)' : eyeState === 'hyperopia' ? '(過薄)' : '(正常)'}
+                            </text>
 
                             {/* 外加矯正鏡片 */}
                             {lensState === 'concave' && (
