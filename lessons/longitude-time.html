@@ -1870,6 +1870,33 @@ body {
                 </div>
               </div>
             </div>
+
+            <!-- 飛行模式設定 -->
+            <div class="location-group border-b" style="margin-top: 15px;">
+              <div class="group-header">
+                <span class="badge" style="background: var(--primary-color);">🛩️ 飛行模式</span>
+                <h3 style="font-size: 0.95rem; margin-left: 5px;">計算降落時間</h3>
+                <label class="switch" style="margin-left: auto;">
+                  <input type="checkbox" id="flight-mode-toggle">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+              
+              <div id="flight-settings-panel" style="display: none; margin-top: 10px;">
+                <div class="form-row">
+                  <label for="flight-duration">飛行時間 (小時)</label>
+                  <input type="number" id="flight-duration" class="styled-input" value="10" min="0" step="0.5">
+                </div>
+                <div class="form-row">
+                  <label for="flight-direction">飛行方向</label>
+                  <select id="flight-direction" class="styled-select">
+                    <option value="auto">最短距離 (自動)</option>
+                    <option value="east">向東飛 (跨越換日線減日)</option>
+                    <option value="west">向西飛 (跨越換日線加日)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- 中間：動態地球儀與互動區 -->
@@ -2432,6 +2459,21 @@ function initExploreMode() {
     adjustBLongitude(15);
   });
 
+  // 飛行模式事件監聽
+  const flightToggle = document.getElementById("flight-mode-toggle");
+  const flightPanel = document.getElementById("flight-settings-panel");
+  const flightDuration = document.getElementById("flight-duration");
+  const flightDirection = document.getElementById("flight-direction");
+
+  if (flightToggle) {
+    flightToggle.addEventListener("change", () => {
+      flightPanel.style.display = flightToggle.checked ? "block" : "none";
+      calculateTimeAndRender();
+    });
+    flightDuration.addEventListener("input", calculateTimeAndRender);
+    flightDirection.addEventListener("change", calculateTimeAndRender);
+  }
+
   // 初次更新
   syncInputsAFromLon(lonA);
   syncInputsBFromLon(lonB);
@@ -2508,9 +2550,21 @@ function calculateTimeAndRender() {
   // 東西經經度為正負值。時差為 (lonB - lonA) * 4 分鐘
   const diffLon = lonB - lonA;
   const diffMinutes = Math.round(diffLon * 4);
+
+  // 飛行模式
+  const flightToggle = document.getElementById("flight-mode-toggle");
+  const isFlightMode = flightToggle && flightToggle.checked;
+  let flightDurationH = 0;
+  let flightDir = "auto";
+
+  if (isFlightMode) {
+    flightDurationH = parseFloat(document.getElementById("flight-duration").value) || 0;
+    flightDir = document.getElementById("flight-direction").value;
+  }
   
   // 2. 利用 Date 計算目標時間（考慮跨日與日期）
-  timeB = new Date(timeA.getTime() + diffMinutes * 60 * 1000);
+  const timeB_departure = new Date(timeA.getTime() + diffMinutes * 60 * 1000);
+  timeB = new Date(timeB_departure.getTime() + flightDurationH * 60 * 60 * 1000);
   
   // 3. 更新數值時鐘顯示
   document.getElementById("digital-a").innerText = formatTime(timeA);
@@ -2523,8 +2577,8 @@ function calculateTimeAndRender() {
   updateAnalogClock("clock-a", timeA);
   updateAnalogClock("clock-b", timeB);
   
-  // 5. 以動畫方式將地球儀滑動到新的經度位置 (取代直接重繪，讓 A/B 位置變化肉眼可見)
-  animateGlobeTo(lonA, lonB);
+  // 5. 以動畫方式將地球儀滑動到新的經度位置
+  animateGlobeTo(lonA, lonB, flightDir, flightDurationH);
   
   // 5.5 更新頁面頂部的「即時結果」Sticky Bar (窄螢幕捲動時仍能看到結果)
   const qrTimeA = document.getElementById("qr-time-a");
@@ -2567,7 +2621,7 @@ function calculateTimeAndRender() {
   updateSkyViewport(timeB);
   
   // 7. 更新露娜的計算步驟筆記
-  renderCalculationSteps(lonA, lonB, timeA, timeB, diffLon, diffMinutes);
+  renderCalculationSteps(lonA, lonB, timeA, timeB, diffLon, diffMinutes, isFlightMode, flightDurationH, timeB_departure);
 }
 
 // ==========================================================================
@@ -2665,7 +2719,7 @@ function getSelectedLat(which) {
 }
 
 // 讓地球儀滑動到目標經度
-function animateGlobeTo(targetA, targetB) {
+function animateGlobeTo(targetA, targetB, flightDir = "auto", flightDurationH = 0) {
   displayLonA = targetA;
   displayLonB = targetB;
   
@@ -2676,7 +2730,15 @@ function animateGlobeTo(targetA, targetB) {
   const dirA = targetA >= 0 ? "E" : "W";
   const dirB = targetB >= 0 ? "E" : "W";
   const labelA = `${getLocationName("a")} (A) ${Math.abs(targetA)}°${dirA} | ${formatTime(timeA)}`;
-  const labelB = `${getLocationName("b")} (B) ${Math.abs(targetB)}°${dirB} | ${formatTime(timeB)}`;
+  
+  // 如果是飛行模式，顯示最終抵達時間
+  const flightToggle = document.getElementById("flight-mode-toggle");
+  const isFlightMode = flightToggle && flightToggle.checked;
+  let finalTimeB = timeB;
+  if (!isFlightMode) {
+    finalTimeB = timeB;
+  }
+  const labelB = `${getLocationName("b")} (B) ${Math.abs(targetB)}°${dirB} | ${formatTime(finalTimeB)}`;
 
   // 更新標記點
   const markerData = [
@@ -2685,9 +2747,47 @@ function animateGlobeTo(targetA, targetB) {
   ];
   myGlobe.htmlElementsData(markerData);
 
-  // 尋找兩個點的中點 (相機注視點)
-  let d = shortestDelta(targetA, targetB);
-  let midLng = targetA + d / 2;
+  // 繪製飛行軌跡 (Arc)
+  if (isFlightMode && flightDurationH > 0) {
+    let arcLngB = targetB;
+    if (flightDir === "east") {
+      while (arcLngB < targetA) arcLngB += 360; // 強制往東
+    } else if (flightDir === "west") {
+      while (arcLngB > targetA) arcLngB -= 360; // 強制往西
+    }
+    
+    myGlobe.arcsData([{
+      startLat: latA, startLng: targetA,
+      endLat: latB, endLng: arcLngB, // 使用調整後的 arcLngB 確保畫出繞地球的長弧線
+      color: ['#ff8da1', '#64b5f6']
+    }])
+    .arcColor('color')
+    .arcDashLength(0.4)
+    .arcDashGap(0.2)
+    .arcDashAnimateTime(2000)
+    .arcStroke(1.5)
+    .arcAltitude(0.25);
+  } else {
+    myGlobe.arcsData([]); // 清除軌跡
+  }
+
+  // 尋找相機注視點 (中點)
+  let midLng;
+  if (isFlightMode && flightDir !== "auto") {
+    // 飛行模式強制指定方向的中點
+    let arcLngB = targetB;
+    if (flightDir === "east") {
+      while (arcLngB < targetA) arcLngB += 360;
+    } else {
+      while (arcLngB > targetA) arcLngB -= 360;
+    }
+    midLng = targetA + (arcLngB - targetA) / 2;
+  } else {
+    // 最短距離中點
+    let d = shortestDelta(targetA, targetB);
+    midLng = targetA + d / 2;
+  }
+  
   while (midLng > 180) midLng -= 360;
   while (midLng < -180) midLng += 360;
   
@@ -2792,7 +2892,7 @@ function updateSkyViewport(date) {
 }
 
 // 繪製一步步的教學計算看板
-function renderCalculationSteps(lonA, lonB, dateA, dateB, diffLon, diffMinutes) {
+function renderCalculationSteps(lonA, lonB, dateA, dateB, diffLon, diffMinutes, isFlightMode, flightDurationH, dateB_departure) {
   const stepsContainer = document.getElementById("calc-steps");
   stepsContainer.innerHTML = "";
   
@@ -2846,14 +2946,15 @@ function renderCalculationSteps(lonA, lonB, dateA, dateB, diffLon, diffMinutes) 
   step4.innerHTML = `<strong>東加西減判斷：</strong>探險地 B 位在基地 A 的 <span class="calc-highlight">${dirText}</span>。`;
   stepsContainer.appendChild(step4);
   
-  // 步驟五：跨日判斷與最終時間
+  // 步驟五：跨日判斷與抵達時間 (或起飛時當地時間)
   const step5 = document.createElement("div");
   step5.className = "calc-step-row";
   
   // 判斷是否跨日
   let crossDayText = "";
+  const targetDateStep5 = isFlightMode ? dateB_departure : dateB;
   const d1 = dateA.getDate();
-  const d2 = dateB.getDate();
+  const d2 = targetDateStep5.getDate();
   if (d2 > d1) {
     crossDayText = " (時間加超過 24 點，進入<strong>隔一天</strong> ➔ 日期加一天)";
   } else if (d2 < d1) {
@@ -2862,8 +2963,28 @@ function renderCalculationSteps(lonA, lonB, dateA, dateB, diffLon, diffMinutes) 
     crossDayText = " (在同一天之內)";
   }
   
-  step5.innerHTML = `<strong>最終時間：</strong>目標時間為 <span class="calc-highlight-b">${formatDate(dateB)} ${formatTime(dateB)}</span>${crossDayText}。`;
+  const step5Title = isFlightMode ? "<strong>起飛時 B 地時間：</strong>" : "<strong>最終時間：</strong>";
+  step5.innerHTML = `${step5Title}時差計算結果為 <span class="calc-highlight-b">${formatDate(targetDateStep5)} ${formatTime(targetDateStep5)}</span>${crossDayText}。`;
   stepsContainer.appendChild(step5);
+
+  // 步驟六：飛行模式 (加上飛行時間)
+  if (isFlightMode) {
+    const step6 = document.createElement("div");
+    step6.className = "calc-step-row";
+    
+    let flightCrossDayText = "";
+    const d3 = dateB.getDate();
+    if (d3 > d2) {
+      flightCrossDayText = " (降落時又進入了<strong>隔一天</strong>)";
+    } else if (d3 < d2) {
+      flightCrossDayText = " (發生異常時間倒退)"; // 理論上飛行時間為正不會發生
+    } else {
+      flightCrossDayText = " (與起飛時同一天)";
+    }
+
+    step6.innerHTML = `<strong>加上飛行時間：</strong>起飛時 B 地為 ${formatTime(targetDateStep5)}，加上飛行時間 ${flightDurationH} 小時。最終降落時間為 <span class="calc-highlight-b">${formatDate(dateB)} ${formatTime(dateB)}</span>${flightCrossDayText}。`;
+    stepsContainer.appendChild(step6);
+  }
 }
 
 
